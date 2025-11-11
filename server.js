@@ -2,6 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const app = express();
 const User = require('./models/user');
+const bcrypt = require('bcrypt');
 
 const PORT = 3000;
 
@@ -22,7 +23,13 @@ app.get('/status', (req, res) => {
 app.post('/signup', async (req, res) => {
     try {
         const { email, password } = req.body;
-        const user = await User.create({ email, password });
+
+        // hash password before saving
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        // create user with hashed password
+        const user = await User.create({ email, password: hashedPassword });
+
         res.status(201).json({ message: 'User created successfully', userId: user._id });
     } catch (error) {
         res.status(400).json({ message: 'Error creating user', error: error.message });
@@ -40,8 +47,10 @@ app.post('/login', async (req, res) => {
         if (!user) {
             return res.status(401).json({ error: 'Invalid email or password' });
         }
-        // check if password matches
-        if (user.password !== password) {
+        // Compare password with hashed password
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+
+        if (!isPasswordValid) {
             return res.status(401).json({ error: 'Invalid email or password' });        
         }
 
