@@ -29,6 +29,29 @@ app.post('/signup', async (req, res) => {
     }
 });
 
+app.post('/login', async (req, res) => {
+    try {
+        const { email, password } = req.body;
+
+        // find user by email
+        const user = await User.findOne({ email });
+
+        // if user doesn't exist
+        if (!user) {
+            return res.status(401).json({ error: 'Invalid email or password' });
+        }
+        // check if password matches
+        if (user.password !== password) {
+            return res.status(401).json({ error: 'Invalid email or password' });        
+        }
+
+        // Success!
+        res.json({ message: 'Login successful', userId: user._id });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
 });
