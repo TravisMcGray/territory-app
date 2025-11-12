@@ -3,7 +3,9 @@ const mongoose = require('mongoose');
 const app = express();
 const User = require('./models/user');
 const bcrypt = require('bcrypt');
+const geolib = require('geolib');
 const Walk = require('./models/walk');
+
 
 const PORT = 3000;
 
@@ -46,43 +48,80 @@ app.post('/login', async (req, res) => {
 
         // if user doesn't exist
         if (!user) {
-            return res.status(401).json({ error: 'Invalid email or password' });
+            return res.status(401).json({ 
+                error: 'Invalid email or password' 
+            });
         }
         // Compare password with hashed password
         const isPasswordValid = await bcrypt.compare(password, user.password);
 
         if (!isPasswordValid) {
-            return res.status(401).json({ error: 'Invalid email or password' });        
+            return res.status(401).json({ 
+                error: 'Invalid email or password' 
+            });        
         }
 
         // Success!
-        res.json({ message: 'Login successful', userId: user._id });
+        res.json({ 
+            message: 'Login successful', 
+            userId: user._id 
+        });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ 
+            error: err.message 
+        });
     }
 });
 
 app.post('/walks', async (req, res) => {
     try {
-        const { userId, coordinates, distance } = req.body;
-        const walk = await Walk.create({ userId, coordinates, distance });
-        res.status(201).json({ message: 'Walk recorded successfully!', walkId: walk._id });
+        const { userId, coordinates } = req.body;
+
+        // Calculate distance from coordinates
+        let distance = 0;
+        if (coordinates.length > 1) {
+            distance = geolib.getPathLength (
+                coordinates.map(coord => ({
+                    latitude: coord.latitude,
+                    longitude: coord.longitude
+                }))
+            );
+            // Convert meters to miles 
+            distance = (distance * 0.000621371).toFixed(2);
+        }
+
+        const walk = await Walk.create({
+            userId, 
+            coordinates, 
+            distance: parseFloat(distance)
+        });
+        res.status(201).json({ 
+            message: 'Walk recorded successfully!',
+            walkId: walk._id,
+            distance: distance + ' miles'
+        });
     } catch (error) {
-        res.status(400).json({ message: 'Error recording walk', error: error.message });
+        res.status(400).json({ 
+            message: 'Error recording walk', 
+            error: error.message 
+        });
     }
 });
 
 app.get('/walks/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
-        const walks = await Walk.find({ userId: userId });
+        const walks = await Walk.find({ 
+            userId: userId 
+        });
         res.json({
             message: 'Walks retrieved successfully',
             count: walks.length,
             walks: walks
         });
     } catch (err) {
-        res.status(500).json({ error: 'Error retrieving walks',
+        res.status(500).json({ 
+            error: 'Error retrieving walks',
             message: err.message
         })
     }
