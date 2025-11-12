@@ -127,6 +127,19 @@ app.get('/walks/:userId', async (req, res) => {
     }
 });
 
+app.delete('/walks/:walkId', async (req, res) => {
+    try {
+        const { walkId } = req.params;
+        const walk = await Walk.findByIdAndDelete(walkId);
+        if (!walk) {
+            return res.status(404).json({ error: 'Walk not found' });
+        }
+        res.json({ message: 'Walk deleted successfully' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 app.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
 });
