@@ -5,6 +5,7 @@ const User = require('./models/user');
 const bcrypt = require('bcrypt');
 const geolib = require('geolib');
 const Walk = require('./models/walk');
+const Territory = require('./models/territory');
 const { latLngToCell, cellToBoundary } = require('h3-js');
 
 
@@ -91,7 +92,7 @@ app.post('/walks', async (req, res) => {
             distance = (distance * 0.000621371).toFixed(2);
         }
 
-        // convert GPS coordinates to H3 hexagons (more accurate)
+        // Convert GPS coordinates to H3 hexagons (more accurate)
         const hexagons = coordinates.map(coord => 
             latLngToCell(coord.latitude, coord.longitude, 10)
         );
@@ -106,11 +107,40 @@ app.post('/walks', async (req, res) => {
             distance: parseFloat(distance),
             capturedHexagons: uniqueHexagons
         });
+
+        // Update territory ownership of each hexagon
+        let captured = 0;
+        let stolen = 0;
+
+        for (const hexagonId of uniqueHexagons) {
+            const existingTerritory = await Territory.findOne({ hexagonId });
+
+            if (existingTerritory) {
+                // If Hexagon is already owned - steal it or increment count
+                if (existingTerritory.ownerId.toString() !== userId) {
+                    stolen++;
+                }
+                existingTerritory.ownerId = userId;
+                existingTerritory.capturedAt = new Date();
+                existingTerritory.timesVisited += 1;
+                await existingTerritory.save();
+            } else {
+                await Territory.create({
+                    hexagonId,
+                    ownerId: userId,
+                    timesVisisted: 1
+                });
+                captured++;
+            }
+        }
+
         res.status(201).json({ 
             message: 'Walk recorded successfully!',
             walkId: walk._id,
             distance: distance + ' miles',
             hexagonsCaptured: uniqueHexagons.length,
+            newTerritory: captured,
+            stolenTerritory: stolen,
             hexagons: uniqueHexagons
         });
     } catch (error) {
