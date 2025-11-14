@@ -15,6 +15,9 @@ const walkSchema = new mongoose.Schema({
         type: Number,
         default: 0
     },
+    capturedHexagons: [{
+        type: String
+    }],
     createdAt: {
         type: Date,
         default: Date.now

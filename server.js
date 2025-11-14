@@ -5,6 +5,7 @@ const User = require('./models/user');
 const bcrypt = require('bcrypt');
 const geolib = require('geolib');
 const Walk = require('./models/walk');
+const { latLngToCell, cellToBoundary } = require('h3-js');
 
 
 const PORT = 3000;
@@ -90,15 +91,27 @@ app.post('/walks', async (req, res) => {
             distance = (distance * 0.000621371).toFixed(2);
         }
 
+        // convert GPS coordinates to H3 hexagons (more accurate)
+        const hexagons = coordinates.map(coord => 
+            latLngToCell(coord.latitude, coord.longitude, 10)
+        );
+
+        // Get unique hexagons only (remove duplicates)
+        const uniqueHexagons = [...new Set(hexagons)];
+
+        // Create walk with captured hexagons
         const walk = await Walk.create({
             userId, 
             coordinates, 
-            distance: parseFloat(distance)
+            distance: parseFloat(distance),
+            capturedHexagons: uniqueHexagons
         });
         res.status(201).json({ 
             message: 'Walk recorded successfully!',
             walkId: walk._id,
-            distance: distance + ' miles'
+            distance: distance + ' miles',
+            hexagonsCaptured: uniqueHexagons.length,
+            hexagons: uniqueHexagons
         });
     } catch (error) {
         res.status(400).json({ 
@@ -137,6 +150,30 @@ app.delete('/walks/:walkId', async (req, res) => {
         res.json({ message: 'Walk deleted successfully' });
     } catch (error) {
         res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/test-h3', (req, res) => {
+    try { 
+        const { latitude, longitude } = req.body;
+
+        // Conver GPS to H3 hexagon at resolution 10 :)
+        const hexId = latLngToCell(latitude, longitude, 10);
+
+        // This gets boundary coordinates of the hexagon
+        const boundary = cellToBoundary(hexId);
+
+        res.json({
+            message: 'H3 test successful',
+            input: { latitude, longitude },
+            hexagonId: hexId,
+            hexagonBoundary: boundary
+        });
+    } catch (error) {
+        res.status(400).json({
+            error: 'H3 test failed',
+            message: error.message
+        });
     }
 });
 
