@@ -6,9 +6,9 @@ const User = require('../models/user');
 const { JWT_SECRET } = require('../middleware/auth');
 
 // POST /api/auth/signup
-router.post('/signup', async (requestAnimationFrame, res) => {
+router.post('/signup', async (req, res) => {
     try {
-        const { email, password } = requestAnimationFrame.body;
+        const { email, password } = req.body;
         const hashedPassword = await bcrypt.hash(password, 10);
         const user = await User.create({
             email,
@@ -21,7 +21,7 @@ router.post('/signup', async (requestAnimationFrame, res) => {
 });
 
 // POST /api/auth/login
-router.post('login', async (requestAnimationFrame, res) => {
+router.post('/login', async (req, res) => {
     try {
         const { email, password } = req.body;
         const user = await User.findOne({ email });
