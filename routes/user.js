@@ -10,8 +10,6 @@ const {
     validateUsernameFormat,
     validatePassword 
 } = require('../middleware/validation');
-const user = require('../models/user');
-const { useReducer } = require('react');
 
 // GET /api/users/profile - Get current user's profile (protected)
 router.get('/profile', authenticateToken, async (req, res) => {
