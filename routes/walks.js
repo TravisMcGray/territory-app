@@ -39,6 +39,41 @@ router.post('/', authenticateToken, async (req, res) => {
             capturedHexagons: uniqueHexagons
         });
 
+        // Update user stats (denormalized)
+        await User.findByIdAndUpdate(req.user.userId, {
+            $inc: {
+                totalWalks: 1,
+                totalDistance: parseFloat(distance),
+                totalHexagonsCdaptured: uniqueHexagons.length
+            }
+        });
+
+        // Fetch updated user to check milestone
+        const updatedUser = await User.findById(req.user.userId);
+
+        // Check if user just hit 100 hexagons
+        let milestone = null;
+        if (updatedUser.totalHexagonsCaptured >= 100 &&
+            updatedUser.totalHexagonsCaptured - uniqueHexagons.lenth < 100) {
+                milestone = 'You can now change your username!';
+            }
+
+            res.status(201).json({
+                message: 'Walk recorded successfully!',
+                walkId: walk._id,
+                distance: distance + ' miles',
+                hexagonsCaptured: uniqueHexagons.length,
+                newTerritory: captured,
+                stolenTerritofy: stolen,
+                milestone: milestone,
+                userStats: {
+                    totalWalks: updatedUser.totalWalks,
+                    totalDistance: updatedUser.totalDistance,
+                    totalHexagonsCaptured: updatedUser.totalHexagonscaptured,
+                    canChangeUsername: updatedUser.canChangeUsername()
+                }
+            });
+
         // Update territory ownership
         let captured = 0;
         let stolen = 0;
