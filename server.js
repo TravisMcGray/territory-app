@@ -1,23 +1,41 @@
 const express = require('express');
 const connectDB = require('./config/db');
-const userRoutes = require('.routes/users');
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
+// Middleware
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
+// Connect to MongoDB
 connectDB();
 
-const authRoutes = require('./routes/auth');
-const walkRoutes = require('./routes/walks');
-const testRoutes = require('./routes/test');
+// Routes
+app.use('/api/auth', require('./routes/auth'));
+app.use('/api/walks', require('./routes/walks'));
+app.use('/api/user', require('./routes/user'));
 
-app.use('/api/auth', authRoutes);
-app.use('/api/walks', walkRoutes);
-app.use('/api/test', testRoutes);
-app.use('/api/users', userRoutes);
+// Health check
+app.get('/health', (req, res) => {
+    res.json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
+// 404 handler
+app.use((req, res) => {
+    res.status(404).json({ error: 'Route not found' });
+});
+
+// Global error handler
+app.use((err, req, res, next) => {
+    console.error('Error:', err);
+    res.status(err.status || 500).json({
+        error: err.message || 'Internal server error',
+        ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+    });
+});
 
 app.listen(PORT, () => {
-    console.log(`Server is running on http://localhost:${PORT}`);
+    console.log(`✓ Server running on http://localhost:${PORT}`);
+    console.log(`✓ Environment: ${process.env.NODE_ENV || 'development'}`);
 });

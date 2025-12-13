@@ -2,10 +2,13 @@ const mongoose = require('mongoose');
 
 const connectDB = async () => {
     try {
-        await mongoose.connect('mongodb://localhost:27017/territory-app');
-        console.log('Connected to MongoDB');
+        const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/territory-app';
+
+        await mongoose.connect(mongoURI);
+
+        console.log('MongoDB connected');
     } catch (err) {
-        console.log('MongoDB connection error:', err);
+        console.error('MongoDB connection error:', err.message);
         process.exit(1);
     }
 };
