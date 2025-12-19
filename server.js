@@ -49,11 +49,11 @@ app.get('/health', (req, res) => {
 
 // Route registration with rate limiters
 app.use('/api/auth', authLimiter);
-app.use('/api/walks', apiLimiter);
+app.use('/api/activities', apiLimiter);
 app.use('/api/user', apiLimiter);
 
 app.use('/api/auth', require('./routes/auth'));
-app.use('/api/walks', require('./routes/walks'));
+app.use('/api/activities', require('./routes/activities'));
 app.use('/api/user', require('./routes/user'));
 app.use('/api/leaderboard', require('./routes/leaderboard'));
 

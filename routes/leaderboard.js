@@ -47,7 +47,8 @@ router.get('/', async (req, res) => {
                     avatar: 1,
                     totalHexagons: '$stats.totalHexagonsCaptured',
                     totalDistance: '$stats.totalDistance',
-                    totalWalks: '$stats.totalWalks'
+                    totalWalks: '$stats.totalWalks',
+                    totalRuns: '$stats.totalRuns',
                 }
             }
         ]);

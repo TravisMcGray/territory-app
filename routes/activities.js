@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const geolib = require('geolib');
 const { latLngToCell } = require('h3-js');
-const Walk = require('../models/walk');
+const Activity = require('../models/activity');
 const Territory = require('../models/territory');
 const User = require('../models/user');
 const { authenticateToken } = require('../middleware/auth');
@@ -21,11 +21,20 @@ const isValidCoordinate = (lat, lng) => {
     );
 };
 
-// ========== POST /api/walks - Record a new walk ==========
+// ========== POST /api/activities - Record a new activity (walk or run) ==========
 router.post('/', authenticateToken, async (req, res) => {
     try {
-        const { coordinates } = req.body;
+        const { coordinates, activityType } = req.body;
         const userId = req.user.userId;
+
+        // Validate activity type
+        if (!activityType || !['walk', 'run'].includes(activityType)) {
+            return res.status(400).json({
+                status: 'error',
+                code: 'INVALID_ACTIVITY_TYPE',
+                message: 'Activity type must be "walk" or "run"'
+            });
+        }
 
         // Validate coordinates exist and are array
         if (!coordinates || !Array.isArray(coordinates) || coordinates.length === 0) {
@@ -67,16 +76,17 @@ router.post('/', authenticateToken, async (req, res) => {
         );
         const uniqueHexagons = [...new Set(hexagons)];
 
-        // Create walk record
-        const walk = await Walk.create({
+        // Create activity record
+        const activity = await Activity.create({
             userId,
+            activityType,
             coordinates,
             distance,
             capturedHexagons: uniqueHexagons
         });
 
         // ========== OPTIMIZED: Batch query instead of N+1 ==========
-        // Get ALL existing territories in ONE query (not 100+)
+        // Get ALL existing territories in ONE query
         const existingTerritories = await Territory.find({
             hexagonId: { $in: uniqueHexagons }
         });
@@ -120,34 +130,39 @@ router.post('/', authenticateToken, async (req, res) => {
             }
         }
 
-        // Execute all saves and creates in parallel (not sequentially)
+        // Execute all saves and creates in parallel
         await Promise.all([...updateOperations, ...createOperations]);
 
-        // Update user stats atomically
-        const updatedUser = await User.findByIdAndUpdate(
-            userId,
-            {
-                $inc: {
-                    'stats.totalWalks': 1,
-                    'stats.totalDistance': distance,
-                    'stats.totalHexagonsCaptured': uniqueHexagons.length
-                },
-                lastLogin: new Date()
+        // Build stats update object
+        const statUpdates = {
+            $inc: {
+                'stats.totalDistance': distance,
+                'stats.totalHexagonsCaptured': uniqueHexagons.length
             },
-            { new: true }
-        );
+            lastLogin: new Date()
+        };
 
-        // Check if user hit 100 hexagon milestone
-        let milestone = null;
+        // Increment appropriate activity counter
+        if (activityType === 'walk') {
+            statUpdates.$inc['stats.totalWalks'] = 1;
+        } else if (activityType === 'run') {
+            statUpdates.$inc['stats.totalRuns'] = 1;
+        }
+
+        // Update user stats atomically
+        const updatedUser = await User.findByIdAndUpdate(userId, statUpdates, { new: true });
+
+// Check if user achieved the 100 hexagon milestone (unlocks username change ability)        let milestone = null;
         const previousTotal = updatedUser.stats.totalHexagonsCaptured - uniqueHexagons.length;
         if (previousTotal < 100 && updatedUser.stats.totalHexagonsCaptured >= 100) {
-            milestone = '🎉 You can now change your username!';
+            milestone = 'You can now change your username!';
         }
 
         res.status(201).json({
-            message: 'Walk recorded successfully',
-            walk: {
-                id: walk._id,
+            message: `${activityType === 'walk' ? 'Walk' : 'Run'} recorded successfully`,
+            activity: {
+                id: activity._id,
+                type: activityType,
                 distance: `${distance} miles`,
                 hexagonsCaptured: uniqueHexagons.length,
                 newTerritory: captured,
@@ -156,6 +171,7 @@ router.post('/', authenticateToken, async (req, res) => {
             milestone,
             userStats: {
                 totalWalks: updatedUser.stats.totalWalks,
+                totalRuns: updatedUser.stats.totalRuns,
                 totalDistance: updatedUser.stats.totalDistance,
                 totalHexagonsCaptured: updatedUser.stats.totalHexagonsCaptured,
                 canChangeUsername: updatedUser.canChangeUsername()
@@ -164,74 +180,81 @@ router.post('/', authenticateToken, async (req, res) => {
 
     } catch (error) {
         res.status(400).json({
-            message: 'Error recording walk',
+            message: 'Error recording activity',
             error: error.message
         });
     }
 });
 
-// ========== GET /api/walks - Get user's walk history with pagination ==========
+// ========== GET /api/activities - Get user's activity history with pagination ==========
 router.get('/', authenticateToken, async (req, res) => {
     try {
         const page = Math.max(1, parseInt(req.query.page) || 1);
-        const limit = Math.min(50, parseInt(req.query.limit) || 20); // Max 50 per page
+        const limit = Math.min(50, parseInt(req.query.limit) || 20);
+        const activityType = req.query.type;
         const skip = (page - 1) * limit;
 
-        // Get total count for pagination info
-        const total = await Walk.countDocuments({ userId: req.user.userId });
+        // Build query
+        const query = { userId: req.user.userId };
+        if (activityType && ['walk', 'run'].includes(activityType)) {
+            query.activityType = activityType;
+        }
 
-        // Get paginated walks
-        const walks = await Walk.find({ userId: req.user.userId })
+        // Get total count
+        const total = await Activity.countDocuments(query);
+
+        // Get paginated activities
+        const activities = await Activity.find(query)
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(limit);
 
         res.json({
-            message: 'Walks retrieved successfully',
+            message: 'Activities retrieved successfully',
             pagination: {
                 page,
                 limit,
                 total,
                 pages: Math.ceil(total / limit)
             },
-            count: walks.length,
-            walks
+            count: activities.length,
+            activities
         });
 
     } catch (error) {
         res.status(500).json({
-            message: 'Error retrieving walks',
+            message: 'Error retrieving activities',
             error: error.message
         });
     }
 });
 
-// ========== DELETE /api/walks/:walkId - Delete a walk ==========
-router.delete('/:walkId', authenticateToken, async (req, res) => {
+// ========== DELETE /api/activities/:activityId - Delete an activity ==========
+router.delete('/:activityId', authenticateToken, async (req, res) => {
     try {
-        const { walkId } = req.params;
+        const { activityId } = req.params;
 
-        // Verify walk belongs to user
-        const walk = await Walk.findById(walkId);
-        if (!walk) {
-            return res.status(404).json({ error: 'Walk not found' });
+        // Verify activity belongs to user
+        const activity = await Activity.findById(activityId);
+        if (!activity) {
+            return res.status(404).json({ error: 'Activity not found' });
         }
 
-        if (walk.userId.toString() !== req.user.userId.toString()) {
+        if (activity.userId.toString() !== req.user.userId.toString()) {
             return res.status(403).json({
                 status: 'error',
                 code: 'FORBIDDEN',
-                message: 'You can only delete your own walks'
+                message: 'You can only delete your own activities'
             });
         }
 
-        // Delete walk
-        await Walk.findByIdAndDelete(walkId);
+        // Delete activity
+        await Activity.findByIdAndDelete(activityId);
 
         // TODO: Reverse territory updates if needed (complex logic)
-        // For now, walk is deleted but territory ownership remains
+        // For now, activity is deleted but territory ownership remains
 
-        res.json({ message: 'Walk deleted successfully' });
+        res.json({ message: 'Activity deleted successfully' });
 
     } catch (error) {
         res.status(500).json({ error: error.message });
