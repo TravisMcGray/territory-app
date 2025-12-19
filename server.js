@@ -55,6 +55,7 @@ app.use('/api/user', apiLimiter);
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/walks', require('./routes/walks'));
 app.use('/api/user', require('./routes/user'));
+app.use('/api/leaderboard', require('./routes/leaderboard'));
 
 // ========== GLOBAL ERROR HANDLER ==========
 app.use((err, req, res, next) => {
