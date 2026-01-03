@@ -14,6 +14,16 @@ const territorySchema = new mongoose.Schema({
         required: true,
         index: true
     },
+    //  Track who owned it BEFORE we change it (for race condition detection)
+    previousOwnerId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    },
+    // Track which activity originally claimed this territory (for deletion reversal)
+    capturedByActivityId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    },
     capturedAt: {
         type: Date,
         default: Date.now
@@ -30,5 +40,8 @@ const territorySchema = new mongoose.Schema({
 
 // Index for leaderboard queries
 territorySchema.index({ ownerId: 1, hexagonId: 1 });
+
+// Index for activity deletion queries (find all territories claimed by this activity)
+territorySchema.index({ capturedByActivityId: 1 });
 
 module.exports = mongoose.model('Territory', territorySchema);
