@@ -4,6 +4,7 @@ const express = require('express');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const connectDB = require('./config/db');
+const socialRoutes = require('./routes/social');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -50,12 +51,14 @@ app.get('/health', (req, res) => {
 // Route registration with rate limiters
 app.use('/api/auth', authLimiter);
 app.use('/api/activities', apiLimiter);
+app.use('/api/users', apiLimiter);
 app.use('/api/user', apiLimiter);
 
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/activities', require('./routes/activities'));
 app.use('/api/user', require('./routes/user'));
 app.use('/api/leaderboard', require('./routes/leaderboard'));
+app.use('/api/users', require('./routes/social'))
 
 // ========== GLOBAL ERROR HANDLER ==========
 app.use((err, req, res, next) => {

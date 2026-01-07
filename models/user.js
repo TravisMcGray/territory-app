@@ -42,6 +42,20 @@ stats: {
     totalHexagonsCaptured: { type: Number, default: 0, min: 0 }
     },
 
+// Social features
+following: [
+    {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+    }
+],
+followers: [
+    {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+    }
+],
+    
     // Account metadata
     usernameChangedAt: Date,
     lastLogin: Date,
@@ -54,10 +68,28 @@ stats: {
 
 // Indexes for performance
 userSchema.index({ 'stats.totalHexagonsCaptured': -1 }); // For leaderboards
+userSchema.index({ followers: 1 }); // For finding who follows a user
+userSchema.index({ following: 1 }); // For finding who a user follows
+
 
 // Instance methods
 userSchema.methods.canChangeUsername = function() {
     return this.stats.totalHexagonsCaptured >= 100;
+};
+
+// Check if user is following another user
+userSchema.methods.isFollowing = function(userId) {
+    return this.following.includes(userId);
+};
+
+// Get follower count
+userSchema.methods.getFollowerCount = function() {
+    return this.followers.length;
+};
+
+// Get following count
+userSchema.methods.getFollowingCount = function() {
+    return this.following.length;
 };
 
 userSchema.methods.toProfileJSON = function() {
@@ -69,9 +101,26 @@ userSchema.methods.toProfileJSON = function() {
         lastName: this.lastName,
         avatar: this.avatar,
         stats: this.stats,
+        followers: this.followers ? this.followers.length : 0,
+        following: this.following ? this.following.length : 0,
         canChangeUsername: this.canChangeUsername(),
         createdAt: this.createdAt,
         lastLogin: this.lastLogin
+    };
+};
+
+// Get public profile (what others see)
+userSchema.methods.toPublicJSON = function() {
+    return {
+        id: this._id,
+        username: this.username,
+        firstName: this.firstName,
+        lastName: this.lastName,
+        avatar: this.avatar,
+        stats: this.stats,
+        followers: this.followers ? this.followers.length : 0,
+        following: this.following ? this.following.length : 0,
+        createdAt: this.createdAt
     };
 };
 
