@@ -1,6 +1,4 @@
-Hey everyone! This is still a work in progress. I am continuing to add to it roughly every week. With the holidays
-I have slowed down a bit just due to me not having a laptop to continue working on it yet. That's also to come!
+Happy new year! I am still in deep with Phase 1. Which is all the backend. I am about 35% of the way done with all I have planned for the backend. Hopefully I can complete the this as well as the frontend by the end of january. 
 
-
-Happy holidays everyone, and stay tuned! Dec 9th 5:06pm
+Lets go 2026!
 
