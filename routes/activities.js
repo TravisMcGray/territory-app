@@ -6,6 +6,7 @@ const { latLngToCell } = require('h3-js');
 const Activity = require('../models/activity');
 const Territory = require('../models/territory');
 const User = require('../models/user');
+const Achievement = require('../models/achievement');
 const { authenticateToken } = require('../middleware/auth');
 
 // ========== VALIDATION HELPERS ==========
@@ -20,6 +21,92 @@ const isValidCoordinate = (lat, lng) => {
         lng >= -180 &&
         lng <= 180
     );
+};
+
+// ========== ACHIEVEMENT UNLOCK HELPER ==========
+
+/**
+ * Check and unlock achievements for user
+ * @param {Object} user - User document with updated stats
+ * @param {Object} activityData - Current activity data
+ * @returns {Promise<Array>} Newly unlocked achievements
+ */
+const checkAndUnlockAchievements = async (user, activityData) => {
+    try {
+        // Get all achievements
+        const allAchievements = await Achievement.find();
+
+        // Get user's already unlocked achievement IDs
+        const unlockedIds = user.achievements.map(a => a.achievementId.toString());
+
+        const newlyUnlocked = [];
+
+        // Check each achievement
+        for (const achievement of allAchievements) {
+            // Skip if already unlocked
+            if (unlockedIds.includes(achievement._id.toString())) {
+                continue;
+            }
+
+            // Get the field and value to check
+            const { field, operator, value } = achievement.condition;
+            let userValue;
+
+            // Handle different field types
+            if (field === 'followers') {
+                userValue = user.followers ? user.followers.length : 0;
+            } else if (field === 'singleActivityDistance') {
+                userValue = activityData.distance;
+            } else if (field === 'singleActivityHexagons') {
+                userValue = activityData.hexagonsCount;
+            } else if (field === 'totalActivities') {
+                userValue = user.stats.totalWalks + user.stats.totalRuns;
+            } else {
+                // For stats fields like 'stats.totalWalks'
+                userValue = eval(`user.${field}`);
+            }
+
+            // Check condition
+            let conditionMet = false;
+            switch (operator) {
+                case '>=':
+                    conditionMet = userValue >= value;
+                    break;
+                case '<=':
+                    conditionMet = userValue <= value;
+                    break;
+                case '>':
+                    conditionMet = userValue > value;
+                    break;
+                case '<':
+                    conditionMet = userValue < value;
+                    break;
+                case '==':
+                    conditionMet = userValue == value;
+                    break;
+            }
+
+            // If condition is met, unlock achievement
+            if (conditionMet) {
+                user.achievements.push({
+                    achievementId: achievement._id,
+                    unlockedAt: new Date()
+                });
+                newlyUnlocked.push(achievement);
+            }
+        }
+
+        // Save user if achievements were unlocked
+        if (newlyUnlocked.length > 0) {
+            await user.save();
+        }
+
+        return newlyUnlocked;
+
+    } catch (error) {
+        console.error('Error checking achievements:', error.message);
+        return [];
+    }
 };
 
 // ========== POST /api/activities - Record a new activity (walk or run) ==========
@@ -177,6 +264,12 @@ router.post('/', authenticateToken, async (req, res) => {
         // Update user stats atomically
         const updatedUser = await User.findByIdAndUpdate(userId, statUpdates, { new: true });
 
+        // Check and unlock achievements
+        const newlyUnlocked = await checkAndUnlockAchievements(updatedUser, {
+            distance: distance,
+            hexagonsCount: uniqueHexagons.length
+        });
+
         // Check if user achieved the 100 hexagon milestone (unlocks username change ability)
         let milestone = null;
         const previousTotal = updatedUser.stats.totalHexagonsCaptured - uniqueHexagons.length;
@@ -199,6 +292,11 @@ router.post('/', authenticateToken, async (req, res) => {
                 newTerritory: captured,
                 stolenTerritory: stolen
             },
+            newAchievements: newlyUnlocked.length > 0 ? newlyUnlocked.map(a => ({
+                name: a.name,
+                description: a.description,
+                rarity: a.rarity
+            })) : [],
             milestone,
             userStats: {
                 totalWalks: updatedUser.stats.totalWalks,

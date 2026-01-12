@@ -55,6 +55,18 @@ followers: [
         ref: 'User',
     }
 ],
+achievements: [
+    {
+        achievements: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Achievement'
+        },
+        unlockedAt: {
+            type: Date,
+            defualt: Date.now
+        }
+    }
+],
     
     // Account metadata
     usernameChangedAt: Date,

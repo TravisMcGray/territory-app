@@ -58,7 +58,8 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/activities', require('./routes/activities'));
 app.use('/api/user', require('./routes/user'));
 app.use('/api/leaderboard', require('./routes/leaderboard'));
-app.use('/api/users', require('./routes/social'))
+app.use('/api/users', require('./routes/social'));
+app.use('/api/achievements', require('./routes/achievements'));
 
 // ========== GLOBAL ERROR HANDLER ==========
 app.use((err, req, res, next) => {
