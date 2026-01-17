@@ -4,8 +4,13 @@ const express = require('express');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const connectDB = require('./config/db');
-const socialRoutes = require('./routes/social');
-
+const authRouter = require('./routes/auth');
+const activitiesRouter = require('./routes/activities');
+const userRouter = require('./routes/user');
+const leaderboardRouter = require('./routes/leaderboard');
+const socialRouter = require('./routes/social');
+const achievementsRouter = require('./routes/achievements');
+const segmentsRouter = require('./routes/segments');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -53,13 +58,16 @@ app.use('/api/auth', authLimiter);
 app.use('/api/activities', apiLimiter);
 app.use('/api/users', apiLimiter);
 app.use('/api/user', apiLimiter);
+app.use('/api/segments', apiLimiter);
 
-app.use('/api/auth', require('./routes/auth'));
-app.use('/api/activities', require('./routes/activities'));
-app.use('/api/user', require('./routes/user'));
-app.use('/api/leaderboard', require('./routes/leaderboard'));
-app.use('/api/users', require('./routes/social'));
-app.use('/api/achievements', require('./routes/achievements'));
+
+app.use('/api/auth', authRouter);
+app.use('/api/activities', activitiesRouter);
+app.use('/api/user', userRouter);
+app.use('/api/leaderboard', leaderboardRouter);
+app.use('/api/users', socialRouter);
+app.use('/api/achievements', achievementsRouter);
+app.use('/api/segments', segmentsRouter);
 
 // ========== GLOBAL ERROR HANDLER ==========
 app.use((err, req, res, next) => {

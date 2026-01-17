@@ -240,11 +240,14 @@ router.post('/', authenticateToken, async (req, res) => {
                 // No previous owner = newly captured
                 captured++;
             } else if (territory.previousOwnerId.toString() !== userId.toString()) {
-                // Previous onwer was a different person = stolen
+                // Previous owner was a different person = stolen
                 stolen++;
             }
             // If previousOwnerId === userId = revisit (count neither)
         }
+
+        // Update activity with stolen count
+        await Activity.findByIdAndUpdate(activity._id, { stolenHexagons: stolen });
 
         // ========== END ATOMIC CAPTURE ==========
 
@@ -451,6 +454,115 @@ router.delete('/:activityId', authenticateToken, async (req, res) => {
     } finally {
         // Always close the session
         session.endSession();
+    }
+});
+
+// ========== GET api/activities/feed - Activity feed from followed users ==========
+router.get('/feed', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.userId;
+        const page = Math.max(1,parseInt(req.query.page) || 1);
+        const limit = Math.min(50, parseInt(req.query.limit) || 20);
+        const skip = (page - 1) * limit;
+
+        // Get user and their following list
+        const user = await User.findById(userId);
+
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        // Convert following Ids for aggregation
+        const followingIds = (user.following || []).map(id => new mongoose.Types.ObjectId(id));
+
+        // If user has no followers, return empty feed
+        if (followingIds.length === 0) {
+        return res.json({
+            message: 'Feed retrieved successfully',
+            pagination: {
+                page,
+                limit,
+                total: 0,
+                pages: 0
+            },
+            activities: []
+        });
+    }
+
+    // Aggregation pipeline: get activites from followed users with user details
+    const [result] = await Activity.aggregate([
+        // Match activities from users you follow
+        { $match: { userId: { $in: followingIds }}},
+
+        // FacetL get both total count AND paginated results efficiently
+        {
+            $facet: {
+                metadata: [
+                    { $count: 'total' }
+                ],
+                data: [
+                    // Sort by most recent first
+                    { $sort: { createdAt: -1 }},
+
+                    // Lookup user info (username, avatar)
+                {
+                    $lookup: {
+                        from: 'users',
+                        localField: 'userId',
+                        foreignField: '_id',
+                        as: 'userInfo'
+                    }
+                },
+
+                // Unwind userInfo (converts array to single object)
+                { $unwind: '$userInfo' },
+
+                // Project only needed fields for feed
+                {
+                    $project: {
+                        _id: 1,
+                        activityType: 1,
+                        distance: 1,
+                        duration: 1,
+                        elevationGain: 1,
+                        capturedHexagons: { $size: '$capturedHexagons' },
+                        stolenHexagons: 1,
+                        coordinates: 1,
+                        createdAt: 1,
+                        username: '$userInfo.username',
+                        avatar: '$userInfo.avatar'
+                    }
+                },
+
+                // Pagination
+                { $skip: skip },
+                { $limit: limit }
+                ]
+            }
+        }
+    ]);
+
+    // Extract metadata and data from facet result
+    const total = result.metadata[0]?.total || 0;
+    const activities = result.data || [];
+
+    res.json({
+        message: 'Feed retrieved successfully',
+        pagination: {
+            page,
+            limit,
+            total,
+            pages: Math.ceil(total / limit)
+        },
+        count: activities.length,
+        activities
+    });
+
+    } catch (error) {
+        res.status(500).json({
+            message: 'Error retrieving feed',
+            error: error.message
+        });
     }
 });
 

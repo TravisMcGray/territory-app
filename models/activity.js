@@ -43,7 +43,12 @@ const activitySchema = new mongoose.Schema({
         // Used to track which territories were claimed/stolen in a single walk/run
             capturedHexagons: [{
             type: String
-        }]
+        }],
+        stolenHexagons: {
+            type: Number,
+            default: 0,
+            min: 0
+        }
     },
 {
     timestamps: true
