@@ -19,6 +19,13 @@ const territorySchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User'
     },
+    // Track what activity type currently owns this (WALK or RUN)
+    // Used to enforce stealing rules: Runners can steal from runners, walkers cannot steal
+    ownerActivityType: {
+        type: String,
+        enum: ['WALK', 'RUN'],
+        required: true
+    },
     // Track which activity originally claimed this territory (for deletion reversal)
     capturedByActivityId: {
         type: mongoose.Schema.Types.ObjectId,

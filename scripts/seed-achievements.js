@@ -3,110 +3,166 @@ require('dotenv').config();
 const Achievement = require('../models/achievement');
 
 const achievements = [
-    // Walk achievements
+    // ========== WALKS: COMMON/LEGENDARY ==========
     {
-        name: 'First walk',
-        description: 'Log your first walk activity',
-        type: 'WALK',
+        name: 'First Steps',
+        description: 'Completed your first walk into the Hex',
+        category: 'ACTIVITY',
+        activityType: 'WALK',
         condition: {
             field: 'stats.totalWalks',
             operator: '>=',
             value: 1
         },
-        rarity: 'COMMON',
-        points: 10
+        rarity: 'COMMON' 
     },
     {
-        name: 'Century Hiker',
-        description: 'Walk 100+ miles total',
-        type: 'DISTANCE',
+        name: 'Rookie',
+        description: 'Found and captured 10 hexagons',
+        category: 'ACTIVITY',
+        activityType: 'WALK',
         condition: {
-            field: 'stats.totalDistance',
+            field: 'stats.totalHexagonsCaptured',
             operator: '>=',
-            value: 100
+            value: 10
         },
-        rarity: 'RARE',
-        points: 50
+        rarity: 'COMMON'
     },
 
-    // Run achievements
+    // ===== WALKS: UNCOMMON =====
     {
-        name: 'Marathon Runner',
-        description: 'Run 26+ miles in a single activity',
-        type: 'RUN',
+        name: 'Strider',
+        description: 'Explore the hex by doing 20+ walks',
+        category: 'ACTIVITY',
+        activityType: 'WALK',
         condition: {
-            field: 'singleActivityDistance',
+            field: 'stats.totalWalks',
             operator: '>=',
-            value: 26
+            value: 20
         },
-        rarity: 'LEGENDARY',
-        points: 100
+        rarity: 'UNCOMMON'
     },
-
-    // Territory achievements
     {
-        name: 'Territory Conqueror',
-        description: 'Capture 50+ hexagons',
-        type: 'TERRITORY',
+        name: 'Hex Capturer',
+        description: 'Find and capture 50 hexagons',
+        category: 'ACTIVITY',
+        activityType: 'WALK',
         condition: {
             field: 'stats.totalHexagonsCaptured',
             operator: '>=',
             value: 50
         },
-        rarity: 'RARE',
-        points: 75
+        rarity: 'UNCOMMON'
+    },
+
+    // ===== WALKS: RARE =====
+    {
+        name: 'Territory Explorer',
+        description: 'Capture 300+ hexagons while walking',
+        category: 'TERRITORY',
+        activityType: 'WALK',
+        condition: {
+            field: 'stats.totalHexagonsCaptured',
+            operator: '>=',
+            value: 300
+        },
+        rarity: 'RARE'
     },
     {
+        name: 'Pathfinder',
+        description: 'Walk 100+ miles total',
+        category: 'DISTANCE',
+        activityType: 'WALK',
+        condition: {
+            field: 'stats.totalDistance',
+            operator: '>=',
+            value: 100
+        },
+        rarity: 'RARE'
+    },
+
+    // ========== WALKS: LEGENDARY ==========
+    {
         name: 'Hexagon Master',
-        description: 'Capture 100+ hexagons',
-        type: 'TERRITORY',
+        description: 'Capture 500+ hexagons while walking',
+        category: 'TERRITORY',
+        activityType: 'WALK',
+        condition: {
+            field: 'stats.totalHexagonsCaptured',
+            operator: '>=',
+            value: 500
+        },
+        rarity: 'LEGENDARY'
+    },
+
+     // ========== RUNS: COMMON ==========
+    {
+        name: 'First Run',
+        description: 'Complete your first run into the hex',
+        category: 'ACTIVITY',
+        activityType: 'RUN',
+        condition: {
+            field: 'stats.totalRuns',
+            operator: '>=',
+            value: 1
+        },
+        rarity: 'COMMON'
+    },
+
+    // ========== RUNS: UNCOMMON ==========
+    {
+        name: 'Hex Raider',
+        description: 'Complete 10+ runs',
+        category: 'ACTIVITY',
+        activityType: 'RUN',
+        condition: {
+            field: 'stats.totalRuns',
+            operator: '>=',
+            value: 10
+        },
+        rarity: 'UNCOMMON'
+    },
+
+    // ========== RUNS: RARE ==========
+    {
+        name: 'Route Conqueror',
+        description: 'Capture 100+ unique hexagons while running',
+        category: 'TERRITORY',
+        activityType: 'RUN',
         condition: {
             field: 'stats.totalHexagonsCaptured',
             operator: '>=',
             value: 100
         },
-        rarity: 'LEGENDARY',
-        points: 150
-    },
-    {
-        name: 'Social Butterfly',
-        description: 'Get 10+ followers',
-        type: 'SOCIAL',
-        condition: {
-            field: 'followers',
-            operator: '>=',
-            value: 10
-        },
-        rarity: 'RARE',
-        points: 40
+        rarity: 'RARE'
     },
 
-    // Distance achievements
+    // ========== RUNS: EPIC ==========
     {
-        name: 'Distance Demon',
-        description: 'Walk/Run 10+ miles in a single activity',
-        type: 'DISTANCE',
+        name: 'Territory Master',
+        description: 'Hold the fastest time on any segment',
+        category: 'TERRITORY',
+        activityType: 'RUN',
+        condition: {
+            field: 'hasSegmentRecord',
+            operator: '>=',
+            value: 1
+        },
+        rarity: 'EPIC'
+    },
+
+    // ========== RUNS: LEGENDARY ==========
+    {
+        name: 'Ultramarathoner',
+        description: 'Run 26+ miles in a single activity',
+        category: 'DISTANCE',
+        activityType: 'RUN',
         condition: {
             field: 'singleActivityDistance',
             operator: '>=',
-            value: 10
+            value: 26
         },
-        rarity: 'RARE',
-        points: 60
-    },
-
-    // Activity achievements
-    {
-        name: 'Getting Active',
-        description: 'Record 5+ activites total',
-        type: 'ACTIVITY',
-        condition: {
-            field: 'totalActivities',
-            operator: '>=',
-            value: 5
-        },
-        rarity: 'COMMON',
-        points: 25
+        rarity: 'LEGENDARY'
     }
 ];
 
@@ -119,16 +175,64 @@ async function seedAchievements() {
         await Achievement.deleteMany({});
         console.log('Cleared existing achievements');
 
-        // Insert new achievements
+        // Insert new Achievements
         const created = await Achievement.insertMany(achievements);
-        console.log(`Successfully seeded ${created.length} achievements!`);
+        console.log(`\nSuccessfully seeded ${created.length} achievements!\n`);
 
-        created.forEach(achievement => {
-            console.log(` - ${achievement.name} (${achievement.rarity})`);
+        // Display by activity type and rarity
+        console.log('========== WALK ACHIEVEMENTS ==========');
+        const walkAchievements = created.filter(a => a.activityType === 'WALK');
+
+        console.log('\n COMMON:');
+        walkAchievements.filter(a => a.rarity === 'COMMON').forEach(a => {
+            console.log(`${a.name}`);
+        });
+
+        console.log('\n UNCOMMON:');
+        walkAchievements.filter(a => a.rarity === 'UNCOMMON').forEach(a => {
+            console.log(`${a.name}`);
+        });
+
+        console.log('\n RARE:');
+        walkAchievements.filter(a => a.rarity === 'RARE').forEach(a => {
+            console.log(`${a.name}`);
+        });
+
+        console.log('\n LEGENDARY:');
+        walkAchievements.filter(a => a.rarity === 'LEGENDARY').forEach(a => {
+            console.log(`${a.name}`);
+        });
+
+        console.log('========== RUN ACHIEVEMENTS ==========');
+        const runAchievements = created.filter(a => a.activityType === 'RUN');
+
+        console.log('\n COMMON:');
+        runAchievements.filter(a => a.rarity === 'COMMON').forEach(a => {
+            console.log(`${a.name}`);
+        });
+
+        console.log('\n UNCOMMON:');
+        runAchievements.filter(a => a.rarity === 'UNCOMMON').forEach(a => {
+            console.log(`${a.name}`);
+        });
+
+        console.log('\n RARE:');
+        runAchievements.filter(a => a.rarity === 'RARE').forEach(a => {
+            console.log(`${a.name}`);
+        });
+
+        console.log('\n EPIC:');
+        runAchievements.filter(a => a.rarity === 'EPIC').forEach(a => {
+            console.log(`${a.name}`);
+        });
+
+        console.log('\n LEGENDARY:');
+        runAchievements.filter(a => a.rarity === 'LEGENDARY').forEach(a => {
+            console.log(`${a.name}`);
         });
 
         await mongoose.connection.close();
-        console.log('Seeding complete!');
+        console.log(`\n Seeding complete!\n`);
 
     } catch (error) {
         console.error('Error seeding achievements:', error.message);

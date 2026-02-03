@@ -5,7 +5,7 @@ const achievementSchema = new mongoose.Schema({
     name: {
         type: String,
         required: true,
-        uneiqu:  true,
+        unique:  true,
         trim: true
     },
     description: {
@@ -14,10 +14,17 @@ const achievementSchema = new mongoose.Schema({
     },
 
     // Achievement type/category
-    type: {
+    category: {
         type: String,
         required: true,
-        enum: ['WALK', 'RUN', 'TERRITORY', 'SOCIAL', 'DISTANCE', 'ACTIVITY'],
+        enum: ['TERRITORY', 'SOCIAL', 'DISTANCE', 'ACTIVITY', 'EXPLORATION', 'CONSISTENCY'],
+        index: true
+    },
+    // Which activity type this achievement is for
+    activityType: {
+        type: String,
+        enum: ['WALK', 'RUN', 'UNIVERSAL'],
+        default: 'UNIVERSAL',
         index: true
     },
 

@@ -57,7 +57,7 @@ followers: [
 ],
 achievements: [
     {
-        achievements: {
+        achievementId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'Achievement'
         },

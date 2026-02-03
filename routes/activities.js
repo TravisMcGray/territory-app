@@ -36,13 +36,27 @@ const checkAndUnlockAchievements = async (user, activityData) => {
         // Get all achievements
         const allAchievements = await Achievement.find();
 
+        // Filter achievements by activity type (only check relevant ones)
+        const relevantAchievements = allAchievements.filter(achievement => {
+            // Universal achievements apply to everyone
+            if (achievement.activityType === 'UNIVERSAL') return true;
+
+            // Only check WALK achievements for walk activities
+            if (activityData.activityType === 'walk' && achievement.activityType === 'WALK') return true;
+            
+            // Only check RUN achievements for run activities
+            if (activityData.activityType === 'run' && achievement.activityType === 'RUN') return true;
+
+            return false;
+        })
+
         // Get user's already unlocked achievement IDs
         const unlockedIds = user.achievements.map(a => a.achievementId.toString());
 
         const newlyUnlocked = [];
 
         // Check each achievement
-        for (const achievement of allAchievements) {
+        for (const achievement of relevantAchievements) {
             // Skip if already unlocked
             if (unlockedIds.includes(achievement._id.toString())) {
                 continue;
@@ -62,8 +76,8 @@ const checkAndUnlockAchievements = async (user, activityData) => {
             } else if (field === 'totalActivities') {
                 userValue = user.stats.totalWalks + user.stats.totalRuns;
             } else {
-                // For stats fields like 'stats.totalWalks'
-                userValue = eval(`user.${field}`);
+                // Safe property access for nested fields like 'stats.totalWalks'
+                userValue = field.split('.').reduce((obj, key) => obj?.[key], user);
             }
 
             // Check condition
@@ -186,7 +200,7 @@ router.post('/', authenticateToken, async (req, res) => {
 
         // ===== ATOMIC CAPTURE - PREVENTS RACE CONDITIONS =====
         // Instead of: fetch territories, loop, save each one
-        // We do: atomic update for each territory (all at once)    
+        // I do: atomic update for each territory (all at once)    
         // This prevents two users from both claiming the same hexagon
 
         const captureResults = [];
@@ -207,8 +221,32 @@ router.post('/', authenticateToken, async (req, res) => {
                                 // Store who OWNED it BEFORE we change it
                                 previousOwnerId: '$ownerId',
 
-                                // Now update to current user
-                                ownerId: userId,
+                                // Stealing rules:
+                                // Walkers can never steal (may change this in future updates - reliant on feedback)
+                                // Runners can only steal from other runners (not from walkers)
+                                ownerId: {
+                                    $cond: [
+                                        // If this is a WALK activity
+                                        { $eq: [activityType, 'walk'] },
+                                        // Walkers: Keep the current owner (never steal)
+                                        '$ownerId',
+                                        // Runners: Check if we can steal
+                                        {
+                                            $cond: [
+                                                // If territory owner is a walker
+                                                { $eq: ['$ownerActivityType', 'WALK'] },
+                                                // Can't steal from walkers, keep their ownership
+                                                '$ownerId',
+                                                // Owner is a runner, we can steal!
+                                                userId
+                                            ]
+                                        }
+                                    ]
+                                },
+                                
+                                // Record what activity type now owns this territory
+                                ownerActivityType: activityType === 'walk' ? 'WALK' : 'RUN',
+
                                 capturedAt: new Date(),
 
                                 // Track which activity captured this
@@ -239,11 +277,13 @@ router.post('/', authenticateToken, async (req, res) => {
             if (!territory.previousOwnerId) {
                 // No previous owner = newly captured
                 captured++;
-            } else if (territory.previousOwnerId.toString() !== userId.toString()) {
-                // Previous owner was a different person = stolen
+            } else if (territory.ownerId.toString() === userId.toString() && 
+                    territory.previousOwnerId.toString() !== userId.toString()) {
+                // We NOW own it AND we DIDN'T own it before = we actually stole it
                 stolen++;
             }
-            // If previousOwnerId === userId = revisit (count neither)
+            // If ownerId !== userId = we're just passing through (walker), don't count anything
+            // If ownerId === userId && previousOwnerId === userId = revisit, don't count
         }
 
         // Update activity with stolen count
@@ -270,7 +310,8 @@ router.post('/', authenticateToken, async (req, res) => {
         // Check and unlock achievements
         const newlyUnlocked = await checkAndUnlockAchievements(updatedUser, {
             distance: distance,
-            hexagonsCount: uniqueHexagons.length
+            hexagonsCount: uniqueHexagons.length,
+            activityType: activityType
         });
 
         // Check if user achieved the 100 hexagon milestone (unlocks username change ability)
