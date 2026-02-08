@@ -11,6 +11,7 @@ const leaderboardRouter = require('./routes/leaderboard');
 const socialRouter = require('./routes/social');
 const achievementsRouter = require('./routes/achievements');
 const segmentsRouter = require('./routes/segments');
+const routesRouter = require('./routes/routes');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -59,6 +60,7 @@ app.use('/api/activities', apiLimiter);
 app.use('/api/users', apiLimiter);
 app.use('/api/user', apiLimiter);
 app.use('/api/segments', apiLimiter);
+app.use('/api/routes', apiLimiter);
 
 
 app.use('/api/auth', authRouter);
@@ -68,6 +70,7 @@ app.use('/api/leaderboard', leaderboardRouter);
 app.use('/api/users', socialRouter);
 app.use('/api/achievements', achievementsRouter);
 app.use('/api/segments', segmentsRouter);
+app.use('/api/routes', routesRouter);
 
 // ========== GLOBAL ERROR HANDLER ==========
 app.use((err, req, res, next) => {
