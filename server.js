@@ -12,6 +12,8 @@ const socialRouter = require('./routes/social');
 const achievementsRouter = require('./routes/achievements');
 const segmentsRouter = require('./routes/segments');
 const routesRouter = require('./routes/routes');
+const notificationsRouter = require('./routes/notifications');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -71,6 +73,7 @@ app.use('/api/users', socialRouter);
 app.use('/api/achievements', achievementsRouter);
 app.use('/api/segments', segmentsRouter);
 app.use('/api/routes', routesRouter);
+app.use('/api/notifications', notificationsRouter);
 
 // ========== GLOBAL ERROR HANDLER ==========
 app.use((err, req, res, next) => {

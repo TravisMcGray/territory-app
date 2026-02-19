@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const User = require('../models/user');
+const { createNewFollowerNotification } = require('../utils/notifications');
 const { authenticateToken } = require('../middleware/auth');
 
 // ========== POST /api/users/:userId/follow - Follow a user ==========
@@ -64,6 +65,10 @@ router.post('/:userId/follow', authenticateToken, async (req, res) => {
         // Add to target user's followers list
         targetUser.followers.push(currentUserId);
         await targetUser.save();
+
+        // Notify the user being followed
+        const followerUser = await User.findById(currentUserId).select('username');
+        await createNewFollowerNotification(targetUserId, followerUser);
 
         res.status(200).json({
             message: `You are now following ${targetUser.username}`,

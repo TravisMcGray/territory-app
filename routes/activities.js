@@ -8,6 +8,11 @@ const Territory = require('../models/territory');
 const User = require('../models/user');
 const Achievement = require('../models/achievement');
 const { authenticateToken } = require('../middleware/auth');
+const {
+    createFriendActivityNotification,
+    createAchievementNotification,
+    createTerritoryStolenNotification
+} = require('../utils/notifications');
 
 // ========== VALIDATION HELPERS ==========
 
@@ -269,9 +274,10 @@ router.post('/', authenticateToken, async (req, res) => {
         // Execute all updates in parallel
         const results = await Promise.all(captureResults);
 
-        // Now count captured vs stolent from ACTUAL results
+        // Now count captured vs stolen from ACTUAL results
         let captured = 0;
         let stolen = 0;
+        const stolenFromUsers = new Map(); // Track who was stolen from for notifications
 
         for (const territory of results) {
             if (!territory.previousOwnerId) {
@@ -280,14 +286,28 @@ router.post('/', authenticateToken, async (req, res) => {
             } else if (territory.ownerId.toString() === userId.toString() && 
                     territory.previousOwnerId.toString() !== userId.toString()) {
                 // We NOW own it AND we DIDN'T own it before = we actually stole it
+                // If ownerId !== userId = we're just passing through (walker), don't count anything
+                // If ownerId === userId && previousOwnerId === userId = revisit, don't count
                 stolen++;
+
+                // Track this victom (only if runner stole from runner)
+                if (activityType === 'run') {
+                    const victimId = territory.previousOwnerId.toString();
+                    stolenFromUsers.set(victimId, (stolenFromUsers.get(victimId) || 0) + 1);
+                }
             }
-            // If ownerId !== userId = we're just passing through (walker), don't count anything
-            // If ownerId === userId && previousOwnerId === userId = revisit, don't count
         }
 
         // Update activity with stolen count
         await Activity.findByIdAndUpdate(activity._id, { stolenHexagons: stolen });
+
+        // Notify user with stolen count
+        if (stolenFromUsers.size > 0) {
+            const thiefUser = await User.findById(userId).select('username');
+            for (const [victimId, hexCount] of stolenFromUsers) {
+                await createTerritoryStolenNotification(victimId, thiefUser, hexCount);
+            }
+        }
 
         // ========== END ATOMIC CAPTURE ==========
 
@@ -314,11 +334,27 @@ router.post('/', authenticateToken, async (req, res) => {
             activityType: activityType
         });
 
+        // Notify user of newly unlocked achievements
+        for (const achievement of newlyUnlocked) {
+            await createAchievementNotification(req.user.userId, achievement);
+        }
+
         // Check if user achieved the 100 hexagon milestone (unlocks username change ability)
         let milestone = null;
         const previousTotal = updatedUser.stats.totalHexagonsCaptured - uniqueHexagons.length;
         if (previousTotal < 100 && updatedUser.stats.totalHexagonsCaptured >= 100) {
             milestone = 'You can now change your username!';
+        }
+
+        // Notify followers of new activity
+        const actorUser = await User.findById(userId).select('username followers');
+        if (actorUser.followers && actorUser.followers.length > 0) {
+            await createFriendActivityNotification(actorUser.followers, actorUser, {
+                activityType: activityType,
+                distance: distance,
+                hexagonsCaptured: uniqueHexagons.length,
+                _id: activity._id
+            });
         }
 
         res.status(201).json({

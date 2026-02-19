@@ -6,6 +6,7 @@ const Segment = require('../models/segment');
 const SegmentAttempt = require('../models/segmentAttempt');
 const UserSegmentRecord = require('../models/userSegmentRecord');
 const User = require('../models/user');
+const { createSegmentRecordNotification } = require('../utils/notifications');
 const { authenticateToken } = require('../middleware/auth');
 
 // ========== POST /api/segments - Create new segment ==========
@@ -276,6 +277,23 @@ router.post('/:segmentId/attempt', authenticateToken, async(req, res) => {
 
         // Update territory Master if new record
         if (isNewTerritoryMaster) {
+            // If there was a previous Territory Master, notify them
+            if (segment.territoryMaster && segment.territoryMaster.userId) {
+                const previousHolderId = segment.territoryMaster.userId.toString();
+        
+                if (previousHolderId !== userId.toString()) {
+                    const newRecordHolder = await User.findById(userId).select('username');
+                    const timeDifference = previousTerritoryMasterTime - duration;
+                    
+                    await createSegmentRecordNotification(
+                        previousHolderId,
+                        newRecordHolder,
+                        segment,
+                        timeDifference
+                    );
+                }
+            }
+
             segment.territoryMaster = {
                 userId,
                 username: req.user.email?.split('@')[0] || 'User', // Get from email or fallback
