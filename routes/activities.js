@@ -7,6 +7,9 @@ const Activity = require('../models/activity');
 const Territory = require('../models/territory');
 const User = require('../models/user');
 const Achievement = require('../models/achievement');
+const ActivityComment = require('../models/activityComment');
+const ActivityKudos = require('../models/activityKudos');
+const { createActivityCommentNotification } = require('../utils/notifications');
 const { authenticateToken } = require('../middleware/auth');
 const {
     createFriendActivityNotification,
@@ -538,7 +541,7 @@ router.delete('/:activityId', authenticateToken, async (req, res) => {
 router.get('/feed', authenticateToken, async (req, res) => {
     try {
         const userId = req.user.userId;
-        const page = Math.max(1,parseInt(req.query.page) || 1);
+        const page = Math.max(1, parseInt(req.query.page) || 1);
         const limit = Math.min(50, parseInt(req.query.limit) || 20);
         const skip = (page - 1) * limit;
 
@@ -549,95 +552,415 @@ router.get('/feed', authenticateToken, async (req, res) => {
             return res.status(404).json({ error: 'User not found' });
         }
 
-        // Convert following Ids for aggregation
+        // Convert following IDs for aggregation
         const followingIds = (user.following || []).map(id => new mongoose.Types.ObjectId(id));
 
-        // If user has no followers, return empty feed
+        // If user has no following, return empty feed
         if (followingIds.length === 0) {
-        return res.json({
+            return res.json({
+                message: 'Feed retrieved successfully',
+                pagination: {
+                    page,
+                    limit,
+                    total: 0,
+                    pages: 0
+                },
+                activities: []
+            });
+        }
+
+        // Aggregation pipeline: get activities from followed users with social data
+        const [result] = await Activity.aggregate([
+            // Match activities from users you follow
+            { $match: { userId: { $in: followingIds } } },
+
+            // Facet: get both total count AND paginated results efficiently
+            {
+                $facet: {
+                    metadata: [
+                        { $count: 'total' }
+                    ],
+                    data: [
+                        // Sort by most recent first
+                        { $sort: { createdAt: -1 } },
+
+                        // Pagination
+                        { $skip: skip },
+                        { $limit: limit },
+
+                        // Lookup user info (username, avatar)
+                        {
+                            $lookup: {
+                                from: 'users',
+                                localField: 'userId',
+                                foreignField: '_id',
+                                as: 'userInfo'
+                            }
+                        },
+
+                        // Lookup kudos count for each activity
+                        {
+                            $lookup: {
+                                from: 'activitykudos',
+                                localField: '_id',
+                                foreignField: 'activity',
+                                as: 'kudos'
+                            }
+                        },
+
+                        // Lookup comments count for each activity
+                        {
+                            $lookup: {
+                                from: 'activitycomments',
+                                localField: '_id',
+                                foreignField: 'activity',
+                                as: 'comments'
+                            }
+                        },
+
+                        // Check if current user gave kudos to each activity
+                        {
+                            $lookup: {
+                                from: 'activitykudos',
+                                let: { activityId: '$_id' },
+                                pipeline: [
+                                    {
+                                        $match: {
+                                            $expr: {
+                                                $and: [
+                                                    { $eq: ['$activity', '$$activityId'] },
+                                                    { $eq: ['$user', new mongoose.Types.ObjectId(userId)] }
+                                                ]
+                                            }
+                                        }
+                                    }
+                                ],
+                                as: 'userKudos'
+                            }
+                        },
+
+                        // Unwind userInfo (converts array to single object)
+                        { $unwind: '$userInfo' },
+
+                        // Project only needed fields for feed with social data
+                        {
+                            $project: {
+                                _id: 1,
+                                activityType: 1,
+                                distance: 1,
+                                duration: 1,
+                                elevationGain: 1,
+                                capturedHexagons: { $size: '$capturedHexagons' },
+                                stolenHexagons: 1,
+                                coordinates: 1,
+                                createdAt: 1,
+                                username: '$userInfo.username',
+                                avatar: '$userInfo.avatar',
+                                userId: '$userInfo._id',
+                                kudosCount: { $size: '$kudos' },
+                                commentCount: { $size: '$comments' },
+                                hasGivenKudos: { $gt: [{ $size: '$userKudos' }, 0] }
+                            }
+                        }
+                    ]
+                }
+            }
+        ]);
+
+        // Extract metadata and data from facet result
+        const total = result.metadata[0]?.total || 0;
+        const activities = result.data || [];
+
+        res.json({
             message: 'Feed retrieved successfully',
             pagination: {
                 page,
                 limit,
-                total: 0,
-                pages: 0
+                total,
+                pages: Math.ceil(total / limit)
             },
-            activities: []
+            count: activities.length,
+            activities
         });
-    }
-
-    // Aggregation pipeline: get activites from followed users with user details
-    const [result] = await Activity.aggregate([
-        // Match activities from users you follow
-        { $match: { userId: { $in: followingIds }}},
-
-        // FacetL get both total count AND paginated results efficiently
-        {
-            $facet: {
-                metadata: [
-                    { $count: 'total' }
-                ],
-                data: [
-                    // Sort by most recent first
-                    { $sort: { createdAt: -1 }},
-
-                    // Lookup user info (username, avatar)
-                {
-                    $lookup: {
-                        from: 'users',
-                        localField: 'userId',
-                        foreignField: '_id',
-                        as: 'userInfo'
-                    }
-                },
-
-                // Unwind userInfo (converts array to single object)
-                { $unwind: '$userInfo' },
-
-                // Project only needed fields for feed
-                {
-                    $project: {
-                        _id: 1,
-                        activityType: 1,
-                        distance: 1,
-                        duration: 1,
-                        elevationGain: 1,
-                        capturedHexagons: { $size: '$capturedHexagons' },
-                        stolenHexagons: 1,
-                        coordinates: 1,
-                        createdAt: 1,
-                        username: '$userInfo.username',
-                        avatar: '$userInfo.avatar'
-                    }
-                },
-
-                // Pagination
-                { $skip: skip },
-                { $limit: limit }
-                ]
-            }
-        }
-    ]);
-
-    // Extract metadata and data from facet result
-    const total = result.metadata[0]?.total || 0;
-    const activities = result.data || [];
-
-    res.json({
-        message: 'Feed retrieved successfully',
-        pagination: {
-            page,
-            limit,
-            total,
-            pages: Math.ceil(total / limit)
-        },
-        count: activities.length,
-        activities
-    });
 
     } catch (error) {
         res.status(500).json({
             message: 'Error retrieving feed',
+            error: error.message
+        });
+    }
+});
+
+// ========== POST /api/activities/:activityId/comment - Add comment to activity ==========
+router.post('/:activityId/comment', authenticateToken, async (req, res) => {
+    try {
+        const { activityId } = req.params;
+        const { text } = req.body;
+        const userId = req.user.userId;
+
+        // Validate comment text
+        if (!text || typeof text !== 'string' || text.trim().length === 0) {
+            return res.status(400).json({
+                status: 'error',
+                code: 'INVALID_COMMENT',
+                message: 'Comment text is required'
+            });
+        }
+
+        if (text.length > 500) {
+            return res.status(400).json({
+                status: 'error',
+                code: 'COMMENT_TOO_LONG',
+                message: 'Comment must be 500 characters or less'
+            });
+        }
+
+        // Verify activity exists
+        const activity = await Activity.findById(activityId);
+        if (!activity) {
+            return res.status(404).json({
+                status: 'error',
+                code: 'ACTIVITY_NOT_FOUND',
+                message: 'Activity not found'
+            });
+        }
+
+        // Create comment
+        const comment = await ActivityComment.create({
+            activity: activityId,
+            user: userId,
+            text: text.trim()
+        });
+
+        // Populate user info for response
+        await comment.populate('user', 'username avatar');
+
+        // Notify activity owner (if commenter is not the owner)
+        if (activity.userId.toString() !== userId) {
+            const commenterUser = await User.findById(userId).select('username');
+            await createActivityCommentNotification(
+                activity.userId,
+                commenterUser,
+                activity
+            );
+        }
+
+        res.status(201).json({
+            message: 'Comment added successfully',
+            comment: {
+                id: comment._id,
+                text: comment.text,
+                user: {
+                    id: comment.user._id,
+                    username: comment.user.username,
+                    avatar: comment.user.avatar
+                },
+                createdAt: comment.createdAt
+            }
+        });
+
+    } catch (error) {
+        res.status(500).json({
+            message: 'Error adding comment',
+            error: error.message
+        });
+    }
+});
+
+// ========== POST /api/activities/:activityId/kudos - Give kudos to activity ==========
+router.post('/:activityId/kudos', authenticateToken, async (req, res) => {
+    try {
+        const { activityId } = req.params;
+        const userId = req.user.userId;
+
+        // Verify activity exists
+        const activity = await Activity.findById(activityId);
+        if (!activity) {
+            return res.status(404).json({
+                status: 'error',
+                code: 'ACTIVITY_NOT_FOUND',
+                message: 'Activity not found'
+            });
+        }
+
+        // Can't kudos your own activity
+        if (activity.userId.toString() === userId) {
+            return res.status(400).json({
+                status: 'error',
+                code: 'CANNOT_KUDOS_OWN_ACTIVITY',
+                message: 'You cannot give kudos to your own activity'
+            });
+        }
+
+        // Check if already gave kudos
+        const existingKudos = await ActivityKudos.findOne({
+            activity: activityId,
+            user: userId
+        });
+
+        if (existingKudos) {
+            return res.status(400).json({
+                status: 'error',
+                code: 'ALREADY_GAVE_KUDOS',
+                message: 'You already gave kudos to this activity'
+            });
+        }
+
+        // Create kudos
+        const kudos = await ActivityKudos.create({
+            activity: activityId,
+            user: userId
+        });
+
+        // Get total kudos count for this activity
+        const kudosCount = await ActivityKudos.countDocuments({ activity: activityId });
+
+        res.status(201).json({
+            message: 'Kudos given successfully',
+            kudos: {
+                id: kudos._id,
+                activityId: kudos.activity,
+                createdAt: kudos.createdAt
+            },
+            totalKudos: kudosCount
+        });
+
+    } catch (error) {
+        // Handle duplicate kudos error from unique index
+        if (error.code === 11000) {
+            return res.status(400).json({
+                status: 'error',
+                code: 'ALREADY_GAVE_KUDOS',
+                message: 'You already gave kudos to this activity'
+            });
+        }
+
+        res.status(500).json({
+            message: 'Error giving kudos',
+            error: error.message
+        });
+    }
+});
+
+// ========== DELETE /api/activities/:activityId/kudos - Remove kudos from activity ==========
+router.delete('/:activityId/kudos', authenticateToken, async (req, res) => {
+    try {
+        const { activityId } = req.params;
+        const userId = req.user.userId;
+
+        // Find and delete kudos
+        const kudos = await ActivityKudos.findOneAndDelete({
+            activity: activityId,
+            user: userId
+        });
+
+        if (!kudos) {
+            return res.status(404).json({
+                status: 'error',
+                code: 'KUDOS_NOT_FOUND',
+                message: 'You have not given kudos to this activity'
+            });
+        }
+
+        // Get remaining kudos count
+        const kudosCount = await ActivityKudos.countDocuments({ activity: activityId });
+
+        res.json({
+            message: 'Kudos removed successfully',
+            totalKudos: kudosCount
+        });
+
+    } catch (error) {
+        res.status(500).json({
+            message: 'Error removing kudos',
+            error: error.message
+        });
+    }
+});
+
+// ========== GET /api/activities/:activityId - Get single activity with comments and kudos ==========
+router.get('/:activityId', authenticateToken, async (req, res) => {
+    try {
+        const { activityId } = req.params;
+        const userId = req.user.userId;
+
+        // Get activity
+        const activity = await Activity.findById(activityId)
+            .populate('userId', 'username avatar');
+
+        if (!activity) {
+            return res.status(404).json({
+                status: 'error',
+                code: 'ACTIVITY_NOT_FOUND',
+                message: 'Activity not found'
+            });
+        }
+
+        // Get comments (most recent first, limit to 50)
+        const comments = await ActivityComment.find({ activity: activityId })
+            .populate('user', 'username avatar')
+            .sort({ createdAt: -1 })
+            .limit(50);
+
+        // Get kudos count
+        const kudosCount = await ActivityKudos.countDocuments({ activity: activityId });
+
+        // Check if current user gave kudos
+        const userKudos = await ActivityKudos.findOne({
+            activity: activityId,
+            user: userId
+        });
+
+        // Get recent kudos users (limit to 10)
+        const recentKudos = await ActivityKudos.find({ activity: activityId })
+            .populate('user', 'username avatar')
+            .sort({ createdAt: -1 })
+            .limit(10);
+
+        res.json({
+            message: 'Activity retrieved successfully',
+            activity: {
+                id: activity._id,
+                type: activity.activityType,
+                distance: activity.distance,
+                duration: activity.duration,
+                pace: activity.pace,
+                averageSpeed: activity.averageSpeed,
+                elevationGain: activity.elevationGain,
+                capturedHexagons: activity.capturedHexagons.length,
+                stolenHexagons: activity.stolenHexagons,
+                createdAt: activity.createdAt,
+                user: {
+                    id: activity.userId._id,
+                    username: activity.userId.username,
+                    avatar: activity.userId.avatar
+                }
+            },
+            social: {
+                kudosCount,
+                commentCount: comments.length,
+                hasGivenKudos: !!userKudos,
+                recentKudos: recentKudos.map(k => ({
+                    username: k.user.username,
+                    avatar: k.user.avatar,
+                    createdAt: k.createdAt
+                })),
+                comments: comments.map(c => ({
+                    id: c._id,
+                    text: c.text,
+                    user: {
+                        id: c.user._id,
+                        username: c.user.username,
+                        avatar: c.user.avatar
+                    },
+                    createdAt: c.createdAt
+                }))
+            }
+        });
+
+    } catch (error) {
+        res.status(500).json({
+            message: 'Error retrieving activity',
             error: error.message
         });
     }

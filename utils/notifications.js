@@ -67,10 +67,28 @@ async function createNewFollowerNotification(followedUserId, followerUser) {
     });
 }
 
+// Activity comment - notify activity owner (add to existing exports)
+async function createActivityCommentNotification(activityOwnerId, commenterUser, activity) {
+    // Don't notify if user commented on their own activity
+    if (activityOwnerId.toString() === commenterUser._id.toString()) {
+        return;
+    }
+    
+    await Notification.create({
+        user: activityOwnerId,
+        type: 'COMMENT',
+        title: 'New Comment',
+        message: `${commenterUser.username} commented on your ${activity.activityType}`,
+        relatedUser: commenterUser._id,
+        relatedActivity: activity._id
+    });
+}
+
 module.exports = {
     createFriendActivityNotification,
     createAchievementNotification,
     createTerritoryStolenNotification,
     createSegmentRecordNotification,
-    createNewFollowerNotification
+    createNewFollowerNotification,
+    createActivityCommentNotification
 };
