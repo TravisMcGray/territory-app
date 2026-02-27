@@ -265,4 +265,37 @@ router.delete('/account', authenticateToken, async (req, res) => {
     }
 });
 
+// ========== GET /api/user/territories - Get all captured territories for the map ==========
+// Returns every hex tile in the database with owner info so the frontend
+// can render the full global territory map using H3 polygon boundaries.
+router.get('/territories', authenticateToken, async (req, res) => {
+    try {
+        const Territory = require('../models/territory');
+
+        const territories = await Territory.find()
+            .populate('ownerId', 'username')
+            .select('hexagonId ownerId ownerActivityType capturedAt')
+            .lean();
+
+        const formatted = territories.map(t => ({
+            hexagonId: t.hexagonId,
+            owner: {
+                id: t.ownerId?._id,
+                username: t.ownerId?.username ?? 'Unknown'
+            },
+            activityType: t.ownerActivityType,
+            capturedAt: t.capturedAt
+        }));
+
+        res.json({
+            message: 'Territories retrieved successfully',
+            count: formatted.length,
+            territories: formatted
+        });
+
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 module.exports = router;

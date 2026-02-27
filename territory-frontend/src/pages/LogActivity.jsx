@@ -1,0 +1,641 @@
+// ========== LOG ACTIVITY PAGE ==========
+// Handles the full lifecycle of recording an activity:
+// 1. Setup - pick activity type
+// 2. Tracking - GPS running, timer counting, coordinates collecting
+// 3. Summary - review before submitting to backend
+// 4. Result - show what was captured including new achievements
+
+import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { createActivity } from '../services/api';
+import HexBackground from '../components/HexBackground';
+
+// ========== CONSTANTS ==========
+// Only accept GPS readings with accuracy better than 30 meters.
+// Anything worse is too noisy and will draw bad hexagon paths.
+const MAX_ACCEPTABLE_ACCURACY = 30;
+
+// Minimum distance (meters) between points to avoid recording duplicates
+// while standing still. Prevents hexagon inflation.
+const MIN_DISTANCE_BETWEEN_POINTS = 5;
+
+// How often we try to collect a GPS point (milliseconds)
+const GPS_INTERVAL = 3000;
+
+// ========== HAVERSINE DISTANCE ==========
+// Calculate distance in meters between two GPS points.
+// Named after the mathematical formula it uses.
+// We need this on the frontend to show live distance while tracking —
+// the backend calculates the official distance on submission.
+const haversineDistance = (lat1, lng1, lat2, lng2) => {
+    const R = 6371000; // Earth radius in meters
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLng = ((lng2 - lng1) * Math.PI) / 180;
+    const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLng / 2) *
+        Math.sin(dLng / 2);
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
+
+// ========== FORMAT HELPERS ==========
+const formatTime = (seconds) => {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+};
+
+const formatDistance = (meters) => {
+    const miles = meters * 0.000621371;
+    return miles.toFixed(2);
+};
+
+// ========== MAIN COMPONENT ==========
+export default function LogActivity() {
+    const navigate = useNavigate();
+
+    // Which screen we're on
+    const [phase, setPhase] = useState('setup'); // 'setup' | 'tracking' | 'summary' | 'result'
+
+    // Activity type chosen by user
+    const [activityType, setActivityType] = useState('walk');
+
+    // GPS and tracking state
+    const [coordinates, setCoordinates] = useState([]);
+    const [distanceMeters, setDistanceMeters] = useState(0);
+    const [elapsedSeconds, setElapsedSeconds] = useState(0);
+    const [gpsStatus, setGpsStatus] = useState('idle'); // 'idle' | 'acquiring' | 'active' | 'error'
+    const [gpsAccuracy, setGpsAccuracy] = useState(null);
+
+    // Submission state
+    const [submitting, setSubmitting] = useState(false);
+    const [error, setError] = useState('');
+    const [result, setResult] = useState(null);
+
+    // Refs — these hold values that need to persist across renders
+    // without triggering re-renders themselves. Critical for GPS callbacks.
+    const watchIdRef = useRef(null);
+    const timerRef = useRef(null);
+    const coordinatesRef = useRef([]);
+    const distanceRef = useRef(0);
+
+    // ========== CLEANUP ON UNMOUNT ==========
+    // If user navigates away mid-activity, stop GPS and timer.
+    useEffect(() => {
+        return () => {
+            stopGPS();
+            stopTimer();
+        };
+    }, []);
+
+    // ========== TIMER ==========
+    const startTimer = () => {
+        timerRef.current = setInterval(() => {
+            setElapsedSeconds(prev => prev + 1);
+        }, 1000);
+    };
+
+    const stopTimer = () => {
+        if (timerRef.current) {
+            clearInterval(timerRef.current);
+            timerRef.current = null;
+        }
+    };
+
+    // ========== GPS ==========
+    const startGPS = () => {
+        if (!navigator.geolocation) {
+            setGpsStatus('error');
+            setError('GPS is not supported on this device.');
+            return;
+        }
+
+        setGpsStatus('acquiring');
+
+        watchIdRef.current = navigator.geolocation.watchPosition(
+            (position) => {
+                const { latitude, longitude, accuracy } = position.coords;
+                setGpsAccuracy(Math.round(accuracy));
+
+                // Reject noisy readings — accuracy value is the radius of
+                // uncertainty in meters. Lower = more accurate.
+                if (accuracy > MAX_ACCEPTABLE_ACCURACY) return;
+
+                const newPoint = { latitude, longitude };
+                const current = coordinatesRef.current;
+
+                // Reject duplicate points — if user is standing still,
+                // don't keep adding the same coordinate.
+                if (current.length > 0) {
+                    const last = current[current.length - 1];
+                    const dist = haversineDistance(
+                        last.latitude, last.longitude,
+                        latitude, longitude
+                    );
+                    if (dist < MIN_DISTANCE_BETWEEN_POINTS) return;
+
+                    // Update live distance display
+                    distanceRef.current += dist;
+                    setDistanceMeters(distanceRef.current);
+                }
+
+                // Add point to our collection
+                coordinatesRef.current = [...current, newPoint];
+                setCoordinates(coordinatesRef.current);
+                setGpsStatus('active');
+            },
+            (err) => {
+                // GPS errors: 1=permission denied, 2=unavailable, 3=timeout
+                if (err.code === 1) {
+                    setError('GPS permission denied. Please allow location access and try again.');
+                } else {
+                    setError('GPS signal lost. Please check your location settings.');
+                }
+                setGpsStatus('error');
+            },
+            {
+                enableHighAccuracy: true,
+                timeout: 15000,
+                maximumAge: 0, // Always get fresh position, never use cached
+            }
+        );
+    };
+
+    const stopGPS = () => {
+        if (watchIdRef.current !== null) {
+            navigator.geolocation.clearWatch(watchIdRef.current);
+            watchIdRef.current = null;
+        }
+    };
+
+    // ========== ACTIVITY CONTROLS ==========
+    const handleStart = () => {
+        // Reset all state for a fresh activity
+        setCoordinates([]);
+        setDistanceMeters(0);
+        setElapsedSeconds(0);
+        setError('');
+        coordinatesRef.current = [];
+        distanceRef.current = 0;
+
+        setPhase('tracking');
+        startGPS();
+        startTimer();
+    };
+
+    const handleStop = () => {
+        stopGPS();
+        stopTimer();
+        setPhase('summary');
+    };
+
+    // ========== SUBMIT TO BACKEND ==========
+    const handleSubmit = async () => {
+        if (coordinates.length < 2) {
+            setError('Not enough GPS points collected. Try moving around more before stopping.');
+            return;
+        }
+
+        setSubmitting(true);
+        setError('');
+
+        try {
+            const payload = {
+                activityType,
+                coordinates,            // Array of { latitude, longitude }
+                duration: elapsedSeconds, // Seconds elapsed
+                elevationGain: 0,        // Future enhancement
+            };
+
+            const res = await createActivity(payload);
+            setResult(res.data);
+            setPhase('result');
+        } catch (err) {
+            const message = typeof err.response?.data === 'string'
+                ? err.response.data
+                : err.response?.data?.message || 'Failed to save activity.';
+            setError(message);
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    // ========== RENDER PHASES ==========
+    return (
+        <div className="min-h-screen bg-gray-950 text-white relative">
+            <HexBackground />
+
+            {/* Navbar */}
+            <nav className="border-b border-gray-800 bg-gray-900 px-4 py-3 sticky top-0 z-10">
+                <div className="max-w-lg mx-auto flex items-center justify-between">
+                    <button
+                        onClick={() => navigate('/dashboard')}
+                        className="font-bold text-gray-200 hover:text-white transition-colors text-sm"
+                    >
+                        ← Back
+                    </button>
+                    <h1 className="text-lg font-black tracking-tight">
+                        Territory<span className="text-emerald-400">Capture</span>
+                    </h1>
+                    <div className="w-12" /> {/* Spacer to center title */}
+                </div>
+            </nav>
+
+            <div className="max-w-lg mx-auto px-4 py-8 relative z-10">
+                {phase === 'setup' && (
+                    <SetupPhase
+                        activityType={activityType}
+                        setActivityType={setActivityType}
+                        onStart={handleStart}
+                    />
+                )}
+                {phase === 'tracking' && (
+                    <TrackingPhase
+                        activityType={activityType}
+                        elapsedSeconds={elapsedSeconds}
+                        distanceMeters={distanceMeters}
+                        coordinateCount={coordinates.length}
+                        gpsStatus={gpsStatus}
+                        gpsAccuracy={gpsAccuracy}
+                        onStop={handleStop}
+                    />
+                )}
+                {phase === 'summary' && (
+                    <SummaryPhase
+                        activityType={activityType}
+                        elapsedSeconds={elapsedSeconds}
+                        distanceMeters={distanceMeters}
+                        coordinateCount={coordinates.length}
+                        submitting={submitting}
+                        error={error}
+                        onSubmit={handleSubmit}
+                        onDiscard={() => navigate('/dashboard')}
+                    />
+                )}
+                {phase === 'result' && result && (
+                    <ResultPhase
+                        result={result}
+                        onDone={() => navigate('/dashboard')}
+                    />
+                )}
+            </div>
+        </div>
+    );
+}
+
+// ========== SETUP PHASE ==========
+function SetupPhase({ activityType, setActivityType, onStart }) {
+    return (
+        <div className="space-y-8">
+            <div>
+                <h2 className="text-3xl font-black">Log Activity</h2>
+                <p className="text-gray-200 mt-1 text-sm">
+                    Choose your activity type and head outside.
+                </p>
+            </div>
+
+            {/* Activity type selector */}
+            <div className="grid grid-cols-2 gap-3">
+                <button
+                    type="button"
+                    onClick={() => setActivityType('walk')}
+                    className={`p-6 rounded-2xl border-2 transition-all text-left ${
+                        activityType === 'walk'
+                            ? 'border-blue-500 bg-blue-500/10'
+                            : 'border-gray-800 bg-gray-900 hover:border-gray-700'
+                    }`}
+                >
+                    <div className="text-3xl mb-2">🚶</div>
+                    <div className="font-bold text-lg">Walk</div>
+                    <div className="text-gray-200 text-xs mt-1">
+                        Capture territory peacefully. Never stolen from.
+                    </div>
+                </button>
+
+                <button
+                    type="button"
+                    onClick={() => setActivityType('run')}
+                    className={`p-6 rounded-2xl border-2 transition-all text-left ${
+                        activityType === 'run'
+                            ? 'border-emerald-500 bg-emerald-500/10'
+                            : 'border-gray-800 bg-gray-900 hover:border-gray-700'
+                    }`}
+                >
+                    <div className="text-3xl mb-2">🏃</div>
+                    <div className="font-bold text-lg">Run</div>
+                    <div className="text-xs text-gray-200 mt-1">
+                        Steal from other runners. Compete for territory.
+                    </div>
+                </button>
+            </div>
+
+            {/* Rules reminder */}
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 space-y-2">
+                <p className="text-gray-400 text-xs font-semibold uppercase tracking-wide">
+                    Territory Rules
+                </p>
+                <p className="text-gray-400 text-sm">
+                    🚶 <span className="text-white">Walkers</span> capture unclaimed land and keep it forever.
+                </p>
+                <p className="text-gray-400 text-sm">
+                    🏃 <span className="text-white">Runners</span> can steal territory from other runners only.
+                </p>
+            </div>
+
+            <button
+                type="button"
+                onClick={onStart}
+                className="w-full bg-emerald-500 hover:bg-emerald-400 text-white font-black text-xl py-5 rounded-2xl transition-colors"
+            >
+                Start {activityType === 'walk' ? 'Walk' : 'Run'}
+            </button>
+        </div>
+    );
+}
+
+// ========== TRACKING PHASE ==========
+function TrackingPhase({
+    activityType,
+    elapsedSeconds,
+    distanceMeters,
+    coordinateCount,
+    gpsStatus,
+    gpsAccuracy,
+    onStop,
+}) {
+    const isWalk = activityType === 'walk';
+
+    return (
+        <div className="space-y-6">
+
+            {/* GPS status indicator */}
+            <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm w-fit ${
+                gpsStatus === 'active'
+                    ? 'bg-emerald-500/20 text-emerald-400'
+                    : gpsStatus === 'acquiring'
+                    ? 'bg-yellow-500/20 font-bold text-yellow-500'
+                    : 'bg-red-500/20 text-red-400'
+            }`}>
+                <span className={`w-2 h-2 rounded-full ${
+                    gpsStatus === 'active'
+                        ? 'bg-emerald-400 animate-pulse'
+                        : gpsStatus === 'acquiring'
+                        ? 'bg-yellow-400 animate-pulse'
+                        : 'bg-red-400'
+                }`} />
+                {gpsStatus === 'active'
+                    ? `GPS Active — ±${gpsAccuracy}m accuracy`
+                    : gpsStatus === 'acquiring'
+                    ? 'Acquiring GPS signal...'
+                    : 'GPS Error'}
+            </div>
+
+            {/* Activity type badge */}
+            <div>
+                <span className={`text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full ${
+                    isWalk
+                        ? 'bg-blue-500/20 text-blue-400'
+                        : 'bg-emerald-500/20 text-emerald-400'
+                }`}>
+                    {isWalk ? '🚶 Walking' : '🏃 Running'}
+                </span>
+            </div>
+
+            {/* Big timer */}
+            <div>
+                <div className="text-7xl font-black tabular-nums tracking-tight">
+                    {formatTime(elapsedSeconds)}
+                </div>
+                <div className="font-bold text-gray-300 text-sm mt-1">Elapsed time</div>
+            </div>
+
+            {/* Stats row */}
+            <div className="grid grid-cols-2 gap-3">
+                <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4">
+                    <div className="text-2xl font-black text-white">
+                        {formatDistance(distanceMeters)}
+                    </div>
+                    <div className="font-bold text-gray-300 text-xs mt-1">Miles</div>
+                </div>
+                <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4">
+                    <div className="text-2xl font-black text-emerald-400">
+                        {coordinateCount}
+                    </div>
+                    <div className="font-bold text-gray-300 text-xs mt-1">GPS points</div>
+                </div>
+            </div>
+
+            {/* Acquiring GPS message */}
+            {gpsStatus === 'acquiring' && (
+                <p className="font-bold text-yellow-500 text-sm text-center bg-yellow-500/10 rounded-xl p-3">
+                    Waiting for GPS signal. Walk outside and away from buildings for best results.
+                </p>
+            )}
+
+            {/* Stop button */}
+            <button
+                type="button"
+                onClick={onStop}
+                className="w-full bg-red-500 hover:bg-red-400 text-white font-black text-xl py-5 rounded-2xl transition-colors"
+            >
+                Stop Activity
+            </button>
+
+            <p className="font-bold text-gray-300 text-xs text-center">
+                Keep this screen open while tracking. Locking your phone may pause GPS.
+            </p>
+        </div>
+    );
+}
+
+// ========== SUMMARY PHASE ==========
+function SummaryPhase({
+    activityType,
+    elapsedSeconds,
+    distanceMeters,
+    coordinateCount,
+    submitting,
+    error,
+    onSubmit,
+    onDiscard,
+}) {
+    const isWalk = activityType === 'walk';
+    const hasEnoughPoints = coordinateCount >= 2;
+
+    return (
+        <div className="space-y-6">
+            <div>
+                <h2 className="text-3xl font-black">Activity Summary</h2>
+                <p className="font-bold text-gray-300 mt-1 text-sm">
+                    Review your activity before saving.
+                </p>
+            </div>
+
+            {/* Summary card */}
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 space-y-4">
+                <div className="flex items-center gap-3">
+                    <span className="text-2xl">{isWalk ? '🚶' : '🏃'}</span>
+                    <div>
+                        <div className="font-bold text-lg capitalize">{activityType}</div>
+                        <div className="font-bold text-gray-400 text-sm">
+                            {new Date().toLocaleDateString('en-US', {
+                                weekday: 'long',
+                                month: 'long',
+                                day: 'numeric'
+                            })}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3 pt-2">
+                    <div className="text-center">
+                        <div className="text-xl font-black">{formatTime(elapsedSeconds)}</div>
+                        <div className="font-bold text-gray-300 text-xs">duration</div>
+                    </div>
+                    <div className="text-center">
+                        <div className="text-xl font-black">{formatDistance(distanceMeters)}</div>
+                        <div className="font-bold text-gray-300 text-xs">miles</div>
+                    </div>
+                    <div className="text-center">
+                        <div className="text-xl font-black text-emerald-400">{coordinateCount}</div>
+                        <div className="font-bold text-gray-300 text-xs">GPS points</div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Not enough points warning */}
+            {!hasEnoughPoints && (
+                <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4">
+                    <p className="font-bold text-yellow-500 text-sm font-semibold">Not enough GPS data</p>
+                    <p className="font-bold text-yellow-400/80 text-xs mt-1">
+                        Only {coordinateCount} GPS point{coordinateCount !== 1 ? 's' : ''} were collected.
+                        You need at least 2. This usually happens when GPS couldn't get a signal.
+                    </p>
+                </div>
+            )}
+
+            {error && (
+                <p className="text-red-400 text-sm text-center bg-red-500/10 rounded-xl p-3">
+                    {error}
+                </p>
+            )}
+
+            {/* Actions */}
+            <div className="space-y-3">
+                <button
+                    type="button"
+                    onClick={onSubmit}
+                    disabled={submitting || !hasEnoughPoints}
+                    className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:bg-gray-800 disabled:text-gray-600 disabled:cursor-not-allowed text-white font-black text-lg py-4 rounded-2xl transition-colors"
+                >
+                    {submitting ? 'Saving...' : 'Save Activity'}
+                </button>
+
+                <button
+                    type="button"
+                    onClick={onDiscard}
+                    className="w-full bg-transparent border border-gray-800 hover:border-gray-600 text-gray-300 hover:text-white font-semibold py-3 rounded-2xl transition-colors"
+                >
+                    Discard
+                </button>
+            </div>
+        </div>
+    );
+}
+
+// ========== RESULT PHASE ==========
+function ResultPhase({ result, onDone }) {
+    const activity = result.activity;
+    const achievements = result.newAchievements || [];
+    const milestone = result.milestone;
+
+    return (
+        <div className="space-y-6">
+            <div className="text-center py-4">
+                <div className="text-5xl mb-3">🎉</div>
+                <h2 className="text-3xl font-black">Activity Saved!</h2>
+                <p className="text-gray-500 mt-1 text-sm">
+                    Territory captured and stats updated.
+                </p>
+            </div>
+
+            {/* Results card */}
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                    <ResultStat label="Distance" value={activity.distance} />
+                    <ResultStat label="Duration" value={activity.duration} />
+                    <ResultStat
+                        label="New Territory"
+                        value={`${activity.newTerritory} hex`}
+                        accent="emerald"
+                    />
+                    <ResultStat
+                        label="Stolen"
+                        value={`${activity.stolenTerritory} hex`}
+                        accent={activity.stolenTerritory > 0 ? 'red' : 'gray'}
+                    />
+                </div>
+            </div>
+
+            {/* New achievements */}
+            {achievements.length > 0 && (
+                <div className="space-y-2">
+                    <p className="text-emerald-400 font-bold text-sm uppercase tracking-wide">
+                        🏆 New Achievements Unlocked!
+                    </p>
+                    {achievements.map((achievement, i) => (
+                        <div
+                            key={i}
+                            className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4"
+                        >
+                            <div className="font-bold text-white">{achievement.name}</div>
+                            <div className="text-gray-400 text-sm mt-0.5">
+                                {achievement.description}
+                            </div>
+                            <div className="text-emerald-400 text-xs mt-1 uppercase tracking-wide">
+                                {achievement.rarity}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {/* Milestone */}
+            {milestone && (
+                <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
+                    <p className="text-blue-400 text-sm font-semibold">🎯 Milestone Reached!</p>
+                    <p className="text-blue-300 text-sm mt-1">{milestone}</p>
+                </div>
+            )}
+
+            <button
+                type="button"
+                onClick={onDone}
+                className="w-full bg-emerald-500 hover:bg-emerald-400 text-white font-black text-lg py-4 rounded-2xl transition-colors"
+            >
+                Back to Dashboard
+            </button>
+        </div>
+    );
+}
+
+// ========== RESULT STAT SUB-COMPONENT ==========
+function ResultStat({ label, value, accent = 'white' }) {
+    const colors = {
+        white: 'text-white',
+        emerald: 'text-emerald-400',
+        red: 'text-red-400',
+        gray: 'text-gray-500',
+    };
+
+    return (
+        <div className="text-center">
+            <div className={`text-xl font-black ${colors[accent]}`}>{value}</div>
+            <div className="text-gray-500 text-xs mt-0.5">{label}</div>
+        </div>
+    );
+}

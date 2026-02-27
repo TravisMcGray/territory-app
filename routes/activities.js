@@ -172,7 +172,7 @@ router.post('/', authenticateToken, async (req, res) => {
         if (!duration || typeof duration !== 'number' || duration <= 0) {
             return res.status(400).json({
                 status: 'error',
-                code: 'INAVLID_DURATION',
+                code: 'INVALID_DURATION',
                 message: 'Duration must be a positive number (seconds). For a 30-minute walk, send duration: 1800'
             });
         }

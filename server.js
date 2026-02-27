@@ -25,14 +25,18 @@ app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 // CORS
 app.use(cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-    credentials: true
+    origin: [
+        'http://localhost:5173',
+        'http://localhost:3000',
+        process.env.FRONTEND_URL,
+    ].filter(Boolean),
+    credentials: true,
 }));
 
 // Rate limiting for auth endpoints (prevent brute force)
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 10, // 5 requests per window
+    max: 50, // 5 requests per window
     message: 'Too many login attempts. Please try again later.',
     standardHeaders: true,
     legacyHeaders: false
