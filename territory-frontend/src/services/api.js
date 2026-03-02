@@ -40,6 +40,7 @@ export const updateUsername = (data) => api.put('/api/user/username', data);
 export const getUserAchievements = () => api.get('/api/user/achievements');
 export const getUserTerritories = () => api.get('/api/user/territories');
 export const getUserById = (id) => api.get(`/api/users/${id}`);
+export const getTerritories = () => api.get('/api/user/territories')
 
 // ========== SOCIAL ==========
 export const followUser = (id) => api.post(`/api/users/${id}/follow`);

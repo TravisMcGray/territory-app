@@ -9,6 +9,7 @@ import LogActivity from './pages/LogActivity';
 import Feed from './pages/Feed';
 import Leaderboard from './pages/Leaderboard';
 import Profile from './pages/Profile';
+import Map from './pages/Map';
 
 // Redirect unauthenticated users to login
 function ProtectedRoute({ children }) {
@@ -73,7 +74,19 @@ export default function App() {
                     </ProtectedRoute>
                 }
             />
-            <Route path="*" element={<Navigate to="/login" />} />
+            <Route 
+                path="*" 
+                element={
+                <Navigate to="/login" />
+                } 
+            />
+            <Route 
+                path="/map"
+                element={
+                <ProtectedRoute>
+                    <Map />
+                </ProtectedRoute>} 
+            />
         </Routes>
     );
 }
