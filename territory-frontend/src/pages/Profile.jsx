@@ -21,6 +21,32 @@ import {
 import HexBackground from '../components/HexBackground';
 import Navbar from '../components/Navbar';
 
+// ========== PROFILE TAB ICONS ==========
+const ActivityTabIcon = ({ color = 'currentColor' }) => (
+    <svg width="14" height="14" viewBox="0 0 28 28" fill="none">
+        <polyline
+            points="2,14 6,14 9,6 13,22 17,10 20,14 26,14"
+            stroke={color}
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="none"
+        />
+    </svg>
+);
+
+const AchievementTabIcon = ({ color = 'currentColor' }) => (
+    <svg width="14" height="14" viewBox="0 0 28 28" fill="none">
+        <polygon
+            points="2,14 8,3 20,3 26,14 20,25 8,25"
+            stroke={color}
+            strokeWidth="2.5"
+            fill="none"
+        />
+        <circle cx="14" cy="14" r="2" fill={color} />
+    </svg>
+);
+
 // ========== TIME HELPER ==========
 const timeAgo = (dateString) => {
     const seconds = Math.floor((new Date() - new Date(dateString)) / 1000);
@@ -149,7 +175,7 @@ useEffect(() => {
                                 <h2 className="text-xl font-black text-white">
                                     {profile.username}
                                 </h2>
-                                <p className="text-gray-400 text-sm mt-0.5">
+                                <p className="font-bold text-gray-400 text-sm mt-0.5">
                                     Member since {new Date(profile.createdAt).toLocaleDateString('en-US', {
                                         month: 'long',
                                         year: 'numeric',
@@ -220,40 +246,51 @@ useEffect(() => {
                     </div>
                 </div>
 
-                {/* ========== TABS ========== */}
                 <div className="flex bg-gray-900 border border-gray-800 rounded-xl p-1 gap-1">
-                    {['activities', 'achievements'].map(tab => (
-                        <button
-                            key={tab}
-                            type="button"
-                            onClick={() => setActiveTab(tab)}
-                            className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all capitalize ${
-                                activeTab === tab
-                                    ? 'bg-emerald-500 text-white'
-                                    : 'text-gray-500 hover:text-white'
-                            }`}
-                        >
-                            {tab === 'activities' ? '🏃 Activities' : '🏆 Achievements'}
-                        </button>
-                    ))}
+                    <button
+                        type="button"
+                        onClick={() => setActiveTab('activities')}
+                        className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${
+                            activeTab === 'activities'
+                                ? 'bg-emerald-500 text-white'
+                                : 'text-gray-500 hover:text-white'
+                        }`}
+                    >
+                        <ActivityTabIcon color={activeTab === 'activities' ? '#ffffff' : '#6b7280'} />
+                        Activities
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setActiveTab('achievements')}
+                        className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${
+                            activeTab === 'achievements'
+                                ? 'bg-emerald-500 text-white'
+                                : 'text-gray-500 hover:text-white'
+                        }`}
+                    >
+                        <AchievementTabIcon color={activeTab === 'achievements' ? '#ffffff' : '#6b7280'} />
+                        Achievements
+                    </button>
                 </div>
 
                 {/* ========== ACTIVITIES TAB ========== */}
                 {activeTab === 'activities' && (
-                    <div className="space-y-3">
-                        {activities.length === 0 ? (
-                            <div className="text-center py-12">
-                                <div className="text-4xl mb-3">🗺️</div>
-                                <p className="text-white font-bold">No activities yet</p>
-                                <p className="text-gray-400 text-sm font-bold mt-1">
-                                    Get outside and start capturing territory!
-                                </p>
-                            </div>
-                        ) : (
-                            activities.slice(0, 10).map(activity => (
-                                <ActivityRow key={activity._id} activity={activity} />
-                            ))
-                        )}
+                    <div className="text-center py-12">
+                        <svg width="48" height="48" viewBox="0 0 28 28" fill="none" className="mx-auto mb-3">
+                            <polygon points="2,14 8,3 20,3 26,14 20,25 8,25" stroke="#374151" strokeWidth="2" fill="#0e0d0d"/>
+                            <polyline
+                                points="5,14 8,14 11,9 15,19 18,12 21,14 24,14"
+                                stroke="#374151"
+                                strokeWidth="1.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                fill="none"
+                            />
+                        </svg>
+                        <p className="text-white font-bold">No activities yet</p>
+                        <p className="text-gray-400 text-sm font-bold mt-1">
+                            Get outside and start capturing territory!
+                        </p>
                     </div>
                 )}
 
@@ -262,7 +299,10 @@ useEffect(() => {
                     <div className="space-y-3">
                         {achievements.length === 0 ? (
                             <div className="text-center py-12">
-                                <div className="text-4xl mb-3">🏆</div>
+                                <svg width="48" height="48" viewBox="0 0 28 28" fill="none" className="mx-auto mb-3">
+                                    <polygon points="2,14 8,3 20,3 26,14 20,25 8,25" stroke="#374151" strokeWidth="2" fill="#0e0d0d"/>
+                                    <text x="14" y="15" textAnchor="middle" dominantBaseline="middle" fontSize="9" fill="#374151" fontWeight="800" fontFamily="Oxanium, sans-serif">HEX</text>
+                                </svg>
                                 <p className="text-white font-bold">No achievements yet</p>
                                 <p className="text-gray-400 text-sm font-bold mt-1">
                                     Log activities to unlock achievements!
@@ -326,7 +366,7 @@ function AchievementRow({ achievement }) {
         <div className={`border rounded-xl p-4 flex items-center gap-3 ${
             isUnlocked
                 ? 'bg-emerald-500/10 border-emerald-500/30'
-                : 'bg-gray-900 border-gray-800 opacity-50'
+                : 'bg-gray-900 border-gray-800 opacity-80'
         }`}>
             <div className="text-2xl flex-shrink-0">
                 {isUnlocked ? '🏆' : '🔒'}

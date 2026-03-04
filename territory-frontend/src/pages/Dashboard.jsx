@@ -45,13 +45,13 @@ const HexDistanceIcon = () => (
 const HexActivitiesIcon = () => (
     <HexIcon stroke="#a855f7">
         <polyline
-            points="16,8 12,14 15,14 12,20"
-            stroke="#a855f7"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            fill="none"
-        />
+        points="5,14 8,14 11,9 15,19 18,12 21,14 24,14"
+        stroke="#a855f7"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+    />
     </HexIcon>
 );
 

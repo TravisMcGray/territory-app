@@ -112,6 +112,7 @@ export default function LogActivity() {
 
     // Activity type chosen by user
     const [activityType, setActivityType] = useState('walk');
+    const [lastActivity, setLastActivity] = useState(null);
 
     // GPS and tracking state
     const [coordinates, setCoordinates] = useState([]);
@@ -300,6 +301,7 @@ export default function LogActivity() {
                         activityType={activityType}
                         setActivityType={setActivityType}
                         onStart={handleStart}
+                        lastActivity={lastActivity}
                     />
                 )}
                 {phase === 'tracking' && (
@@ -337,70 +339,155 @@ export default function LogActivity() {
 }
 
 // ========== SETUP PHASE ==========
-function SetupPhase({ activityType, setActivityType, onStart }) {
+function SetupPhase({ activityType, setActivityType, onStart, lastActivity }) {
+    const isWalk = activityType === 'walk';
+
+    const taglines = {
+        walk: [
+            "Every step claims new ground!",
+            "Your territory grows with every stride!",
+            "Walkers never lose what they earn!",
+            "The map is yours for the taking!",
+        ],
+        run: [
+            "Runners take what they want!",
+            "Speed is power. Go steal some hexagons!",
+            "Other runners won't know what hit them!",
+            "Fast feet, more territory. Let's go!",
+        ],
+    };
+
+    // Pick a random tagline for the current activity type
+    const tagline = taglines[activityType][Math.floor(Math.random() * taglines[activityType].length)];
+
     return (
-        <div className="space-y-8">
+        <div className="space-y-6">
+
+            {/* ========== HEADER ========== */}
             <div>
-                <h2 className="text-3xl font-black">Log Activity</h2>
-                <p className="font-bold text-gray-200 mt-1 text-sm">
-                    Choose your activity type and head outside.
+                <h2 className="text-3xl font-black">Let's Go!</h2>
+                <p className="font-bold text-gray-300 mt-1 text-sm">
+                    Choose your activity and claim your territory.
                 </p>
             </div>
 
-            {/* Activity type selector */}
+            {/* ========== LAST ACTIVITY STAT ========== */}
+            {lastActivity && (
+                <div className="flex items-center gap-2 px-4 py-2 bg-gray-900 border border-gray-800 rounded-xl w-fit">
+                    <span className="text-gray-400 text-xs font-bold">Last time:</span>
+                    <span className="text-emerald-400 text-xs font-black">
+                        {lastActivity.distance}mi
+                    </span>
+                    <span className="text-gray-600 text-xs">·</span>
+                    <span className="text-gray-400 text-xs font-bold">
+                        {lastActivity.hexagons} hexagons
+                    </span>
+                </div>
+            )}
+
+            {/* ========== ACTIVITY CARDS ========== */}
             <div className="grid grid-cols-2 gap-3">
+
+                {/* WALK CARD */}
                 <button
                     type="button"
                     onClick={() => setActivityType('walk')}
-                    className={`p-6 rounded-2xl border-2 transition-all text-left ${
+                    className={`relative rounded-2xl border-2 transition-all overflow-hidden text-left ${
                         activityType === 'walk'
                             ? 'border-blue-500 bg-blue-500/10'
                             : 'border-gray-800 bg-gray-900 hover:border-gray-700'
                     }`}
+                    style={{ minHeight: '200px' }}
                 >
-                    <div className="mb-2"><WalkHexIcon size={48} active={activityType === 'walk'} /></div>
-                    <div className="font-bold text-lg">Walk</div>
-                    <div className="font-bold text-gray-200 text-xs mt-1">
-                        Capture territory peacefully. Never stolen from.
+                    {/* Animated hex pulse when selected */}
+                    {activityType === 'walk' && (
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <div className="w-32 h-32 rounded-full bg-blue-500/10 animate-ping" />
+                        </div>
+                    )}
+                    <div className="relative p-6 flex flex-col h-full gap-3">
+                        <WalkHexIcon size={52} active={activityType === 'walk'} />
+                        <div className="font-black text-xl text-white">Walk</div>
+                        <div className="font-bold text-gray-300 text-xs leading-relaxed">
+                            Claim unclaimed land forever. Nobody can take it from you.
+                        </div>
+                        {activityType === 'walk' && (
+                            <div className="mt-auto">
+                                <span className="text-blue-400 text-xs font-black uppercase tracking-widest">
+                                    Selected ✓
+                                </span>
+                            </div>
+                        )}
                     </div>
                 </button>
 
+                {/* RUN CARD */}
                 <button
                     type="button"
                     onClick={() => setActivityType('run')}
-                    className={`p-6 rounded-2xl border-2 transition-all text-left ${
+                    className={`relative rounded-2xl border-2 transition-all overflow-hidden text-left ${
                         activityType === 'run'
                             ? 'border-emerald-500 bg-emerald-500/10'
                             : 'border-gray-800 bg-gray-900 hover:border-gray-700'
                     }`}
+                    style={{ minHeight: '200px' }}
                 >
-                    <div className="mb-2"><RunHexIcon size={48} active={activityType === 'run'} /></div>
-                    <div className="font-bold text-lg">Run</div>
-                    <div className="font-bold text-xs text-gray-200 mt-1">
-                        Steal from other runners. Compete for territory.
+                    {/* Animated hex pulse when selected */}
+                    {activityType === 'run' && (
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <div className="w-32 h-32 rounded-full bg-emerald-500/10 animate-ping" />
+                        </div>
+                    )}
+                    <div className="relative p-6 flex flex-col h-full gap-3">
+                        <RunHexIcon size={52} active={activityType === 'run'} />
+                        <div className="font-black text-xl text-white">Run</div>
+                        <div className="font-bold text-gray-300 text-xs leading-relaxed">
+                            Steal territory from other runners. Speed wins.
+                        </div>
+                        {activityType === 'run' && (
+                            <div className="mt-auto">
+                                <span className="text-emerald-400 text-xs font-black uppercase tracking-widest">
+                                    Selected ✓
+                                </span>
+                            </div>
+                        )}
                     </div>
                 </button>
             </div>
 
-            {/* Rules reminder */}
+            {/* ========== MOTIVATIONAL TAGLINE ========== */}
+            <div className={`text-center py-3 px-4 rounded-xl border transition-all ${
+                isWalk
+                    ? 'bg-blue-500/10 border-blue-500/20 text-blue-300'
+                    : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300'
+            }`}>
+                <p className="font-black text-sm">{tagline}</p>
+            </div>
+
+            {/* ========== RULES ========== */}
             <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 space-y-2">
                 <p className="font-bold text-gray-100 text-sm uppercase tracking-wide">
                     Territory Rules
                 </p>
                 <p className="font-bold text-gray-400 text-sm">
-                    🚶 <span className="font-bold text-white">Walkers</span> capture unclaimed land and keep it forever.
+                    <span className="font-bold text-white">Walkers</span> capture unclaimed land and keep it forever!
                 </p>
                 <p className="font-bold text-gray-400 text-sm">
-                    🏃 <span className="font-bold text-white">Runners</span> can steal territory from other runners only.
+                    <span className="font-bold text-white">Runners</span> can steal territory from other runners only!
                 </p>
             </div>
 
+            {/* ========== START BUTTON ========== */}
             <button
                 type="button"
                 onClick={onStart}
-                className="w-full bg-emerald-500 hover:bg-emerald-400 text-white font-black text-xl py-5 rounded-2xl transition-colors"
+                className={`w-full font-black text-xl py-5 rounded-2xl transition-all transform active:scale-95 ${
+                    isWalk
+                        ? 'bg-blue-500 hover:bg-blue-400 text-white'
+                        : 'bg-emerald-500 hover:bg-emerald-400 text-white'
+                }`}
             >
-                Start {activityType === 'walk' ? 'Walk' : 'Run'}
+                {isWalk ? '🚶 Start Walk' : '🏃 Start Run'}
             </button>
         </div>
     );

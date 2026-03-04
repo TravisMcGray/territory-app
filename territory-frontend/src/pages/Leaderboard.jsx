@@ -42,13 +42,13 @@ const HexDistanceIcon = ({ color, active }) => (
 const HexActivityIcon = ({ color, active }) => (
     <HexIcon color={color} fill={active ? '#10b98122' : 'none'}>
         <polyline
-            points="16,8 12,14 15,14 12,20"
-            stroke={color}
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            fill="none"
-        />
+        points="5,14 8,14 11,9 15,19 18,12 21,14 24,14"
+        stroke={color}
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+    />
     </HexIcon>
 );
 
