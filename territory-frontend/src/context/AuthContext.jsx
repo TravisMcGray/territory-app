@@ -15,20 +15,13 @@ export function AuthProvider({ children }) {
     // Check if user has a token on app load and fetch their profile.
     useEffect(() => {
     const token = localStorage.getItem('token');
-    console.log('Token on load:', token ? 'EXISTS' : 'MISSING');
     
     if (token) {
         setUser({ _id: 'loading' });
         
         getProfile()
-            .then(res => {
-                console.log('Full response data:', res.data);
-                console.log('Profile loaded:', res.data.user);
-                setUser(res.data.profile);
-            })
+            .then(res => setUser(res.data.profile))
             .catch((err) => {
-                console.log('Profile error status:', err.response?.status);
-                console.log('Profile error:', err.message);
                 if (err.response?.status === 401) {
                     localStorage.removeItem('token');
                     setUser(null);
@@ -56,7 +49,9 @@ export function AuthProvider({ children }) {
     if (loading) {
         return (
             <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-                <div className="text-white text-xl">Loading...</div>
+                <div className="text-emerald-400 text-lg font-semibold animate-pulse">
+                    Loading...
+                </div>
             </div>
         );
     }

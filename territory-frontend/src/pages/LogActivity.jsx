@@ -54,6 +54,55 @@ const formatDistance = (meters) => {
     return miles.toFixed(2);
 };
 
+// ========== ACTIVITY TYPE HEX ICONS ==========
+// Walk = blue, Run = emerald. Matches color scheme throughout the app.
+
+const WalkHexIcon = ({ size = 48, active = false }) => (
+    <svg width={size} height={size} viewBox="0 0 28 28" fill="none">
+        <polygon
+            points="2,14 8,3 20,3 26,14 20,25 8,25"
+            fill="#0e0d0d"
+            stroke={active ? '#3b82f6' : '#374151'}
+            strokeWidth="2"
+        />
+        <text
+            x="14"
+            y="15"
+            textAnchor="middle"
+            dominantBaseline="middle"
+            fontSize="7"
+            fill={active ? '#3b82f6' : '#6b7280'}
+            fontWeight="800"
+            fontFamily="Oxanium, sans-serif"
+        >
+            WALK
+        </text>
+    </svg>
+);
+
+const RunHexIcon = ({ size = 48, active = false }) => (
+    <svg width={size} height={size} viewBox="0 0 28 28" fill="none">
+        <polygon
+            points="2,14 8,3 20,3 26,14 20,25 8,25"
+            fill="#0e0d0d"
+            stroke={active ? '#10b981' : '#374151'}
+            strokeWidth="2"
+        />
+        <text
+            x="14"
+            y="15"
+            textAnchor="middle"
+            dominantBaseline="middle"
+            fontSize="7"
+            fill={active ? '#10b981' : '#6b7280'}
+            fontWeight="800"
+            fontFamily="Oxanium, sans-serif"
+        >
+            RUN
+        </text>
+    </svg>
+);
+
 // ========== MAIN COMPONENT ==========
 export default function LogActivity() {
     const navigate = useNavigate();
@@ -293,7 +342,7 @@ function SetupPhase({ activityType, setActivityType, onStart }) {
         <div className="space-y-8">
             <div>
                 <h2 className="text-3xl font-black">Log Activity</h2>
-                <p className="text-gray-200 mt-1 text-sm">
+                <p className="font-bold text-gray-200 mt-1 text-sm">
                     Choose your activity type and head outside.
                 </p>
             </div>
@@ -309,9 +358,9 @@ function SetupPhase({ activityType, setActivityType, onStart }) {
                             : 'border-gray-800 bg-gray-900 hover:border-gray-700'
                     }`}
                 >
-                    <div className="text-3xl mb-2">🚶</div>
+                    <div className="mb-2"><WalkHexIcon size={48} active={activityType === 'walk'} /></div>
                     <div className="font-bold text-lg">Walk</div>
-                    <div className="text-gray-200 text-xs mt-1">
+                    <div className="font-bold text-gray-200 text-xs mt-1">
                         Capture territory peacefully. Never stolen from.
                     </div>
                 </button>
@@ -325,9 +374,9 @@ function SetupPhase({ activityType, setActivityType, onStart }) {
                             : 'border-gray-800 bg-gray-900 hover:border-gray-700'
                     }`}
                 >
-                    <div className="text-3xl mb-2">🏃</div>
+                    <div className="mb-2"><RunHexIcon size={48} active={activityType === 'run'} /></div>
                     <div className="font-bold text-lg">Run</div>
-                    <div className="text-xs text-gray-200 mt-1">
+                    <div className="font-bold text-xs text-gray-200 mt-1">
                         Steal from other runners. Compete for territory.
                     </div>
                 </button>
@@ -335,14 +384,14 @@ function SetupPhase({ activityType, setActivityType, onStart }) {
 
             {/* Rules reminder */}
             <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 space-y-2">
-                <p className="text-gray-400 text-xs font-semibold uppercase tracking-wide">
+                <p className="font-bold text-gray-100 text-sm uppercase tracking-wide">
                     Territory Rules
                 </p>
-                <p className="text-gray-400 text-sm">
-                    🚶 <span className="text-white">Walkers</span> capture unclaimed land and keep it forever.
+                <p className="font-bold text-gray-400 text-sm">
+                    🚶 <span className="font-bold text-white">Walkers</span> capture unclaimed land and keep it forever.
                 </p>
-                <p className="text-gray-400 text-sm">
-                    🏃 <span className="text-white">Runners</span> can steal territory from other runners only.
+                <p className="font-bold text-gray-400 text-sm">
+                    🏃 <span className="font-bold text-white">Runners</span> can steal territory from other runners only.
                 </p>
             </div>
 

@@ -19,6 +19,7 @@ import {
     getFollowing,
 } from '../services/api';
 import HexBackground from '../components/HexBackground';
+import Navbar from '../components/Navbar';
 
 // ========== TIME HELPER ==========
 const timeAgo = (dateString) => {
@@ -55,82 +56,54 @@ export default function Profile() {
     const [error, setError] = useState('');
     const [activeTab, setActiveTab] = useState('activities');
 
-    // ========== LOAD PROFILE DATA ==========
-    useEffect(() => {
-        const loadProfile = async () => {
-            try {
-                if (isOwnProfile) {
-                    // Load own profile
-                    const [profileRes, achievementsRes, activitiesRes] = await Promise.all([
-                        getProfile(),
-                        getUserAchievements(),
-                        getActivities(),
-                    ]);
-                    setProfile(profileRes.data.user);
-                    setAchievements(achievementsRes.data.achievements || []);
-                    setActivities(activitiesRes.data.activities || []);
-
-                    // Load followers/following
-                    const profileId = profileRes.data.user._id;
-                    const [followersRes, followingRes] = await Promise.all([
-                        getFollowers(profileId),
-                        getFollowing(profileId),
-                    ]);
-                    setFollowers(followersRes.data.followers || []);
-                    setFollowing(followingRes.data.following || []);
-                } else {
-                    // Load someone else's profile
-                    const [profileRes, followersRes, followingRes] = await Promise.all([
-                        getUserById(userId),
-                        getFollowers(userId),
-                        getFollowing(userId),
-                    ]);
-                    setProfile(profileRes.data.user);
-                    setFollowers(followersRes.data.followers || []);
-                    setFollowing(followingRes.data.following || []);
-
-                    // Check if current user is already following this person
-                    const alreadyFollowing = followersRes.data.followers?.some(
-                        f => f._id === currentUser?._id
-                    );
-                    setIsFollowing(alreadyFollowing);
-                }
-            } catch (err) {
-                setError('Failed to load profile.');
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        loadProfile();
-    }, [userId, isOwnProfile]);
-
-    // ========== FOLLOW / UNFOLLOW ==========
-    const handleFollowToggle = async () => {
-        setFollowLoading(true);
+// ========== LOAD PROFILE DATA ==========
+useEffect(() => {
+    const loadProfile = async () => {
         try {
-            if (isFollowing) {
-                await unfollowUser(userId);
-                setIsFollowing(false);
-                setFollowers(prev => prev.filter(f => f._id !== currentUser?._id));
+            if (isOwnProfile) {
+                // Load own profile
+                const [profileRes, achievementsRes, activitiesRes] = await Promise.all([
+                    getProfile(),
+                    getUserAchievements(),
+                    getActivities(),
+                ]);
+                setProfile(profileRes.data.profile);
+                setAchievements(achievementsRes.data.achievements || []);
+                setActivities(activitiesRes.data.activities || []);
+
+                const profileId = profileRes.data.profile.id;
+                const [followersRes, followingRes] = await Promise.all([
+                    getFollowers(profileId),
+                    getFollowing(profileId),
+                ]);
+                setFollowers(followersRes.data.followers || []);
+                setFollowing(followingRes.data.following || []);
+
             } else {
-                await followUser(userId);
-                setIsFollowing(true);
-                setFollowers(prev => [...prev, { _id: currentUser?._id }]);
+                // Load someone else's profile
+                const profileRes = await getUserById(userId);
+                setProfile(profileRes.data.user);
+                setFollowers(Array(profileRes.data.relationshipStatus.followerCount).fill({}));
+                setFollowing(Array(profileRes.data.relationshipStatus.followingCount).fill({}));
+                setIsFollowing(profileRes.data.relationshipStatus.isFollowing);
             }
         } catch (err) {
-            console.error('Follow toggle failed:', err);
+            console.error('Profile load error:', err);
+            setError('Failed to load profile.');
         } finally {
-            setFollowLoading(false);
+            setLoading(false);
         }
     };
+
+    loadProfile();
+}, [userId, isOwnProfile]);
 
     // ========== LOADING STATE ==========
     if (loading) {
         return (
             <div className="min-h-screen bg-gray-950 flex items-center justify-center">
                 <div className="text-emerald-400 text-lg font-semibold animate-pulse">
-                    Loading profile...
+                    Loading profile data...
                 </div>
             </div>
         );
@@ -143,7 +116,7 @@ export default function Profile() {
                     <p className="text-lg font-bold">Profile not found</p>
                     <button
                         onClick={() => navigate('/dashboard')}
-                        className="text-emerald-400 text-sm mt-3 hover:text-emerald-300"
+                        className="font-bold text-emerald-400 text-sm mt-3 hover:text-emerald-300"
                     >
                         ← Back to dashboard
                     </button>
@@ -160,20 +133,7 @@ export default function Profile() {
             <HexBackground />
 
             {/* Navbar */}
-            <nav className="border-b border-gray-800 bg-gray-900 px-4 py-3 sticky top-0 z-10">
-                <div className="max-w-lg mx-auto flex items-center justify-between">
-                    <button
-                        onClick={() => navigate('/dashboard')}
-                        className="text-gray-400 hover:text-white transition-colors text-sm"
-                    >
-                        ← Back
-                    </button>
-                    <h1 className="text-lg font-black tracking-tight">
-                        Territory<span className="text-emerald-400">Capture</span>
-                    </h1>
-                    <div className="w-12" />
-                </div>
-            </nav>
+            <Navbar />
 
             <div className="max-w-lg mx-auto px-4 py-6 relative z-10 space-y-6">
 
@@ -326,7 +286,7 @@ export default function Profile() {
 // ========== ACTIVITY ROW ==========
 function ActivityRow({ activity }) {
     const isWalk = activity.activityType === 'walk' || activity.activityType === 'WALKING';
-    const distanceMiles = ((activity.distance ?? 0) / 1609).toFixed(2);
+    const distanceMiles = (activity.distance ?? 0).toFixed(2);
 
     const formatDuration = (seconds) => {
         if (!seconds) return '0m';

@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { getFeed, addKudos, removeKudos, addComment } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import HexBackground from '../components/HexBackground';
+import Navbar from '../components/Navbar';
 
 // ========== TIME HELPER ==========
 // Converts a timestamp to a human-readable relative time string.
@@ -28,7 +29,6 @@ const timeAgo = (dateString) => {
 
 // ========== MAIN COMPONENT ==========
 export default function Feed() {
-    const navigate = useNavigate();
     const { user } = useAuth();
 
     const [activities, setActivities] = useState([]);
@@ -96,25 +96,23 @@ export default function Feed() {
     };
 
     // ========== RENDER ==========
+
+    if (loading) {
+    return (
+        <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+            <div className="text-emerald-400 text-lg font-semibold animate-pulse">
+                Loading feed data...
+            </div>
+        </div>
+    );
+}
+
     return (
         <div className="min-h-screen bg-gray-950 text-white relative">
             <HexBackground />
 
             {/* Navbar */}
-            <nav className="border-b border-gray-800 bg-gray-900 px-4 py-3 sticky top-0 z-10">
-                <div className="max-w-lg mx-auto flex items-center justify-between">
-                    <button
-                        onClick={() => navigate('/dashboard')}
-                        className="font-bold text-gray-100 hover:text-white transition-colors text-sm"
-                    >
-                        ← Back
-                    </button>
-                    <h1 className="text-lg font-black tracking-tight">
-                        Territory<span className="text-emerald-400">Capture</span>
-                    </h1>
-                    <div className="w-12" />
-                </div>
-            </nav>
+            <Navbar />
 
             <div className="max-w-lg mx-auto px-4 py-6 relative z-10">
 

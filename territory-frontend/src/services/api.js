@@ -37,7 +37,7 @@ export const removeKudos = (id) => api.delete(`/api/activities/${id}/kudos`);
 // ========== USERS ==========
 export const getProfile = () => api.get('/api/user/profile');
 export const updateUsername = (data) => api.put('/api/user/username', data);
-export const getUserAchievements = () => api.get('/api/user/achievements');
+export const getUserAchievements = () => api.get('/api/achievements');
 export const getUserTerritories = () => api.get('/api/user/territories');
 export const getUserById = (id) => api.get(`/api/users/${id}`);
 export const getTerritories = () => api.get('/api/user/territories')
