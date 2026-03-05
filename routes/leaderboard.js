@@ -102,7 +102,10 @@ const getLeaderboardData = async (metricKey, pagination) => {
         rank: 1,
         username: 1,
         avatar: 1,
-        stats: 1
+        'stats.totalHexagonsCaptured': 1,
+        'stats.totalDistance': 1,
+        'stats.totalWalks': 1,
+        'stats.totalRuns': 1
     };
 
     if (metricKey === 'ACTIVITY') {
@@ -186,7 +189,10 @@ const getUserRankWithContext = async (userId, metricKey, contextLimit = 2) => {
         rank: 1,
         username: 1,
         avatar: 1,
-        stats: 1,
+        'stats.totalHexagonsCaptured': 1,
+        'stats.totalDistance': 1,
+        'stats.totalWalks': 1,
+        'stats.totalRuns': 1
     };
 
     if (metricKey === 'ACTIVITY') {
@@ -255,7 +261,7 @@ const formatLeaderboardResponse = (users, pagination, metricKey) => {
 };
 
 // ========== GET /api/leaderboard/hexagons - Top hexagon capturers ==========
-router.get('/hexagons', async (req, res) => {
+router.get('/hexagons', authenticateToken, async (req, res) => {
     try {
         const pagination = getPaginationParams(req.query.page, req.query.limit);
         const topUsers = await getLeaderboardData('HEXAGONS', pagination);
@@ -270,14 +276,15 @@ router.get('/hexagons', async (req, res) => {
 
     } catch (error) {
         res.status(500).json({
-            message: 'Error retrieving hexagon leaderboard',
-            error: error.message
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error retrieving hexagon leaderboard'
         });
     }
 });
 
 // ========== GET /api/leaderboard/distance - Top distance travelers ==========
-router.get('/distance', async (req, res) => {
+router.get('/distance', authenticateToken, async (req, res) => {
     try {
         const pagination = getPaginationParams(req.query.page, req.query.limit);
         const topUsers = await getLeaderboardData('DISTANCE', pagination);
@@ -292,14 +299,15 @@ router.get('/distance', async (req, res) => {
 
     } catch (error) {
         res.status(500).json({
-            message: 'Error retrieving distance leaderboard',
-            error: error.message
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error retrieving distance leaderboard'
         });
     }
 });
 
 // ========== GET /api/leaderboard/activity - Most active users ==========
-router.get('/activity', async (req, res) => {
+router.get('/activity', authenticateToken, async (req, res) => {
     try {
         const pagination = getPaginationParams(req.query.page, req.query.limit);
         const topUsers = await getLeaderboardData('ACTIVITY', pagination);
@@ -314,8 +322,9 @@ router.get('/activity', async (req, res) => {
 
     } catch (error) {
         res.status(500).json({
-            message: 'Error retrieving activity leaderboard',
-            error: error.message
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error retrieving activity leaderboard'
         });
     }
 });
@@ -363,8 +372,9 @@ router.get('/:metric/rank', authenticateToken, async (req, res) => {
 
     } catch (error) {
         res.status(500).json({
-            message: 'Error retrieving user rank',
-            error: error.message
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error retrieving user rank'
         });
     }
 });
