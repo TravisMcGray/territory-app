@@ -210,10 +210,21 @@ router.post('/:segmentId/attempt', authenticateToken, async(req, res) => {
         const { coordinates, duration, elevationGain } = req.body;
         const userId = req.user.userId;
 
-        // Validate 
+        // ===== Step 1: Fetch current user ONCE - reuse everywhere below =====
+        const currentUser = await User.findById(userId).select('username');
+        if (!currentUser) {
+            return res.status(404).json({
+                status: 'error',
+                code: 'USER_NOT_FOUND',
+                message: 'User not found'
+            });
+        }
+
+        // ===== Step 2: Validate inputs before any writes =====
         if (!coordinates || coordinates.length < 2) {
             return res.status(400).json({
                 status: 'error',
+                code: 'INVALID_COORDINATES',
                 message: 'Coordinates required'
             });
         }
@@ -221,17 +232,22 @@ router.post('/:segmentId/attempt', authenticateToken, async(req, res) => {
         if (!duration || typeof duration !== 'number' || duration <= 0) {
             return res.status(400).json({
                 status: 'error',
+                code: 'INVALID_DURATION',
                 message: 'Duration must be positive number (seconds)'
             });
         }
 
-        // Get segment
+        // ===== Step 3: Fetch segment =====
         const segment = await Segment.findById(segmentId);
         if (!segment) {
-            return res.status(404).json({ error: 'Segment not found' });
+            return res.status(404).json({
+                status: 'error',
+                code: 'SEGMENT_NOT_FOUND',
+                message: 'Segment not found'
+            });
         }
 
-        // Calculate distance
+        // ===== Step 4: Calculate distance =====
         let distance = 0;
         if (coordinates.length > 1) {
             const metersDistance = geolib.getPathLength(
@@ -243,13 +259,13 @@ router.post('/:segmentId/attempt', authenticateToken, async(req, res) => {
             distance = parseFloat((metersDistance * 0.000621371).toFixed(2));
         }
 
-        // Convert to H3 hexagons
+        // ===== Step 5: Convert to H3 hexagons =====
         const hexagons = coordinates.map(coord =>
             latLngToCell(coord.latitude, coord.longitude, 10)
         );
         const uniqueHexagons = [...new Set(hexagons)];
 
-        // Check if this is a new Territory Master (new fastest time)
+        // ===== Step 6: Check Territory Master =====
         let isNewTerritoryMaster = false;
         let previousTerritoryMasterTime = null;
 
@@ -258,7 +274,7 @@ router.post('/:segmentId/attempt', authenticateToken, async(req, res) => {
             previousTerritoryMasterTime = segment.territoryMaster?.time || null;
         }
 
-        // Create segment attempt record
+        // ===== Step 7: Create attempt record =====
         const attempt = await SegmentAttempt.create({
             segmentId,
             userId,
@@ -272,31 +288,30 @@ router.post('/:segmentId/attempt', authenticateToken, async(req, res) => {
             previousTerritoryMaster: previousTerritoryMasterTime
         });
 
-        // Update segment stats
+        // ===== Step 8: Update segment stats =====
         segment.totalAttempts += 1;
 
-        // Update territory Master if new record
+        // ===== Step 9: Update Territory Master if new record =====
         if (isNewTerritoryMaster) {
-            // If there was a previous Territory Master, notify them
+            // Notify previous holder if there was one and it wasn't the same user
             if (segment.territoryMaster && segment.territoryMaster.userId) {
                 const previousHolderId = segment.territoryMaster.userId.toString();
-        
+
                 if (previousHolderId !== userId.toString()) {
-                    const newRecordHolder = await User.findById(userId).select('username');
                     const timeDifference = previousTerritoryMasterTime - duration;
-                    
                     await createSegmentRecordNotification(
                         previousHolderId,
-                        newRecordHolder,
+                        currentUser,  // already fetched at top - no second lookup needed
                         segment,
                         timeDifference
                     );
                 }
             }
 
+            // Use currentUser.username - already verified not null at top of route
             segment.territoryMaster = {
                 userId,
-                username: req.user.email?.split('@')[0] || 'User', // Get from email or fallback
+                username: currentUser.username,
                 time: duration,
                 heldSince: new Date()
             };
@@ -304,11 +319,10 @@ router.post('/:segmentId/attempt', authenticateToken, async(req, res) => {
 
         await segment.save();
 
-        // Update or create UserSegmentrecord (personal stats)
+        // ===== Step 10: Update or create UserSegmentRecord =====
         let userRecord = await UserSegmentRecord.findOne({ userId, segmentId });
 
         if (!userRecord) {
-            // First time on this segment
             userRecord = await UserSegmentRecord.create({
                 userId,
                 segmentId,
@@ -321,29 +335,24 @@ router.post('/:segmentId/attempt', authenticateToken, async(req, res) => {
                 lastAttempt: new Date()
             });
         } else {
-            // Update existing record
             userRecord.attempts += 1;
             userRecord.lastAttempt = new Date();
             userRecord.totalHexagonsCaptured += uniqueHexagons.length;
 
-            // Update personal best if faster
             if (duration < userRecord.personalBest) {
                 userRecord.personalBest = duration;
             }
 
-            // Update Territory Master status
-            if ( isNewTerritoryMaster) {
+            if (isNewTerritoryMaster) {
                 userRecord.holdsTerritoryMaster = true;
                 userRecord.territoryMasterSince = new Date();
             }
 
-            // Calculate territory strength (1-10 scale based on revisits)
-            // White: 1-3, Yellow: 4-6, Gold: 7-9, Red: 10+
             userRecord.territoryStrength = Math.min(10, userRecord.attempts);
-
             await userRecord.save();
         }
 
+        // ===== Step 11: Return clean response =====
         res.status(201).json({
             message: 'Segment attempt recorded successfully',
             attempt: {
@@ -363,9 +372,10 @@ router.post('/:segmentId/attempt', authenticateToken, async(req, res) => {
         });
 
     } catch (error) {
-        res.status(400).json({
-            message: 'Error recording attempt',
-            error: error.message
+        res.status(500).json({
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error recording attempt'
         });
     }
 });
