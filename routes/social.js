@@ -30,17 +30,15 @@ router.post('/:userId/follow', authenticateToken, async (req, res) => {
 
         // Get current user and target user
         const currentUser = await User.findById(currentUserId);
+        if (!currentUser) {
+            return res.status(404).json({
+                status: 'error',
+                code: 'USER_NOT_FOUND',
+                message: 'Current user not found'
+            });
+        }
+
         const targetUser = await User.findById(targetUserId);
-
-        // Ensure arrays exist (for old documents without these fields)
-        if (!currentUser.following) {
-            currentUser.following = [];
-        }
-        if (!targetUser.followers) {
-            targetUser.followers = [];
-        }
-
-        // Check if target user exists
         if (!targetUser) {
             return res.status(404).json({
                 status: 'error',
@@ -48,6 +46,10 @@ router.post('/:userId/follow', authenticateToken, async (req, res) => {
                 message: 'User not found'
             });
         }
+
+        // Ensure arrays exist (for old documents without these fields)
+        if (!currentUser.following) currentUser.following = [];
+        if (!targetUser.followers) targetUser.followers = [];
 
         // Check if already following
         if (currentUser.isFollowing(targetUserId)) {
@@ -67,8 +69,7 @@ router.post('/:userId/follow', authenticateToken, async (req, res) => {
         await targetUser.save();
 
         // Notify the user being followed
-        const followerUser = await User.findById(currentUserId).select('username');
-        await createNewFollowerNotification(targetUserId, followerUser);
+        await createNewFollowerNotification(targetUserId, currentUser);
 
         res.status(200).json({
             message: `You are now following ${targetUser.username}`,
@@ -81,8 +82,9 @@ router.post('/:userId/follow', authenticateToken, async (req, res) => {
 
     } catch (error) {
         res.status(500).json({
-            message: 'Error following user',
-            error: error.message
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error following user'
         });
     }
 });
@@ -104,17 +106,15 @@ router.delete('/:userId/follow', authenticateToken, async (req, res) => {
 
         // Get current user and target user
         const currentUser = await User.findById(currentUserId);
+        if (!currentUser) {
+            return res.status(404).json({
+                status: 'error',
+                code: 'USER_NOT_FOUND',
+                message: 'Current user not found'
+            });
+        }
+
         const targetUser = await User.findById(targetUserId);
-
-        // Ensure arrays exist (for old documents without these fields)
-        if (!currentUser.following) {
-            currentUser.following = [];
-        }
-        if (!targetUser.followers) {
-            targetUser.followers = [];
-        }
-
-        // Check if target user exists
         if (!targetUser) {
             return res.status(404).json({
                 status: 'error',
@@ -122,6 +122,10 @@ router.delete('/:userId/follow', authenticateToken, async (req, res) => {
                 message: 'User not found'
             });
         }
+
+        // Ensure arrays exist (for old documents without these fields)
+        if (!currentUser.following) currentUser.following = [];
+        if (!targetUser.followers) targetUser.followers = [];
 
         // Check if following
         if (!currentUser.isFollowing(targetUserId)) {
@@ -154,8 +158,9 @@ router.delete('/:userId/follow', authenticateToken, async (req, res) => {
 
     } catch (error) {
         res.status(500).json({
-            message: 'Error unfollowing user',
-            error: error.message
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error unfollowing user'
         });
     }
 });
@@ -167,8 +172,6 @@ router.get('/:userId/followers', authenticateToken, async (req, res) => {
         const page = Math.max(1, parseInt(req.query.page) || 1);
         const limit = Math.min(50, parseInt(req.query.limit) || 20);
         const skip = (page - 1) * limit;
-
-        console.log('1. Got request for user:', userId);
 
         // Validate ID
         if (!userId || userId.length !== 24) {
@@ -186,8 +189,6 @@ router.get('/:userId/followers', authenticateToken, async (req, res) => {
                 select: 'username avatar stats',
             });
 
-        console.log('2. Found user:', user?.username, 'followers type:', typeof user?.followers);
-
         if (!user) {
             return res.status(404).json({
                 status: 'error',
@@ -198,14 +199,11 @@ router.get('/:userId/followers', authenticateToken, async (req, res) => {
 
         // Ensure followers array exists (for old documents without this field)
         if (!user.followers) {
-            console.log('3. Initializing followers array');
             user.followers = [];
         }
 
-        console.log('4. About to get totalFollowers, user.followers is:', Array.isArray(user.followers));
         // Get total follower count
         const totalFollowers = user.followers.length;
-        console.log('5. totalFollowers:', totalFollowers);
 
         // Apply pagination manually
         const paginatedFollowers = user.followers.slice(skip, skip + limit);
@@ -213,8 +211,6 @@ router.get('/:userId/followers', authenticateToken, async (req, res) => {
         // Format follower data with isFollowing indicator
         const { userId: currentUserId } = req.user;
         const currentUser = await User.findById(currentUserId);
-
-        console.log('6. currentUser found:', !!currentUser);
 
         // Ensure currentUser exists and has following array
         if (!currentUser) {
@@ -229,13 +225,11 @@ router.get('/:userId/followers', authenticateToken, async (req, res) => {
             currentUser.following = [];
         }
 
-        console.log('7. About to map followers');
         const followersList = paginatedFollowers.map(follower => ({
             ...follower.toPublicJSON(),
             isFollowedByYou: currentUser.isFollowing(follower._id)
         }));
 
-        console.log('8. Sending response');
         res.json({
             message: `${user.username}'s followers`,
             user: {
@@ -254,10 +248,10 @@ router.get('/:userId/followers', authenticateToken, async (req, res) => {
         });
 
     } catch (error) {
-        console.error('ERROR:', error);
         res.status(500).json({
-            message: 'Error retrieving followers',
-            error: error.message
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error retrieving followers'
         });
     }
 });
@@ -345,8 +339,9 @@ router.get('/:userId/following', authenticateToken, async (req, res) => {
 
     } catch (error) {
         res.status(500).json({
-            message: 'Error retrieving following list',
-            error: error.message
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error retrieving following list'
         });
     }
 });
@@ -379,11 +374,15 @@ router.get('/:userId', authenticateToken, async (req, res) => {
 
         // Check if current user is following this user
         const currentUser = await User.findById(currentUserId);
-
-        // Ensure currentUser has following array
-        if (!currentUser.following) {
-            currentUser.following = [];
+        if (!currentUser) {
+            return res.status(404).json({
+                status: 'error',
+                code: 'USER_NOT_FOUND',
+                message: 'Current user not found'
+            });
         }
+
+        if (!currentUser.following) currentUser.following = [];
 
         const isFollowing = currentUser.isFollowing(userId);
 
@@ -399,8 +398,9 @@ router.get('/:userId', authenticateToken, async (req, res) => {
 
     } catch (error) {
         res.status(500).json({
-            message: 'Error retrieving user profile',
-            error: error.message
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error retrieving user profile'
         });
     }
 });
