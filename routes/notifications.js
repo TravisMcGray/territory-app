@@ -3,6 +3,24 @@ const router = express.Router();
 const Notification = require('../models/notification');
 const { authenticateToken: auth } = require('../middleware/auth');
 
+// ========== GET UNREAD COUNT ==========
+router.get('/unread-count', auth, async(req, res) => {
+    try {
+        const count = await Notification.countDocuments({
+            user: req.user.userId,
+            read: false
+        });
+
+        res.json({ unreadCount: count });
+    } catch (error) {
+        res.status(500).json({
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error fetching unread count'
+        });
+    }
+});
+
 // ========== GET USER NOTIFICATIONS (Paginated) ==========
 router.get('/', auth, async (req, res) => {
     try {
@@ -62,32 +80,11 @@ router.get('/', auth, async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error fetching notifications:', error);
-        res.status(500).json({ message: 'Server error fetching notifications' });
-    }
-});
-
-// ========== MARK NOTIFICATIONS AS READ ==========
-router.put('/:id/read', auth, async (req, res) => {
-    try {
-        const notification = await Notification.findById(req.params.id);
-
-        if (!notification) {
-            return res.status(404).json({ message: 'Notification not found' });
-        }
-
-        // Only owner can mark as read
-        if (notification.user.toString() !== req.user.userId) {
-            return res.status(403).json({ message: 'Not your notification' })
-        }
-
-        notification.read = true;
-        await notification.save();
-
-        res.json({ message: 'Notification marked as read' });
-    } catch (error) {
-        console.error('Error marking notification as read:', error);
-        res.status(500).json({ message: 'Server error updating notification' });
+        res.status(500).json({
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error fetching notifications'
+        });
     }
 });
 
@@ -104,9 +101,47 @@ router.put('/read-all', auth, async (req, res) => {
             updatedCount: result.modifiedCount
         });
 
-    } catch  (error) {
-        console.error('Error marking all notifications as read:', error);
-        res.status(500).json({ message: 'Server error updating notifications' });
+    } catch (error) {
+        res.status(500).json({
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error marking all notifications as read'
+        });
+    }
+});
+
+
+// ========== MARK NOTIFICATIONS AS READ ==========
+router.put('/:id/read', auth, async (req, res) => {
+    try {
+        const notification = await Notification.findById(req.params.id);
+
+        if (!notification) {
+            return res.status(404).json({
+                status: 'error',
+                code: 'NOT_FOUND',
+                message: 'Notification not found'
+            });
+        }
+
+        if (notification.user.toString() !== req.user.userId) {
+            return res.status(403).json({
+                status: 'error',
+                code: 'FORBIDDEN',
+                message: 'Not your notification'
+            });
+        }
+
+        notification.read = true;
+        await notification.save();
+
+        res.json({ message: 'Notification marked as read' });
+    } catch (error) {
+        res.status(500).json({
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error marking notification as read'
+        });
     }
 });
 
@@ -116,34 +151,29 @@ router.delete('/:id', auth, async (req, res) => {
         const notification = await Notification.findById(req.params.id);
 
         if (!notification) {
-            return res.status(404).json({ message: 'Notification not found' });
+            return res.status(404).json({
+                status: 'error',
+                code: 'NOT_FOUND',
+                message: 'Notification not found'
+            });
         }
 
-        // Only owner can delete
         if (notification.user.toString() !== req.user.userId) {
-            return res.status(403).json({ message: 'Not your notification' });
+            return res.status(403).json({
+                status: 'error',
+                code: 'FORBIDDEN',
+                message: 'Not your notification'
+            });
         }
 
         await Notification.findByIdAndDelete(req.params.id);
         res.json({ message: 'Notification deleted' });
     } catch (error) {
-        console.error('Error deleting notification:', error);
-        res.status(500).json({ message: 'Server error deleting notification' });
-    }
-});
-
-// ========== GET UNREAD COUNT ==========
-router.get('/unread-count', auth, async(req, res) => {
-    try {
-        const count = await Notification.countDocuments({
-            user: req.user.userId,
-            read: false
+        res.status(500).json({
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error deleting notification'
         });
-
-        res.json({ unreadCount: count });
-    } catch (error) {
-        console.error('Error fetching unread count:', error);
-        res.status(500).json({ message: 'Server error fetching count' });
     }
 });
 
