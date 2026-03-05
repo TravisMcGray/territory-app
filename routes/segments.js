@@ -45,15 +45,16 @@ router.post('/', authenticateToken, async (req, res) => {
         });
 
     } catch (error) {
-        res.status(400).json({
-            message: 'Error creating segment',
-            error: error.message
+        res.status(500).json({
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error creating segment'
         });
     }
 });
 
 // ========== GET /api/segments - List all segments (paginated) ==========
-router.get('/', async(req, res) => {
+router.get('/', authenticateToken, async(req, res) => {
     try {
         const page = Math.max(1, parseInt(req.query.page) || 1);
         const limit = Math.min(50, parseInt(req.query.limit) || 20);
@@ -90,14 +91,15 @@ router.get('/', async(req, res) => {
 
     } catch (error) {
         res.status(500).json({
-            message: 'Error retrieving segments',
-            error: error.message
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error retrieving segments'
         });
     }
 });
 
 // ========== GET /api/segments/:segmentId - Get specific segment ==========
-router.get('/:segmentId', async (req,res) => {
+router.get('/:segmentId', authenticateToken, async (req,res) => {
     try {
         const segment = await Segment.findById(req.params.segmentId)
         .populate('creator', 'username avatar')
@@ -114,8 +116,9 @@ router.get('/:segmentId', async (req,res) => {
 
     } catch (error) {
         res.status(500).json({
-            message: 'Error retrieving segment',
-            error: error.message
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error retrieving segment'
         });
     }
 });
@@ -157,9 +160,10 @@ router.put('/:segmentId', authenticateToken, async (req, res) => {
         });
 
     } catch (error) {
-        res.status(400).json({
-            message: 'Error updating segment',
-            error: error.message
+        res.status(500).json({
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error updating segment'
         });
     }
 });
@@ -197,8 +201,9 @@ router.delete('/:segmentId', authenticateToken, async(req, res) => {
 
     } catch (error) {
         res.status(500).json({
-            message: 'Error deleting segment',
-            error: error.message
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error deleting segment'
         });
     }
 });
@@ -381,7 +386,7 @@ router.post('/:segmentId/attempt', authenticateToken, async(req, res) => {
 });
 
 // ========== GET /api/segments/:segmentId/leaderboard - Segment leaderboard ==========
-router.get('/:segmentId/leaderboard', async(req,res) => {
+router.get('/:segmentId/leaderboard', authenticateToken, async(req,res) => {
     try {
         const { segmentId } = req.params;
         const page = Math.max(1, parseInt(req.query.page) || 1);
@@ -438,9 +443,10 @@ router.get('/:segmentId/leaderboard', async(req,res) => {
         });
 
     } catch (error) {
-        res.status(500).json({ 
-            message: 'Error retrieving leaderboard',
-            error: error.message
+        res.status(500).json({
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error retrieving leaderboard'
         });
     }
 });
