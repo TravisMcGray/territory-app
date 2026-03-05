@@ -67,7 +67,9 @@ app.use('/api/users', apiLimiter);
 app.use('/api/user', apiLimiter);
 app.use('/api/segments', apiLimiter);
 app.use('/api/routes', apiLimiter);
-
+app.use('/api/leaderboard', apiLimiter);
+app.use('/api/achievements', apiLimiter);
+app.use('/api/notifications', apiLimiter);
 
 app.use('/api/auth', authRouter);
 app.use('/api/activities', activitiesRouter);
