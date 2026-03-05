@@ -10,6 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@tailwindcss/vite": "^4.2.1",
+    "axios": "^1.13.6",
     "h3-js": "^4.4.0",
     "leaflet": "^1.9.4",
     "react": "^19.2.0",

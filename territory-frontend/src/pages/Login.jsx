@@ -38,7 +38,7 @@ const handleSubmit = async (e) => {
             : { email: form.email, password: form.password };
 
         const res = isSignup ? await signup(payload) : await login(payload);
-        loginUser(res.data.token, { _id: res.data.userId });
+        loginUser(res.data.token, { _id: res.data.userId, username: res.data.username });
         navigate('/dashboard');
     } catch (err) {
         const message = typeof err.response?.data === 'string'

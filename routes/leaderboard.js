@@ -134,7 +134,8 @@ const getUserRankWithContext = async (userId, metricKey, contextLimit = 2) => {
     if (metricKey === 'ACTIVITY') {
         userValue = user.stats.totalWalks + user.stats.totalRuns;
     } else {
-        userValue = eval(`user.${metric.field}`);
+        // Safe property access for nested fields like 'stats.totalWalks'
+        userValue = metric.field.split('.').reduce((obj, key) => obj?.[key], user);
     }
 
     // Count how many users are ahead (rank calculation)

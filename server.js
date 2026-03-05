@@ -36,7 +36,7 @@ app.use(cors({
 // Rate limiting for auth endpoints (prevent brute force)
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 50, // 5 requests per window
+    max: 50, // 50 requests per window
     message: 'Too many login attempts. Please try again later.',
     standardHeaders: true,
     legacyHeaders: false
