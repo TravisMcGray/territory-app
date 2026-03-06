@@ -10,7 +10,9 @@ const achievementSchema = new mongoose.Schema({
     },
     description: {
         type: String,
-        required: true
+        required: true,
+        trim: true, // Strips leading/trailing whitespace
+        maxlength: 500
     },
 
     // Achievement type/category
@@ -18,14 +20,14 @@ const achievementSchema = new mongoose.Schema({
         type: String,
         required: true,
         enum: ['TERRITORY', 'SOCIAL', 'DISTANCE', 'ACTIVITY', 'EXPLORATION', 'CONSISTENCY'],
-        index: true
+        // No standalone index needed — covered by compound index below
     },
     // Which activity type this achievement is for
     activityType: {
         type: String,
         enum: ['WALK', 'RUN', 'UNIVERSAL'],
         default: 'UNIVERSAL',
-        index: true
+        // No standalone index needed — covered by compound index below
     },
 
     // What triggers this achievement
@@ -46,8 +48,8 @@ const achievementSchema = new mongoose.Schema({
         }
     },
 
-    // Badge/icon URL (TODO: images added later)
-    badgeUrl: String,
+    // Badge/icon URL
+    badgeUrl: { type: String, maxlength: 500 }, 
 
     // rarity tier
     rarity: {
@@ -59,11 +61,16 @@ const achievementSchema = new mongoose.Schema({
     // Optional gamification
     points: {
         type: Number,
-        default: 10
+        default: 10,
+        min: 0 // Points cannot be negative
     }
 },
 { 
     timestamps: true 
 });
+
+// ========== INDEXES FOR EFFICIENT QUERIES ==========
+achievementSchema.index({ category: 1, activityType: 1 }); // Filter achievements by category and activity type
+achievementSchema.index({ rarity: 1 }); // Filter by rarity tier
 
 module.exports = mongoose.model('Achievement', achievementSchema);
