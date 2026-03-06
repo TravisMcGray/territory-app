@@ -9,8 +9,7 @@ email: {
     unique: true,
     lowercase: true,
     trim: true,
-    match: [/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/, 'Please provide a valid email'],
-    index: true
+    match: [/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/, 'Please provide a valid email']
     },
     password: {
         type: String,
@@ -27,12 +26,11 @@ username: {
     trim: true,
     minlength: 3,
     maxlength: 20,
-    match: [/^[a-zA-Z][a-zA-Z0-9_]*$/, 'Username must start with letter, contain only alphanumeric and underscore'],
-    index: true
+    match: [/^[a-zA-Z][a-zA-Z0-9_]*$/, 'Username must start with letter, contain only alphanumeric and underscore']
     },
-    firstName: String,
-    lastName: String,
-    avatar: String,
+    firstName: { type: String, trim: true, maxlength: 50 },
+    lastName: { type: String, trim: true, maxlength: 50 },
+    avatar: { type: String, maxlength: 500 },
 
 // Game stats (updated atomically with walks/runs)
 stats: {
@@ -63,7 +61,7 @@ achievements: [
         },
         unlockedAt: {
             type: Date,
-            defualt: Date.now
+            default: Date.now
         }
     }
 ],
@@ -71,7 +69,7 @@ achievements: [
     // Account metadata
     usernameChangedAt: Date,
     lastLogin: Date,
-    isActive: { type: Boolean, default: true }
+    isActive: { type: Boolean, default: true, select: false }
     },
     {
         timestamps: true // Adds createdAt and updatedAt automatically
@@ -91,7 +89,8 @@ userSchema.methods.canChangeUsername = function() {
 
 // Check if user is following another user
 userSchema.methods.isFollowing = function(userId) {
-    return this.following.includes(userId);
+    if (!this.following) return false;
+    return this.following.some(id => id.toString() === userId.toString());
 };
 
 // Get follower count
@@ -137,8 +136,10 @@ userSchema.methods.toPublicJSON = function() {
 };
 
 // Static methods
-userSchema.statics.findByEmail = function(email) {
-    return this.findOne({ email: email.toLowerCase() });
+userSchema.statics.findByEmail = function(email, selectPassword = false) {
+    const query = this.findOne({ email: email.toLowerCase() });
+    if (selectPassword) query.select('+password');
+    return query;
 };
 
 // Middleware: Hash password before save (only if modified)
@@ -151,12 +152,6 @@ userSchema.pre('save', async function(next) {
     } catch (err) {
         next(err);
     }
-});
-
-// Middleware: Filter inactive users
-userSchema.pre(/^find/, function(next) {
-    this.where({ isActive: true });
-    next();
 });
 
 module.exports = mongoose.model('User', userSchema);
