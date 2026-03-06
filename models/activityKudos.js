@@ -6,24 +6,23 @@ const activityKudosSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Activity',
         required: true,
-        index: true
     },
     user: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
         required: true,
-        index: true
     },
     
     // ========== TIMESTAMPS ==========
-    createdAt: {
-        type: Date,
-        default: Date.now,
-        index: true
-    }
+    // createdAt and updatedAt added automatically by Mongoose
+    },
+{
+    timestamps: true
 });
 
 // ========== INDEXES FOR EFFICIENT QUERIES ==========
+activityKudosSchema.index({ createdAt: -1 }); // Timestamp-based sorting
+
 // Ensure one kudos per user per activity (prevent duplicates)
 activityKudosSchema.index({ activity: 1, user: 1 }, { unique: true });
 
