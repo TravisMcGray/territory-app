@@ -6,13 +6,11 @@ const activityCommentSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Activity',
         required: true,
-        index: true
     },
     user: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
         required: true,
-        index: true
     },
     
     // ========== COMMENT CONTENT ==========
@@ -25,14 +23,15 @@ const activityCommentSchema = new mongoose.Schema({
     },
     
     // ========== TIMESTAMPS ==========
-    createdAt: {
-        type: Date,
-        default: Date.now,
-        index: true
-    }
+    // createdAt and updatedAt added automatically by Mongoose
+    },
+{
+    timestamps: true
 });
 
 // ========== INDEXES FOR EFFICIENT QUERIES ==========
+activityCommentSchema.index({ createdAt: -1 }); // Timestamp-based sorting
+
 // Get all comments for an activity (sorted by time)
 activityCommentSchema.index({ activity: 1, createdAt: 1 });
 
