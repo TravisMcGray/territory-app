@@ -85,23 +85,28 @@ router.put('/username', authenticateToken, async (req, res) => {
 
         if (!newUsername || newUsername.length < 3 || newUsername.length > 20) {
             return res.status(400).json({
-                error: 'Invalid username',
-                requirements: '3-20 characters, alphanumeric + underscore, start with letter'
+                status: 'error',
+                code: 'INVALID_USERNAME',
+                message: 'Username must be 3-20 characters, alphanumeric + underscore, start with letter'
             });
         }
 
         // Check if username already exists
         const existingUser = await User.findOne({ username: newUsername });
         if (existingUser && existingUser._id.toString() !== user._id.toString()) {
-            return res.status(409).json({ error: 'Username already taken' });
+            return res.status(409).json({
+                status: 'error',
+                code: 'USERNAME_TAKEN',
+                message: 'Username already taken'
+            });
         }
 
         // Check achievement: 100 hexagons captured
         if (!user.canChangeUsername()) {
             return res.status(403).json({
-                error: 'Must capture 100 hexagons to change username',
-                progress: `${user.stats.totalHexagonsCaptured}/100`,
-                needed: 100 - user.stats.totalHexagonsCaptured
+                status: 'error',
+                code: 'INSUFFICIENT_HEXAGONS',
+                message: `Must capture 100 hexagons to change username. Progress: ${user.stats.totalHexagonsCaptured}/100`
             });
         }
 
@@ -139,20 +144,30 @@ router.put('/email', authenticateToken, async (req, res) => {
 
         if (!newEmail || !password) {
             return res.status(400).json({
-                error: 'New email and current password are required'
+                status: 'error',
+                code: 'MISSING_FIELDS',
+                message: 'New email and current password are required'
             });
         }
 
         // Verify current password
         const isPasswordValid = await bcrypt.compare(password, user.password);
         if (!isPasswordValid) {
-            return res.status(401).json({ error: 'Incorrect password' });
+            return res.status(401).json({
+                status: 'error',
+                code: 'INCORRECT_PASSWORD',
+                message: 'Incorrect password'
+            });
         }
 
         // Check if email already exists
         const existingEmail = await User.findOne({ email: newEmail.toLowerCase() });
         if (existingEmail && existingEmail._id.toString() !== user._id.toString()) {
-            return res.status(409).json({ error: 'Email already in use' });
+            return res.status(409).json({
+                status: 'error',
+                code: 'EMAIL_IN_USE',
+                message: 'Email already in use'
+            });
         }
 
         user.email = newEmail.toLowerCase();
@@ -186,13 +201,21 @@ router.put('/password', authenticateToken, validatePasswordStrength, async (req,
         }
 
         if (!currentPassword) {
-            return res.status(400).json({ error: 'Current password is required' });
+            return res.status(400).json({
+                status: 'error',
+                code: 'MISSING_FIELDS',
+                message: 'Current password is required'
+            });
         }
 
         // Verify current password
         const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
         if (!isPasswordValid) {
-            return res.status(401).json({ error: 'Current password is incorrect' });
+            return res.status(401).json({
+                status: 'error',
+                code: 'INCORRECT_PASSWORD',
+                message: 'Current password is incorrect'
+            });
         }
 
         user.password = password; // Will be hashed by pre-save middleware
@@ -275,7 +298,11 @@ router.post('/reset-password', validatePasswordStrength, async (req, res) => {
         const { token, password } = req.body;
 
         if (!token) {
-            return res.status(400).json({ error: 'Reset token is required' });
+            return res.status(400).json({
+                status: 'error',
+                code: 'MISSING_TOKEN',
+                message: 'Reset token is required'
+            });
         }
 
         // Verify reset token
@@ -283,11 +310,19 @@ router.post('/reset-password', validatePasswordStrength, async (req, res) => {
         try {
             decoded = jwt.verify(token, JWT_SECRET);
         } catch (err) {
-            return res.status(403).json({ error: 'Invalid or expired token' });
+            return res.status(403).json({
+                status: 'error',
+                code: 'INVALID_TOKEN',
+                message: 'Invalid or expired token'
+            });
         }
 
         if (decoded.type !== 'password-reset') {
-            return res.status(403).json({ error: 'Invalid token type' });
+            return res.status(403).json({
+                status: 'error',
+                code: 'INVALID_TOKEN_TYPE',
+                message: 'Invalid token type'
+            });
         }
 
         const user = await User.findById(decoded.userId);
@@ -329,13 +364,21 @@ router.delete('/account', authenticateToken, async (req, res) => {
         }
 
         if (!password) {
-            return res.status(400).json({ error: 'Password is required to delete account' });
+            return res.status(400).json({
+                status: 'error',
+                code: 'MISSING_FIELDS',
+                message: 'Password is required to delete account'
+            });
         }
 
         // Verify password before deletion
         const isPasswordValid = await bcrypt.compare(password, user.password);
         if (!isPasswordValid) {
-            return res.status(401).json({ error: 'Incorrect password' });
+            return res.status(401).json({
+                status: 'error',
+                code: 'INCORRECT_PASSWORD',
+                message: 'Incorrect password'
+            });
         }
 
         // Soft delete (set isActive to false instead of hard delete)
