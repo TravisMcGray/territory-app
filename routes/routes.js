@@ -60,6 +60,7 @@ router.post('/', auth, async (req, res) => {
                     message: 'Longitude must be between -180 and 180'
                 });
             }
+            
         }
 
         // Add order to coordinates
