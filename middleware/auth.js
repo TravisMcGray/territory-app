@@ -40,7 +40,7 @@ const authenticateToken = (req, res, next) => {
             });
         }
 
-        req.user = user;
+        req.user = { userId: user.userId };
         next();
     });
 };
