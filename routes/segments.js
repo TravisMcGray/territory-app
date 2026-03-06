@@ -19,6 +19,7 @@ router.post('/', authenticateToken, async (req, res) => {
         if (!name || !coordinates || coordinates.length < 2) {
             return res.status(400).json({
                 status: 'error',
+                code: 'MISSING_FIELDS',
                 message: 'Name and at least 2 coordinates required'
             });
         }
@@ -106,7 +107,11 @@ router.get('/:segmentId', authenticateToken, async (req,res) => {
         .populate('territoryMaster.userId', 'username');
 
         if (!segment) {
-            return res.status(404).json({ error: 'Segment not found' });
+            return res.status(404).json({
+                status: 'error',
+                code: 'SEGMENT_NOT_FOUND',
+                message: 'Segment not found'
+            });
         }
 
         res.json({
@@ -134,13 +139,18 @@ router.put('/:segmentId', authenticateToken, async (req, res) => {
         const segment = await Segment.findById(segmentId);
 
         if (!segment) {
-            return res.status(404).json({ error: 'Segment not found' });
+            return res.status(404).json({
+                status: 'error',
+                code: 'SEGMENT_NOT_FOUND',
+                message: 'Segment not found'
+            });
         }
 
         // Verify ownership
         if (segment.creator.toString() !== userId.toString()) {
             return res.status(403).json({
                 status: 'error',
+                code: 'FORBIDDEN',
                 message: 'You can only edit your own segments'
             });
         }
@@ -178,13 +188,18 @@ router.delete('/:segmentId', authenticateToken, async(req, res) => {
         const segment = await Segment.findById(segmentId);
 
         if (!segment) {
-            return res.status(404).json({ error: 'Segment not found' });
+            return res.status(404).json({
+                status: 'error',
+                code: 'SEGMENT_NOT_FOUND',
+                message: 'Segment not found'
+            });
         }
 
         // Verify ownership
         if (segment.creator.toString() !== userId.toString()) {
             return res.status(403).json({
                 status: 'error',
+                code: 'FORBIDDEN',
                 message: 'You can only delete your own segments'
             });
         }
@@ -396,7 +411,11 @@ router.get('/:segmentId/leaderboard', authenticateToken, async(req,res) => {
         // Get segment
         const segment = await Segment.findById(segmentId);
         if (!segment) {
-            return res.status(404).json({ error: 'Segment not found' });
+            return res.status(404).json({
+                status: 'error',
+                code: 'SEGMENT_NOT_FOUND',
+                message: 'Segment not found'
+            });
         }
 
         // Get all attempts on this segment, sorted by time
