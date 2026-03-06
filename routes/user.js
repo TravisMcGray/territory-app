@@ -3,6 +3,9 @@ const router = express.Router();
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const User = require('../models/user');
+const Territory = require('../models/territory');
+const { Resend } = require('resend');
+const resend = new Resend(process.env.RESEND_API_KEY);
 const { authenticateToken, JWT_SECRET } = require('../middleware/auth');
 const { validatePasswordStrength, validateEmailFormat } = require('../middleware/validation');
 
@@ -12,15 +15,24 @@ router.get('/profile', authenticateToken, async (req, res) => {
         const user = await User.findById(req.user.userId);
 
         if (!user) {
-            return res.status(404).json({ error: 'User not found' });
+            return res.status(404).json({
+            status: 'error',
+            code: 'USER_NOT_FOUND',
+            message: 'User not found'
+        });
         }
 
-        res.json({
+        return res.json({
             message: 'Profile retrieved successfully',
             profile: user.toProfileJSON()
         });
+
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        return res.status(500).json({
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error retrieving profile'
+        });
     }
 });
 
@@ -31,7 +43,11 @@ router.put('/profile', authenticateToken, async (req, res) => {
         const user = await User.findById(req.user.userId);
 
         if (!user) {
-            return res.status(404).json({ error: 'User not found' });
+            return res.status(404).json({
+                status: 'error',
+                code: 'USER_NOT_FOUND',
+                message: 'User not found'
+            });
         }
 
         if (firstName !== undefined) user.firstName = firstName;
@@ -40,12 +56,16 @@ router.put('/profile', authenticateToken, async (req, res) => {
 
         await user.save();
 
-        res.json({
+        return res.json({
             message: 'Profile updated successfully',
             profile: user.toProfileJSON()
         });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        return res.status(500).json({
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error updating profile'
+        });
     }
 });
 
@@ -56,7 +76,11 @@ router.put('/username', authenticateToken, async (req, res) => {
         const user = await User.findById(req.user.userId);
 
         if (!user) {
-            return res.status(404).json({ error: 'User not found' });
+            return res.status(404).json({
+                status: 'error',
+                code: 'USER_NOT_FOUND',
+                message: 'User not found'
+            });
         }
 
         if (!newUsername || newUsername.length < 3 || newUsername.length > 20) {
@@ -91,7 +115,11 @@ router.put('/username', authenticateToken, async (req, res) => {
             profile: user.toProfileJSON()
         });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error updating username'
+        });
     }
 });
 
@@ -102,7 +130,11 @@ router.put('/email', authenticateToken, async (req, res) => {
         const user = await User.findById(req.user.userId).select('+password');
 
         if (!user) {
-            return res.status(404).json({ error: 'User not found' });
+            return res.status(404).json({
+                status: 'error',
+                code: 'USER_NOT_FOUND',
+                message: 'User not found'
+            });
         }
 
         if (!newEmail || !password) {
@@ -131,7 +163,11 @@ router.put('/email', authenticateToken, async (req, res) => {
             email: user.email
         });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error updating email'
+        });
     }
 });
 
@@ -142,7 +178,11 @@ router.put('/password', authenticateToken, validatePasswordStrength, async (req,
         const user = await User.findById(req.user.userId).select('+password');
 
         if (!user) {
-            return res.status(404).json({ error: 'User not found' });
+            return res.status(404).json({
+                status: 'error',
+                code: 'USER_NOT_FOUND',
+                message: 'User not found'
+            });
         }
 
         if (!currentPassword) {
@@ -160,7 +200,11 @@ router.put('/password', authenticateToken, validatePasswordStrength, async (req,
 
         res.json({ message: 'Password changed successfully' });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error updating password'
+        });
     }
 });
 
@@ -171,6 +215,7 @@ router.post('/forgot-password', validateEmailFormat, async (req, res) => {
         const user = await User.findByEmail(email);
 
         // Don't reveal if email exists (security best practice)
+        // Always return same message whether user exists or not
         if (!user) {
             return res.json({
                 message: 'If an account exists with this email, reset instructions have been sent'
@@ -184,15 +229,43 @@ router.post('/forgot-password', validateEmailFormat, async (req, res) => {
             { expiresIn: '1h' }
         );
 
-        // TODO: Send reset email with token
-        // Email should contain: http://frontend.com/reset-password?token=resetToken
-        console.log(`📧 TODO: Send reset email to ${email} with token: ${resetToken}`);
+        // Build reset URL using frontend env var
+        const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
 
-        res.json({
+        // Send reset email via Resend
+        await resend.emails.send({
+            from: 'TerritoryCapture <onboarding@resend.dev>',
+            to: user.email,
+            subject: 'Reset your TerritoryCapture password',
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <h2 style="color: #10b981;">TerritoryCapture</h2>
+                    <p>Hi ${user.username},</p>
+                    <p>You requested a password reset. Click the button below to reset your password.</p>
+                    <p>This link expires in <strong>1 hour</strong>.</p>
+                    <a href="${resetUrl}" 
+                        style="display: inline-block; background: #10b981; color: white; 
+                                padding: 12px 24px; border-radius: 8px; text-decoration: none; 
+                                font-weight: bold; margin: 16px 0;">
+                        Reset Password
+                    </a>
+                    <p>If you didn't request this, you can safely ignore this email.</p>
+                    <p>If the button doesn't work, copy and paste this link into your browser:</p>
+                    <p style="color: #6b7280; font-size: 12px;">${resetUrl}</p>
+                </div>
+            `
+        });
+
+        return res.json({
             message: 'If an account exists with this email, reset instructions have been sent'
         });
+
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        return res.status(500).json({
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error processing password reset request'
+        });
     }
 });
 
@@ -219,7 +292,11 @@ router.post('/reset-password', validatePasswordStrength, async (req, res) => {
 
         const user = await User.findById(decoded.userId);
         if (!user) {
-            return res.status(404).json({ error: 'User not found' });
+            return res.status(404).json({
+                status: 'error',
+                code: 'USER_NOT_FOUND',
+                message: 'User not found'
+            });
         }
 
         user.password = password; // Will be hashed by pre-save middleware
@@ -229,7 +306,11 @@ router.post('/reset-password', validatePasswordStrength, async (req, res) => {
             message: 'Password reset successful. You can now login with your new password.'
         });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error resetting password'
+        });
     }
 });
 
@@ -240,7 +321,11 @@ router.delete('/account', authenticateToken, async (req, res) => {
         const user = await User.findById(req.user.userId).select('+password');
 
         if (!user) {
-            return res.status(404).json({ error: 'User not found' });
+            return res.status(404).json({
+                status: 'error',
+                code: 'USER_NOT_FOUND',
+                message: 'User not found'
+            });
         }
 
         if (!password) {
@@ -258,10 +343,14 @@ router.delete('/account', authenticateToken, async (req, res) => {
         await user.save();
 
         res.json({
-            message: 'Account deleted successfully. All your data has been removed.'
+            message: 'Account deactivated successfully. Your data will be removed shortly.'
         });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error deleting account'
+        });
     }
 });
 
@@ -270,22 +359,22 @@ router.delete('/account', authenticateToken, async (req, res) => {
 // can render the full global territory map using H3 polygon boundaries.
 router.get('/territories', authenticateToken, async (req, res) => {
     try {
-        const Territory = require('../models/territory');
-
-        const territories = await Territory.find()
-            .populate('ownerId', 'username')
+        const territories = await Territory.find({ 'ownerId': { $exists: true } })
+            .populate({ path: 'ownerId', match: { isActive: true }, select: 'username' })
             .select('hexagonId ownerId ownerActivityType capturedAt')
             .lean();
 
-        const formatted = territories.map(t => ({
-            hexagonId: t.hexagonId,
-            owner: {
-                id: t.ownerId?._id,
-                username: t.ownerId?.username ?? 'Unknown'
-            },
-            activityType: t.ownerActivityType,
-            capturedAt: t.capturedAt
-        }));
+        const formatted = territories
+            .filter(t => t.ownerId !== null)
+            .map(t => ({
+                hexagonId: t.hexagonId,
+                owner: {
+                    id: t.ownerId._id,
+                    username: t.ownerId.username
+                },
+                activityType: t.ownerActivityType,
+                capturedAt: t.capturedAt
+            }));
 
         res.json({
             message: 'Territories retrieved successfully',
@@ -294,7 +383,11 @@ router.get('/territories', authenticateToken, async (req, res) => {
         });
 
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error retrieving territories'
+        });
     }
 });
 
