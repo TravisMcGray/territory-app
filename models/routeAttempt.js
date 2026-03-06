@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const route = require('./route');
 
 const routeAttemptSchema = new mongoose.Schema({
     // ========== CORE REFERENCES ==========
@@ -7,13 +6,11 @@ const routeAttemptSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Route',
         required: true,
-        index: true
     },
     user: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
         required: true,
-        index: true
     },
     // Link to the activity that completed this route
     activity: {
@@ -27,21 +24,20 @@ const routeAttemptSchema = new mongoose.Schema({
     completionTime: {
         type: Number,
         required: true,
-        min: 0
+        min: 1 // Minimum 1 second — a zero completion time is not valid
     },
 
-    // ========== COMPLETION STATUS ==========
-    createdAt: {
-        type: Date,
-        default: Date.now,
-        index: true
-    }
+    // ========== TIMESTAMPS ==========
+    // createdAt and updatedAt added automatically by Mongoose
+},
+{
+    timestamps: true
 });
 
-// ========== INDEXES FFOR LEADERBOARDS AND QUERIES ==========
-routeAttemptSchema.index({ route: 1, completionTime: 1 }); // For leaderboards (fastest first)
+// ========== INDEXES FOR LEADERBOARDS AND QUERIES ==========
+routeAttemptSchema.index({ createdAt: -1 }); // Timestamp-based sorting
+routeAttemptSchema.index({ route: 1, completionTime: 1 }); // Leaderboards — fastest completions per route
 routeAttemptSchema.index({ user: 1, createdAt: -1 }); // User's attempts sorted by most recent
-routeAttemptSchema.index({ route: 1, user: 1 }); // User's attempts on specific route
-routeAttemptSchema.index({ route: 1, completed: 1, completionTime: 1 }); // Fast Leaderboard queries
+routeAttemptSchema.index({ route: 1, user: 1 }); // User's attempts on a specific route
 
 module.exports = mongoose.model('RouteAttempt', routeAttemptSchema);
