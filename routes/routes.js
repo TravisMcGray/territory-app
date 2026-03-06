@@ -104,10 +104,11 @@ router.post('/', auth, async (req, res) => {
             }
         });
     } catch (error) {
-        console.error('Error creating route:', error);
         res.status(500).json({
-            message: 'Server error creating route' 
-        })
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error creating route'
+        });
     }
 });
 
@@ -186,11 +187,13 @@ router.get('/', auth, async (req, res) => {
                 totalRoutes: total
             }
         });
+
     } catch (error) {
-        console.error('Error fetching routes:', error);
         res.status(500).json({
-            message: 'Server error fetching routes'
-        })
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error fetching routes'
+        });
     }
 });
 
@@ -235,8 +238,11 @@ router.get('/nearby', auth, async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error fetching nearby routes:', error);
-        res.status(500).json({ message: 'Server error fetching nearby routes' });
+        res.status(500).json({
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error fetching nearby routes'
+        });
     }
 });
 
@@ -263,8 +269,11 @@ router.get('/popular', auth, async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error fetching popular routes:', error);
-        res.status(500).json({ message: 'Server error fetching popular routes' });
+        res.status(500).json({
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error fetching popular routes'
+        });
     }
 });
 
@@ -305,8 +314,11 @@ router.get('/:id', auth, async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error fetching route:', error);
-        res.status(500).json({ message: 'Server error fetching route' });
+        res.status(500).json({
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error fetching route'
+        });
     }
 });
 
@@ -345,8 +357,11 @@ router.put('/:id', auth, async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error updating route:', error);
-        res.status(500).json({ message: 'Server error updating route' });
+        res.status(500).json({
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error updating route'
+        });
     }
 });
 
@@ -372,8 +387,11 @@ router.delete('/:id', auth, async (req, res) => {
         res.json({ message: 'Route and all attempts deleted successfully' });
 
     } catch (error) {
-        console.error('Error deleting route:', error);
-        res.status(500).json({ message: 'Server error deleting route' });
+        res.status(500).json({
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error deleting route'
+        });
     }
 });
 
@@ -437,10 +455,10 @@ router.post('/:id/attempt', auth, async (req, res) => {
             route.fastestCompletionTime = completionTime;
         }
 
-        // Recalculate average completion time
-        const allAttempts = await RouteAttempt.find({ route: route._id, completed: true });
-        const totalTime = allAttempts.reduce((sum, att) => sum + att.completionTime, 0);
-        route.averageTime = totalTime / allAttempts.length;
+        // Update average using running average formula - no memory issues at scale
+        const oldAverage = route.averageTime || completionTime;
+        const oldCount = route.totalCompletions - 1;
+        route.averageTime = ((oldAverage * oldCount) + completionTime) / route.totalCompletions;
 
         route.updatedAt = new Date();
         await route.save();
@@ -470,8 +488,11 @@ router.post('/:id/attempt', auth, async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error recording route attempt:', error);
-        res.status(500).json({ message: 'Server error recording attempt' });
+        res.status(500).json({
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error recording route attempt'
+        });
     }
 });
 
@@ -482,7 +503,11 @@ router.get('/:id/leaderboard', auth, async (req, res) => {
 
         const route = await Route.findById(req.params.id);
         if (!route) {
-            return res.status(404).json({ message: 'Route not found' });
+            return res.status(404).json({
+                status: 'error',
+                code: 'NOT_FOUND',
+                message: 'Route not found'
+            });
         }
 
         // Get fastest attempt for each user
@@ -508,19 +533,23 @@ router.get('/:id/leaderboard', auth, async (req, res) => {
 
         const totalCount = totalEntries.length > 0 ? totalEntries[0].total : 0;
 
-        // Populate user data
-        const leaderboardWithUsers = await Promise.all(
-            leaderboard.map(async (entry, index) => {
-                const user = await User.findById(entry._id).select('username');
-                const rank = (parseInt(page) - 1) * parseInt(limit) + index + 1;
-                return {
-                    rank,
-                    username: user ? user.username : 'Unknown',
-                    time: `${Math.floor(entry.fastestTime / 60)} min ${entry.fastestTime % 60} sec`,
-                    date: entry.attemptDate
-                };
-            })
-        );
+        // Fetch all users in one query instead of one per entry
+        const userIds = leaderboard.map(entry => entry._id);
+        const users = await User.find({ _id: { $in: userIds } }).select('username');
+        const userMap = users.reduce((map, user) => {
+            map[user._id.toString()] = user.username;
+            return map;
+        }, {});
+
+        const leaderboardWithUsers = leaderboard.map((entry, index) => {
+            const rank = (parseInt(page) - 1) * parseInt(limit) + index + 1;
+            return {
+                rank,
+                username: userMap[entry._id.toString()] || 'Unknown',
+                time: `${Math.floor(entry.fastestTime / 60)} min ${entry.fastestTime % 60} sec`,
+                date: entry.attemptDate
+            };
+        });
 
         res.json({
             route: {
@@ -537,8 +566,11 @@ router.get('/:id/leaderboard', auth, async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error fetching leaderboard:', error);
-        res.status(500).json({ message: 'Server error fetching leaderboard' });
+        res.status(500).json({
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error fetching leaderboard'
+        });
     }
 });
 
@@ -580,8 +612,11 @@ router.get('/:id/my-attempts', auth, async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error fetching user attempts:', error);
-        res.status(500).json({ message: 'Server error fetching attempts' });
+        res.status(500).json({
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error fetching attempts'
+        });
     }
 });
 
