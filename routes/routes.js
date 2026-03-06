@@ -22,6 +22,8 @@ router.post('/', auth, async (req, res) => {
         // Validate coordinates exist and minimum length
         if (!coordinates || coordinates.length < 2) {
             return res.status(400).json({
+                status: 'error',
+                code: 'INVALID_COORDINATES',
                 message: 'Route must have at least 2 waypoints (start and end)'
             });
         }
@@ -29,6 +31,8 @@ router.post('/', auth, async (req, res) => {
         // Prevent abuse - max 100 waypoints
         if (coordinates.length > 100) {
             return res.status(400).json({
+                status: 'error',
+                code: 'INVALID_COORDINATES',
                 message: 'Maximum 100 waypoints allowed'
             });
         }
@@ -37,16 +41,22 @@ router.post('/', auth, async (req, res) => {
         for (const coord of coordinates) {
             if (!coord.latitude || !coord.longitude) {
                 return res.status(400).json({
+                    status: 'error',
+                    code: 'INVALID_COORDINATES',
                     message: 'Each coordinate must have latitude and longitude'
                 });
             }
             if (coord.latitude < -90 || coord.latitude > 90) {
                 return res.status(400).json({
+                    status: 'error',
+                    code: 'INVALID_COORDINATES',
                     message: 'Latitude must be between -90 and 90'
                 });
             }
             if (coord.longitude < -180 || coord.longitude > 180) {
                 return res.status(400).json({
+                    status: 'error',
+                    code: 'INVALID_COORDINATES',
                     message: 'Longitude must be between -180 and 180'
                 });
             }
@@ -203,7 +213,11 @@ router.get('/nearby', auth, async (req, res) => {
         const { latitude, longitude, radius = 10 } = req.query; // radius in miles
 
         if (!latitude || !longitude) {
-            return res.status(400).json({ message: 'Latitude and longitude required' });
+            return res.status(400).json({
+                status: 'error',
+                code: 'MISSING_FIELDS',
+                message: 'Latitude and longitude required'
+            });
         }
 
         // Convert miles to meters for MongoDB geospatial query
@@ -284,12 +298,20 @@ router.get('/:id', auth, async (req, res) => {
             .populate('creator', 'username');
 
         if (!route) {
-            return res.status(404).json({ message: 'Route not found' });
+            return res.status(404).json({
+                status: 'error',
+                code: 'NOT_FOUND',
+                message: 'Route not found'
+            });
         }
 
         // Check if private and user is not creator
         if (!route.isPublic && route.creator._id.toString() !== req.user.userId) {
-            return res.status(403).json({ message: 'This route is private' });
+            return res.status(403).json({
+                status: 'error',
+                code: 'FORBIDDEN',
+                message: 'This route is private'
+            });
         }
 
         res.json({
@@ -328,12 +350,20 @@ router.put('/:id', auth, async (req, res) => {
         const route = await Route.findById(req.params.id);
 
         if (!route) {
-            return res.status(404).json({ message: 'Route not found' });
+            return res.status(404).json({
+                status: 'error',
+                code: 'NOT_FOUND',
+                message: 'Route not found'
+            });
         }
 
         // Only creator can update
         if (route.creator.toString() !== req.user.userId) {
-            return res.status(403).json({ message: 'Only route creator can update this route' });
+            return res.status(403).json({
+                status: 'error',
+                code: 'FORBIDDEN',
+                message: 'Only route creator can update this route'
+            });
         }
 
         const { name, description, tags, isPublic, estimatedTime } = req.body;
@@ -371,14 +401,21 @@ router.delete('/:id', auth, async (req, res) => {
         const route = await Route.findById(req.params.id);
 
         if (!route) {
-            return res.status(404).json({ message: 'Route not found' });
+            return res.status(404).json({
+                status: 'error',
+                code: 'NOT_FOUND',
+                message: 'Route not found'
+            });
         }
 
         // Only creator can delete
         if (route.creator.toString() !== req.user.userId) {
-            return res.status(403).json({ message: 'Only route creator can delete this route' });
+            return res.status(403).json({
+                status: 'error',
+                code: 'FORBIDDEN',
+                message: 'Only route creator can delete this route'
+            });
         }
-
         // Delete all attempts for this route
         await RouteAttempt.deleteMany({ route: route._id });
 
@@ -402,26 +439,46 @@ router.post('/:id/attempt', auth, async (req, res) => {
 
         // Validate required fields
         if (!activityId || !completionTime) {
-            return res.status(400).json({ message: 'Activity ID and completion time required' });
+            return res.status(400).json({
+                status: 'error',
+                code: 'MISSING_FIELDS',
+                message: 'Activity ID and completion time required'
+            });
         }
 
         // Validate completion time
         if (completionTime <= 0) {
-            return res.status(400).json({ message: 'Completion time must be positive' });
+            return res.status(400).json({
+                status: 'error',
+                code: 'INVALID_COMPLETION_TIME',
+                message: 'Completion time must be positive'
+            });
         }
 
         const route = await Route.findById(req.params.id);
         if (!route) {
-            return res.status(404).json({ message: 'Route not found' });
+            return res.status(404).json({
+                status: 'error',
+                code: 'NOT_FOUND',
+                message: 'Route not found'
+            });
         }
 
         // Verify activity exists and belongs to user
         const activity = await Activity.findById(activityId);
         if (!activity) {
-            return res.status(404).json({ message: 'Activity not found' });
+            return res.status(404).json({
+                status: 'error',
+                code: 'NOT_FOUND',
+                message: 'Activity not found'
+            });
         }
         if (activity.userId.toString() !== req.user.userId) {
-            return res.status(403).json({ message: 'Activity does not belong to you' });
+            return res.status(403).json({
+                status: 'error',
+                code: 'FORBIDDEN',
+                message: 'Activity does not belong to you'
+            });
         }
 
         // Create attempt
@@ -579,9 +636,12 @@ router.get('/:id/my-attempts', auth, async (req, res) => {
     try {
         const route = await Route.findById(req.params.id);
         if (!route) {
-            return res.status(404).json({ message: 'Route not found' });
+            return res.status(404).json({
+                status: 'error',
+                code: 'NOT_FOUND',
+                message: 'Route not found'
+            });
         }
-
         const attempts = await RouteAttempt.find({
             route: route._id,
             user: req.user.userId
