@@ -7,23 +7,23 @@ const userSegmentRecordSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
         required: true,
-        index: true
     },
     segmentId: { 
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Segment',
         required: true,
-        index: true
     },
 
     // Performance
     personalBest: {
         type: Number,
-        required: true // seconds (their fastest time)
+        required: true, // seconds (their fastest time)
+        min: 1 
     },
     attempts: {
         type: Number,
-        default: 1 // How many times they've completed this segment
+        default: 1, // How many times they've completed this segment
+        min: 1
     },
 
     // Territory Strength (for hexagon Coloring)
@@ -37,7 +37,8 @@ const userSegmentRecordSchema = new mongoose.Schema({
     // Hexagons
     totalHexagonsCaptured: {
         type: Number,
-        default: 0 // Cumulative from all attempts
+        default: 0,
+        min: 0 // Cumulative from all attempts
     },
 
     // Territory Master Status
@@ -48,12 +49,14 @@ const userSegmentRecordSchema = new mongoose.Schema({
     territoryMasterSince: Date,
 
     // Timestamps
-    lastAttempt: Date,
-    createdAt: { type: Date, default: Date.now, index: true },
-    updatedAt: Date
+    lastAttempt: Date
+},
+{
+    timestamps: true
 });
 
 // Compound indexes for efficient queries
+userSegmentRecordSchema.index({ createdAt: -1 });
 userSegmentRecordSchema.index({ userId: 1, segmentId: 1 });
 userSegmentRecordSchema.index({ segmentId: 1, personalBest: 1 });
 userSegmentRecordSchema.index({ holdsTerritoryMaster: 1, segmentId: 1 });
