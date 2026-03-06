@@ -5,8 +5,8 @@ const notificationSchema = new mongoose.Schema({
     user: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
-        required: true,
-        index: true
+        required: true
+        // No standalone index needed — covered by compound indexes below
     },
 
     // ========== NOTIFICATION CONTENT ==========
@@ -21,17 +21,19 @@ const notificationSchema = new mongoose.Schema({
             'COMMENT',
             'KUDOS'
         ],
-        required: true,
-        index: true
+        required: true
+        // No standalone index needed — covered by compound indexes below
     },
     title: {
         type: String,
         required: true,
+        trim: true, // Strips leading/trailing whitespace
         maxlength: 100
     },
     message: {
         type: String,
         required: true,
+        trim: true, // Strips leading/trailing whitespace
         maxlength: 500
     },
 
@@ -53,25 +55,30 @@ const notificationSchema = new mongoose.Schema({
         ref: 'Segment'
     },
 
-    // ========== READ STATUS & TIMESTAMPS ==========
+    // ========== READ STATUS ==========
     read: {
         type: Boolean,
-        default: false,
-        index: true
+        default: false
+        // No standalone index needed — covered by compound indexes below
     },
-    createdAt: {
+
+    // ========== TTL: Auto-delete READ notifications after 30 days ==========
+    // expiresAt is set by the route when a notification is marked as read
+    // Unread notifications are never deleted automatically
+    expiresAt: {
         type: Date,
-        default: Date.now,
-        index: true
+        default: null,
+        index: { expireAfterSeconds: 0 } // MongoDB deletes doc when expiresAt date is reached
     }
+
+},
+{
+    timestamps: true // createdAt and updatedAt added automatically by Mongoose
 });
 
 // ========== INDEXES FOR EFFICIENT QUERIES ==========
-notificationSchema.index({ user: 1, read: 1, createdAt: -1 }); // User's notifications timeline
-notificationSchema.index({ user: 1, read: 1 }); // Unread count queries
+notificationSchema.index({ createdAt: -1 }); // Timestamp-based sorting
+notificationSchema.index({ user: 1, read: 1, createdAt: -1 }); // User's notifications timeline + unread count queries
 notificationSchema.index({ user: 1, type: 1 }); // Filter by type
-
-// Auto-delete old read notifications after 30 days (Optional - keeps DB clean)
-notificationSchema.index({ createdAt: 1 }, { expireAfterSeconds: 2592000 }); // 30 days in seconds
 
 module.exports = mongoose.model('Notification', notificationSchema);
