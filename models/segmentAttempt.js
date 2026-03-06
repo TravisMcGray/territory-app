@@ -7,23 +7,23 @@ const segmentAttemptSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Segment',
         required: true,
-        index: true
     },
     userId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
         required: true,
-        index: true
     },
 
     // Performance Data
     time: {
         type: Number,
-        required: true // seconds
+        required: true, // seconds
+        min: 1
     },
     distance: {
         type: Number,
-        required: true // miles
+        required: true, // miles
+        min: 0
     },
     elevationGain: {
         type: Number,
@@ -40,7 +40,8 @@ const segmentAttemptSchema = new mongoose.Schema({
     }],
     hexagonCount: {
         type: Number,
-        default: 0
+        default: 0,
+        min: 0
     },
 
     // Tracking
@@ -48,14 +49,19 @@ const segmentAttemptSchema = new mongoose.Schema({
         type: Boolean,
         default: false // Did this break the record?
     },
-    previousTerritoryMaster: Number, // What they beat (if any)
+    previousTerritoryMaster: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        default: null
+    },
 
-    // Timestamps
-    createdAt: { type: Date, default: Date.now, index: true },
-    updatedAt: Date
+},
+{
+    timestamps: true
 });
 
 // Compound index for fast queries
+segmentAttemptSchema.index({ createdAt: -1 });
 segmentAttemptSchema.index({ segmentId: 1, createdAt: -1 });
 segmentAttemptSchema.index({ userId: 1, segmentId: 1 });
 
