@@ -23,15 +23,18 @@ const connectDB = async () => {
 
         // Log connection events
         mongoose.connection.on('disconnected', () => {
-            console.warn('MongoDB disconnected');
+            console.warn('MongoDB disconnected — attempting reconnect in 5 seconds...');
+            setTimeout(() => connectDB(), 5000); // Retry after 5 seconds
         });
 
         mongoose.connection.on('error', (err) => {
             console.error('MongoDB error:', err.message);
         });
+
     } catch (err) {
         console.error('MongoDB connection failed:', err.message);
-        process.exit(1);
+        console.warn('Retrying connection in 5 seconds...');
+        setTimeout(() => connectDB(), 5000); // Retry on initial connection failure too
     }
 };
 
