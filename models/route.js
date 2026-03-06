@@ -5,12 +5,13 @@ const routeSchema = new mongoose.Schema({
     name: {
         type: String,
         required: true,
-        trim: true,
+        trim: true, // Strips leading/trailing whitespace
         maxlength: 100,
         index: true
     },
     description: {
         type: String,
+        trim: true, // Strips leading/trailing whitespace
         maxlength: 500
     },
 
@@ -74,11 +75,11 @@ const routeSchema = new mongoose.Schema({
     creator: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
-        required: true,
-        index: true
+        required: true
+        // No standalone index needed — covered by compound index below
     },
 
-    // ========== STATISTICS (Updated by route handlesd when attempts are recorded) ==========
+    // ========== STATISTICS (Updated by route handlers when attempts are recorded) ==========
     totalCompletions: {
         type: Number,
         default: 0
@@ -96,12 +97,13 @@ const routeSchema = new mongoose.Schema({
         default: 0
     },
     estimatedTime: {
-        type: Number, //seconds (creator's estimate for expected completion time)
+        type: Number, // seconds (creator's estimate for expected completion time)
         default: null
     },
 
     // ========== GEOSPATIAL SEARCH ==========
     // Start location for "routes near me" queries
+    // Uses GeoJSON Point format — index defined below handles 2dsphere queries
     startLocation: {
         type: {
             type: String,
@@ -110,34 +112,32 @@ const routeSchema = new mongoose.Schema({
         },
         coordinates: {
             type: [Number], // [longitude, latitude]
-            index: '2dsphere'
         }
     },
 
     // ========== TIMESTAMPS ==========
-    createdAt: {
-        type: Date,
-        default: Date.now,
-        index: true
-    },
-    updatedAt: Date
+    // createdAt and updatedAt added automatically by Mongoose
+},
+{
+    timestamps: true
 });
 
-// ========== INDEXES FOR EFFICIENT queries ==========
-routeSchema.index({ startLocation: '2dsphere' }); // Geospatial queries
+// ========== INDEXES FOR EFFICIENT QUERIES ==========
+routeSchema.index({ createdAt: -1 }); // Timestamp-based sorting
+routeSchema.index({ startLocation: '2dsphere' }); // Geospatial "routes near me" queries
 routeSchema.index({ creator: 1, createdAt: -1 }); // User's routes sorted by creation date
 routeSchema.index({ isPublic: 1, difficulty: 1, distance: 1 }); // Discovery filters
 routeSchema.index({ tags: 1 }); // Tag-based discovery
-routeSchema.index({ totalCompletions: -1 }); // Popular routes
+routeSchema.index({ totalCompletions: -1 }); // Popular routes leaderboard
 
 // ========== METHODS ==========
-// Calculate difficulty based on distance and elevationGain
-// This is a data calculation
-routeSchema.methods.calculateDifficulty = function() {
+// Calculate and persist difficulty based on distance and elevationGain
+// Call this after creating or updating a route's distance/elevation
+// Difficulty score = distance (miles) + (elevation gain in meters / 100)
+routeSchema.methods.calculateDifficulty = async function() {
     const distance = this.distance;
     const elevationGain = this.elevationGain;
 
-    // Difficulty score = distance (miles) + (elevation gain in meters / 100)
     const difficultyScore = distance + (elevationGain / 100);
 
     if (difficultyScore < 3) {
@@ -149,6 +149,8 @@ routeSchema.methods.calculateDifficulty = function() {
     } else {
         this.difficulty = 'EXPERT';
     }
+
+    await this.save(); // Persists the updated difficulty to the database
 };
 
 module.exports = mongoose.model('Route', routeSchema);
