@@ -22,15 +22,17 @@ const validatePasswordStrength = (req, res, next) => {
 
     if (!password) {
         return res.status(400).json({
-            error: 'Password is required',
-            requirements: 'Min 8 characters, 1 uppercase, 1 lowercase, 1 number'
+            status: 'error',
+            code: 'PASSWORD_REQUIRED',
+            message: 'Password is required. Min 8 characters, 1 uppercase, 1 lowercase, 1 number'
         });
     }
 
     if (!validatePassword(password)) {
         return res.status(400).json({
-            error: 'Password does not meet requirements',
-            requirements: 'Min 8 characters, 1 uppercase, 1 lowercase, 1 number'
+            status: 'error',
+            code: 'PASSWORD_TOO_WEAK',
+            message: 'Password does not meet requirements. Min 8 characters, 1 uppercase, 1 lowercase, 1 number'
         });
     }
 
@@ -41,11 +43,19 @@ const validateEmailFormat = (req, res, next) => {
     const { email } = req.body;
 
     if (!email) {
-        return res.status(400).json({ error: 'Email is required' });
+        return res.status(400).json({
+            status: 'error',
+            code: 'EMAIL_REQUIRED',
+            message: 'Email is required'
+        });
     }
 
     if (!validateEmail(email)) {
-        return res.status(400).json({ error: 'Invalid email format' }); // Fixed: was 4004
+        return res.status(400).json({
+            status: 'error',
+            code: 'EMAIL_INVALID',
+            message: 'Invalid email format'
+        });
     }
 
     next();
@@ -55,11 +65,19 @@ const validateUsernameFormat = (req, res, next) => {
     const { username } = req.body;
 
     if (!username) {
-        return res.status(400).json({ error: 'Username is required' }); // Fixed: was 404
+        return res.status(400).json({
+            status: 'error',
+            code: 'USERNAME_REQUIRED',
+            message: 'Username is required'
+        });
     }
 
     if (!validateUsername(username)) {
-        return res.status(400).json({ error: 'Invalid username', requirements: '3-20 characters, alphanumeric + underscore, start with letter' }); // Fixed: was 404
+        return res.status(400).json({
+            status: 'error',
+            code: 'USERNAME_INVALID',
+            message: 'Invalid username. 3-20 characters, alphanumeric + underscore, start with letter'
+        });
     }
 
     next();
