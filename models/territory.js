@@ -6,7 +6,6 @@ const territorySchema = new mongoose.Schema({
         type: String,
         required: true,
         unique: true,
-        index: true
     },
     ownerId: {
         type: mongoose.Schema.Types.ObjectId,
@@ -29,7 +28,7 @@ const territorySchema = new mongoose.Schema({
     // Track which activity originally claimed this territory (for deletion reversal)
     capturedByActivityId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'User'
+        ref: 'Activity'
     },
     capturedAt: {
         type: Date,
