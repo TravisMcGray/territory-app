@@ -133,6 +133,7 @@ router.put('/:id/read', auth, async (req, res) => {
         }
 
         notification.read = true;
+        notification.expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
         await notification.save();
 
         res.json({ message: 'Notification marked as read' });

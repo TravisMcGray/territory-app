@@ -6,14 +6,12 @@ const activitySchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
         required: true,
-        index: true
         },
         activityType: {
             type: String,
             enum: ['walk', 'run'],
             default: 'walk',
             required: true,
-            index: true
         },
         coordinates: [{
             latitude: { type: Number, required: true },
@@ -36,6 +34,7 @@ const activitySchema = new mongoose.Schema({
         elevationGain: {
             type: Number,
             required: true,
+            default: 0,
             min: 0
         },
 
@@ -63,20 +62,20 @@ activitySchema.index({ userId: 1, activityType: 1, createdAt: -1 });
 activitySchema.virtual('pace').get(function() {
     if (this.distance === 0) return 0;
     const minutes = this.duration / 60;
-    return parseFloat((minutes / this.duration).toFixed(2));
+    return parseFloat((minutes / this.distance).toFixed(2));
 });
 
 // Calculate average speed: miles per hour
 activitySchema.virtual('averageSpeed').get(function() {
     if (this.duration === 0) return 0;
-    const hours = this.duation / 3600;
-    return parseFloat((this.distance / hours).toFixed(2));``
+    const hours = this.duration / 3600;
+    return parseFloat((this.distance / hours).toFixed(2));
 });
 
 // Estimate calories burned (rough formula)
 // Assumes 70kg person
 // Running burns ~100 cal/mile, walking ~50 cal/mile
-activitySchema.virtual('esitmatedCalories').get(function() {
+activitySchema.virtual('estimatedCalories').get(function() {
     const caloriesPerMile = this.activityType === 'run' ? 100 : 50;
     return Math.round(this.distance * caloriesPerMile);
 });
