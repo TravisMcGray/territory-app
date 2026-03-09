@@ -126,7 +126,7 @@ const checkAndUnlockAchievements = async (user, activityData) => {
         return newlyUnlocked;
 
     } catch (error) {
-        console.error('Error checking achievements:', error.message);
+        // Silent fail - achievement check errors should not break activity recording
         return [];
     }
 };
@@ -391,9 +391,10 @@ router.post('/', authenticateToken, async (req, res) => {
         });
 
     } catch (error) {
-        res.status(400).json({
-            message: 'Error recording activity',
-            error: error.message
+        res.status(500).json({
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error recording activity'
         });
     }
 });
@@ -435,8 +436,9 @@ router.get('/', authenticateToken, async (req, res) => {
 
     } catch (error) {
         res.status(500).json({
-            message: 'Error retrieving activities',
-            error: error.message
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error retrieving activities'
         });
     }
 });
@@ -457,7 +459,11 @@ router.delete('/:activityId', authenticateToken, async (req, res) => {
 
         if (!activity) {
             await session.abortTransaction();
-            return res.status(400).json({ error: 'Activity not found' });
+            return res.status(404).json({
+                status: 'error',
+                code: 'NOT_FOUND',
+                message: 'Activity not found'
+            });
         }
 
         if (activity.userId.toString() !== userId.toString()) {
@@ -528,9 +534,12 @@ router.delete('/:activityId', authenticateToken, async (req, res) => {
     });
 
     } catch (error) {
-        // if anything failed, rollback EVERYTHING
         await session.abortTransaction();
-        res.status(500).json({ error: error.message });
+        res.status(500).json({
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error deleting activity'
+        });
     } finally {
         // Always close the session
         session.endSession();
@@ -549,7 +558,11 @@ router.get('/feed', authenticateToken, async (req, res) => {
         const user = await User.findById(userId);
 
         if (!user) {
-            return res.status(404).json({ error: 'User not found' });
+            return res.status(404).json({
+                status: 'error',
+                code: 'USER_NOT_FOUND',
+                message: 'User not found'
+            });
         }
 
         // Convert following IDs for aggregation
@@ -685,8 +698,9 @@ router.get('/feed', authenticateToken, async (req, res) => {
 
     } catch (error) {
         res.status(500).json({
-            message: 'Error retrieving feed',
-            error: error.message
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error retrieving feed'
         });
     }
 });
@@ -761,8 +775,9 @@ router.post('/:activityId/comment', authenticateToken, async (req, res) => {
 
     } catch (error) {
         res.status(500).json({
-            message: 'Error adding comment',
-            error: error.message
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error adding comment'
         });
     }
 });
@@ -836,8 +851,9 @@ router.post('/:activityId/kudos', authenticateToken, async (req, res) => {
         }
 
         res.status(500).json({
-            message: 'Error giving kudos',
-            error: error.message
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error giving kudos'
         });
     }
 });
@@ -872,8 +888,9 @@ router.delete('/:activityId/kudos', authenticateToken, async (req, res) => {
 
     } catch (error) {
         res.status(500).json({
-            message: 'Error removing kudos',
-            error: error.message
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error removing kudos'
         });
     }
 });
@@ -960,8 +977,9 @@ router.get('/:activityId', authenticateToken, async (req, res) => {
 
     } catch (error) {
         res.status(500).json({
-            message: 'Error retrieving activity',
-            error: error.message
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error retrieving activity'
         });
     }
 });

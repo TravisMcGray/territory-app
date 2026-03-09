@@ -10,6 +10,7 @@ import Feed from './pages/Feed';
 import Leaderboard from './pages/Leaderboard';
 import Profile from './pages/Profile';
 import Map from './pages/Map';
+import ResetPassword from './pages/ResetPassword';
 
 // Redirect unauthenticated users to login
 function ProtectedRoute({ children }) {
@@ -24,7 +25,11 @@ export default function App() {
         <Routes>
             <Route
                 path="/login"
-                element={user ? <Navigate to="/dashboard" /> : <Login />}
+                element={
+                    user ? 
+                    <Navigate to="/dashboard" />
+                    : <Login />
+                }
             />
             <Route
                 path="/dashboard"
@@ -43,12 +48,12 @@ export default function App() {
                 }
             />
             <Route
-              path="/feed"
-              element={
-                  <ProtectedRoute>
+                path="/feed"
+                element={
+                    <ProtectedRoute>
                     <Feed />
-                  </ProtectedRoute>
-              }
+                    </ProtectedRoute>
+                }
             />
             <Route
                 path="/leaderboard"
@@ -73,6 +78,11 @@ export default function App() {
                         <Profile />
                     </ProtectedRoute>
                 }
+            />
+            <Route
+                path="/reset-password" 
+                element=
+                {<ResetPassword />} 
             />
             <Route 
                 path="*" 
