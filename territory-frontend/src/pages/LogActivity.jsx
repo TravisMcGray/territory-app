@@ -265,10 +265,7 @@ export default function LogActivity() {
             setResult(res.data);
             setPhase('result');
         } catch (err) {
-            const message = typeof err.response?.data === 'string'
-                ? err.response.data
-                : err.response?.data?.message || 'Failed to save activity.';
-            setError(message);
+            const message = err.response?.data?.message || 'Failed to save activity.';            setError(message);
         } finally {
             setSubmitting(false);
         }
@@ -715,7 +712,10 @@ function ResultPhase({ result, onDone }) {
                         accent={activity.stolenTerritory > 0 ? 'red' : 'gray'}
                     />
                 </div>
-            </div>
+                <div className="border-t border-gray-800 pt-3 text-center">
+                    <span className="text-white font-black">{activity.estimatedCalories ?? 0} kcal</span>
+                    <span className="text-gray-500 text-xs ml-2">estimated calories burned</span>
+                </div>            </div>
 
             {/* New achievements */}
             {achievements.length > 0 && (

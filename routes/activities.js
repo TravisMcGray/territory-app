@@ -370,7 +370,7 @@ router.post('/', authenticateToken, async (req, res) => {
                 pace: `${activity.pace.toFixed(2)} min/mile`,
                 speed: `${activity.averageSpeed.toFixed(2)} mph`,
                 elevationGain: `${activity.elevationGain} m (${Math.round(activity.elevationGain * 3.28084)} ft)`,
-                estimatedCalories: activity.estimatedCalories,
+                estimatedCalories: Math.round(distance * (activityType === 'run' ? 0.63 : 0.30) * (updatedUser.weight || 154)),
                 hexagonsCaptured: uniqueHexagons.length,
                 newTerritory: captured,
                 stolenTerritory: stolen
@@ -656,13 +656,25 @@ router.get('/feed', authenticateToken, async (req, res) => {
                         { $unwind: '$userInfo' },
 
                         // Project only needed fields for feed with social data
-                        {
+{
                             $project: {
                                 _id: 1,
                                 activityType: 1,
                                 distance: 1,
                                 duration: 1,
                                 elevationGain: 1,
+                                estimatedCalories: {
+                                    $round: [
+                                        {
+                                            $multiply: [
+                                                '$distance',
+                                                { $cond: [{ $eq: ['$activityType', 'run'] }, 0.63, 0.30] },
+                                                154
+                                            ]
+                                        },
+                                        0
+                                    ]
+                                },
                                 capturedHexagons: { $size: '$capturedHexagons' },
                                 stolenHexagons: 1,
                                 coordinates: 1,
@@ -944,7 +956,7 @@ router.get('/:activityId', authenticateToken, async (req, res) => {
                 pace: activity.pace,
                 averageSpeed: activity.averageSpeed,
                 elevationGain: activity.elevationGain,
-                estimatedCalories: activity.estimatedCalories,
+                estimatedCalories: Math.round(activity.distance * (activity.activityType === 'run' ? 0.63 : 0.30) * 154),
                 capturedHexagons: activity.capturedHexagons.length,
                 stolenHexagons: activity.stolenHexagons,
                 createdAt: activity.createdAt,
