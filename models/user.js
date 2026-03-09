@@ -31,6 +31,7 @@ username: {
     firstName: { type: String, trim: true, maxlength: 50 },
     lastName: { type: String, trim: true, maxlength: 50 },
     avatar: { type: String, maxlength: 500 },
+    weight: { type: Number, min: 50, max: 1000, default: 154 }, // lbs — used for calorie calculation, defaults to 154
 
 // Game stats (updated atomically with walks/runs)
 stats: {
@@ -111,6 +112,7 @@ userSchema.methods.toProfileJSON = function() {
         firstName: this.firstName,
         lastName: this.lastName,
         avatar: this.avatar,
+        weight: this.weight, // User's weight in lbs — used for calorie calculations
         stats: this.stats,
         followers: this.followers ? this.followers.length : 0,
         following: this.following ? this.following.length : 0,
