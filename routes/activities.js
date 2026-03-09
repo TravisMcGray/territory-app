@@ -370,7 +370,7 @@ router.post('/', authenticateToken, async (req, res) => {
                 pace: `${activity.pace.toFixed(2)} min/mile`,
                 speed: `${activity.averageSpeed.toFixed(2)} mph`,
                 elevationGain: `${activity.elevationGain} m (${Math.round(activity.elevationGain * 3.28084)} ft)`,
-                caloriesBurned: activity.estimatedCalories,
+                estimatedCalories: activity.estimatedCalories,
                 hexagonsCaptured: uniqueHexagons.length,
                 newTerritory: captured,
                 stolenTerritory: stolen
@@ -944,6 +944,7 @@ router.get('/:activityId', authenticateToken, async (req, res) => {
                 pace: activity.pace,
                 averageSpeed: activity.averageSpeed,
                 elevationGain: activity.elevationGain,
+                estimatedCalories: activity.estimatedCalories,
                 capturedHexagons: activity.capturedHexagons.length,
                 stolenHexagons: activity.stolenHexagons,
                 createdAt: activity.createdAt,

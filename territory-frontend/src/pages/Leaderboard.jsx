@@ -63,7 +63,8 @@ const TABS = [
 // ========== MAIN COMPONENT ==========
 export default function Leaderboard() {
     const { user } = useAuth();
-    console.log('Auth user object:', user);
+
+    // FIX 1: Removed debug console.log('Auth user object:', user)
 
     const [activeTab, setActiveTab] = useState('hexagons');
     const [data, setData] = useState({
@@ -188,7 +189,8 @@ export default function Leaderboard() {
                                 entry={entry}
                                 rank={index + 1}
                                 tab={activeTab}
-                                isCurrentUser={!!(user?.id && entry.id === user.id)}
+                                // FIX 2: String comparison prevents ObjectId vs string mismatch
+                                isCurrentUser={!!(user?.id && String(entry.id) === String(user.id))}
                             />
                         ))}
                     </div>
@@ -268,11 +270,10 @@ function LeaderboardRow({ entry, rank, tab, isCurrentUser }) {
 
     const formatValue = () => {
         if (tab === 'hexagons') return `${entry.hexagons ?? 0} hex`;
-        if (tab === 'distance') return `${((entry.totalDistance ?? 0)).toFixed(1)} mi`;
-        if (tab === 'activity') {
-            const total = (entry.totalWalks ?? 0) + (entry.totalRuns ?? 0);
-            return `${total} activities`;
-        }
+        // FIX 3: Backend returns 'distance' not 'totalDistance'
+        if (tab === 'distance') return `${(entry.distance ?? 0).toFixed(1)} mi`;
+        // FIX 4: Use backend's pre-calculated totalActivities instead of manual sum
+        if (tab === 'activity') return `${entry.totalActivities ?? 0} activities`;
         return '';
     };
 
