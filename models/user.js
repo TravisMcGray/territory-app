@@ -38,7 +38,8 @@ stats: {
     totalWalks: { type: Number, default: 0, min: 0 },
     totalRuns: { type: Number, default: 0, min: 0 },
     totalDistance: { type: Number, default: 0, min: 0 }, // miles
-    totalHexagonsCaptured: { type: Number, default: 0, min: 0 }
+    totalHexagonsCaptured: { type: Number, default: 0, min: 0 },
+    totalStolenTerritories: { type: Number, default: 0, min: 0 } // Cumulative hexagons stolen from other players
     },
 
 // Social features
