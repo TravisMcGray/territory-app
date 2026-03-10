@@ -320,7 +320,8 @@ router.post('/', authenticateToken, async (req, res) => {
                 'stats.totalDistance': distance,
                 'stats.totalHexagonsCaptured': uniqueHexagons.length,
                 'stats.totalWalks': activityType === 'walk' ? 1 : 0,
-                'stats.totalRuns': activityType === 'run' ? 1 : 0
+                'stats.totalRuns': activityType === 'run' ? 1 : 0,
+                'stats.totalStolenTerritories': stolen
             },
             $set: {
                 lastLogin: new Date()
@@ -925,6 +926,9 @@ router.get('/:activityId', authenticateToken, async (req, res) => {
             });
         }
 
+        // Fetch user for weight-based calorie calculation
+        const user = await User.findById(req.user.userId).select('weight');
+
         // Get comments (most recent first, limit to 50)
         const comments = await ActivityComment.find({ activity: activityId })
             .populate('user', 'username avatar')
@@ -956,7 +960,7 @@ router.get('/:activityId', authenticateToken, async (req, res) => {
                 pace: activity.pace,
                 averageSpeed: activity.averageSpeed,
                 elevationGain: activity.elevationGain,
-                estimatedCalories: Math.round(activity.distance * (activity.activityType === 'run' ? 0.63 : 0.30) * 154),
+                estimatedCalories: Math.round(activity.distance * (activity.activityType === 'run' ? 0.63 : 0.30) * (user?.weight || 154)),
                 capturedHexagons: activity.capturedHexagons.length,
                 stolenHexagons: activity.stolenHexagons,
                 createdAt: activity.createdAt,
