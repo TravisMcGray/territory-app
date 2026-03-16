@@ -23,80 +23,54 @@ export default function App() {
 
     return (
         <Routes>
+            {/* ========== AUTH ROUTES ========== */}
             <Route
                 path="/login"
-                element={
-                    user ? 
-                    <Navigate to="/dashboard" />
-                    : <Login />
-                }
+                element={user ? <Navigate to="/dashboard" /> : <Login />}
+            />
+            {/* /verify-email is not used directly — backend redirects to /login?verified=true */}
+            {/* But we define it as a fallback in case someone navigates here directly */}
+            <Route
+                path="/verify-email"
+                element={<Navigate to="/login" />}
             />
             <Route
+                path="/reset-password"
+                element={<ResetPassword />}
+            />
+
+            {/* ========== PROTECTED ROUTES ========== */}
+            <Route
                 path="/dashboard"
-                element={
-                    <ProtectedRoute>
-                        <Dashboard />
-                    </ProtectedRoute>
-                }
+                element={<ProtectedRoute><Dashboard /></ProtectedRoute>}
             />
             <Route
                 path="/log-activity"
-                element={
-                    <ProtectedRoute>
-                        <LogActivity />
-                    </ProtectedRoute>
-                }
+                element={<ProtectedRoute><LogActivity /></ProtectedRoute>}
             />
             <Route
                 path="/feed"
-                element={
-                    <ProtectedRoute>
-                    <Feed />
-                    </ProtectedRoute>
-                }
+                element={<ProtectedRoute><Feed /></ProtectedRoute>}
             />
             <Route
                 path="/leaderboard"
-                element={
-                    <ProtectedRoute>
-                        <Leaderboard />
-                    </ProtectedRoute>
-                }
+                element={<ProtectedRoute><Leaderboard /></ProtectedRoute>}
             />
             <Route
                 path="/profile"
-                element={
-                    <ProtectedRoute>
-                        <Profile />
-                    </ProtectedRoute>
-                }
+                element={<ProtectedRoute><Profile /></ProtectedRoute>}
             />
             <Route
                 path="/profile/:userId"
-                element={
-                    <ProtectedRoute>
-                        <Profile />
-                    </ProtectedRoute>
-                }
+                element={<ProtectedRoute><Profile /></ProtectedRoute>}
             />
             <Route
-                path="/reset-password" 
-                element=
-                {<ResetPassword />} 
-            />
-            <Route 
-                path="*" 
-                element={
-                <Navigate to="/login" />
-                } 
-            />
-            <Route 
                 path="/map"
-                element={
-                <ProtectedRoute>
-                    <Map />
-                </ProtectedRoute>} 
+                element={<ProtectedRoute><Map /></ProtectedRoute>}
             />
+
+            {/* ========== FALLBACK ========== */}
+            <Route path="*" element={<Navigate to="/login" />} />
         </Routes>
     );
 }

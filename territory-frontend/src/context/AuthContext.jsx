@@ -39,6 +39,10 @@ export function AuthProvider({ children }) {
     const loginUser = (token, userData) => {
         localStorage.setItem('token', token);
         setUser(userData);
+        // Fetch full profile immediately so username and stats are available
+        getProfile()
+            .then(res => setUser(res.data.profile))
+            .catch(() => {}); // silently keep the partial user if profile fetch fails
     };
 
     const logoutUser = () => {

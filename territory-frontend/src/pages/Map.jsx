@@ -36,7 +36,7 @@ const FALLBACK_LAT = 27.9506;
 const FALLBACK_LNG = -82.4572;
 
 export default function Map() {
-    const { user, logoutUser } = useAuth();
+    const { user } = useAuth();
     const navigate = useNavigate();
 
     // ========== STATE ==========
@@ -50,12 +50,15 @@ export default function Map() {
     // its own DOM — putting them in state would cause double-render issues.
     const mapRef = useRef(null);
     const hexLayerRef = useRef(null);
+    const locationMarkerRef = useRef(null);
+
 
     // ========== MAP REF CALLBACK ==========
 // useCallback ref fires the instant the DOM node attaches — guarantees
 // Leaflet always gets a real node, unlike useEffect which can fire too early.
 const mapContainerRef = useCallback((node) => {
     if (!node || mapRef.current) return;
+    if (!document.body.contains(node)) return;
 
     const map = L.map(node, {
         center: [FALLBACK_LAT, FALLBACK_LNG],
@@ -73,13 +76,38 @@ const mapContainerRef = useCallback((node) => {
 
     navigator.geolocation.getCurrentPosition(
         (position) => {
-            map.setView([position.coords.latitude, position.coords.longitude], DEFAULT_ZOOM);
+            const { latitude, longitude } = position.coords;
+            map.setView([latitude, longitude], DEFAULT_ZOOM);
+
+            // Blue dot marker for current location
+            const locationIcon = L.divIcon({
+                className: '',
+                html: `<div style="
+                    width: 16px;
+                    height: 16px;
+                    background: #3b82f6;
+                    border: 3px solid white;
+                    border-radius: 50%;
+                    box-shadow: 0 0 0 3px rgba(59,130,246,0.4);
+                "></div>`,
+                iconSize: [16, 16],
+                iconAnchor: [8, 8],
+            });
+
+            locationMarkerRef.current = L.marker([latitude, longitude], { icon: locationIcon })
+                .addTo(map);
         },
         (err) => {
             console.warn('GPS unavailable:', err.message);
-            setLocationError('Could not get your location — showing default view.');
+            if (err.code === 1) {
+                setLocationError('Location access denied — enable location permissions for this site in your browser settings, then refresh.');
+            } else if (err.code === 3) {
+                setLocationError('Location timed out — tap "My Location" to try again.');
+            } else {
+                setLocationError('Could not get your location — tap "My Location" to try again.');
+            }
         },
-        { enableHighAccuracy: true, timeout: 10000 }
+        { enableHighAccuracy: true, timeout: 30000 }
     );
 
     return () => {
@@ -184,11 +212,6 @@ const mapContainerRef = useCallback((node) => {
 
     }, [territories, user]);
 
-    const handleLogout = () => {
-        logoutUser();
-        navigate('/login');
-    };
-
     // ========== RENDER ==========
     return (
         <div className="min-h-screen bg-gray-950 text-white relative">
@@ -232,6 +255,60 @@ const mapContainerRef = useCallback((node) => {
                         <p className="text-yellow-400 font-bold text-sm">{locationError}</p>
                     </div>
                 )}
+
+{/* ========== MY LOCATION BUTTON ========== */}
+                <div className="mb-4 flex justify-end">
+                    <button
+                        onClick={() => {
+                            navigator.geolocation.getCurrentPosition(
+                                (position) => {
+                                    const { latitude, longitude } = position.coords;
+                                    mapRef.current?.setView([latitude, longitude], DEFAULT_ZOOM);
+                                    setLocationError(null);
+
+                                    const locationIcon = L.divIcon({
+                                        className: '',
+                                        html: `<div style="
+                                            width: 16px;
+                                            height: 16px;
+                                            background: #3b82f6;
+                                            border: 3px solid white;
+                                            border-radius: 50%;
+                                            box-shadow: 0 0 0 3px rgba(59,130,246,0.4);
+                                        "></div>`,
+                                        iconSize: [16, 16],
+                                        iconAnchor: [8, 8],
+                                    });
+                                    if (locationMarkerRef.current) {
+                                        locationMarkerRef.current.remove();
+                                    }
+                                    locationMarkerRef.current = L.marker([latitude, longitude], { icon: locationIcon })
+                                        .addTo(mapRef.current);
+                                },
+                                (err) => {
+                                    if (err.code === 1) {
+                                        setLocationError('Location access denied — enable location permissions for this site in your browser settings, then refresh.');
+                                    } else if (err.code === 3) {
+                                        setLocationError('Location timed out — please try again.');
+                                    } else {
+                                        setLocationError('Could not get your location — please try again.');
+                                    }
+                                },
+                                { enableHighAccuracy: true, timeout: 30000 }
+                            );
+                        }}
+                        className="bg-gray-900 hover:bg-gray-800 border border-gray-700 text-emerald-400 font-bold text-sm px-4 py-2 rounded-xl transition-colors flex items-center gap-2"
+                    >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="3"/>
+                            <line x1="12" y1="2" x2="12" y2="6"/>
+                            <line x1="12" y1="18" x2="12" y2="22"/>
+                            <line x1="2" y1="12" x2="6" y2="12"/>
+                            <line x1="18" y1="12" x2="22" y2="12"/>
+                        </svg>
+                        My Location
+                    </button>
+                </div>
             </div>
 
             {/* ========== MAP CONTAINER ========== */}

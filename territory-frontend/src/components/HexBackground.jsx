@@ -4,8 +4,8 @@ export default function HexBackground() {
     const colSpacing = hexSize * 2 * 0.75;
     const rowSpacing = hexHeight;
 
-    const cols = 32;
-    const rows = 24;
+    const cols = 48;
+    const rows = 40;
     const gridWidth = cols * colSpacing + hexSize;
 
     const hexPoints = (cx, cy) => {
@@ -92,6 +92,17 @@ export default function HexBackground() {
                     width: '100%',
                     height: '100%',
                     background: 'linear-gradient(to right, transparent 0%, transparent 35%, #030712 55%, #030712 100%)',
+                }}
+            />
+            {/* Bottom fade so hex grid blends into page background */}
+            <div
+                style={{
+                    position: 'absolute',
+                    bottom: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '30%',
+                    background: 'linear-gradient(to bottom, transparent, #030712)',
                 }}
             />
         </div>

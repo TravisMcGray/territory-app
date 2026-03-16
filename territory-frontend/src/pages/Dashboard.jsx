@@ -1,20 +1,18 @@
 // ========== DASHBOARD PAGE ==========
 // Main hub after login. Shows stats, quick actions, and recent activity.
+// Leaderboard rows and feed usernames are clickable → navigate to profile.
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getProfile, getFeed, getHexagonLeaderboard } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import HexBackground from '../components/HexBackground';
 import Navbar from '../components/Navbar';
 
 // ========== STAT CARD ICONS ==========
-// Matches the leaderboard hexagon style exactly:
-// dark fill, colored stroke, strokeWidth 3.
-
 const HexIcon = ({ stroke, children }) => (
     <svg width="36" height="36" viewBox="0 0 28 28" fill="none">
         <polygon
-            // Flat-top (matches HexBackground — CORRECT shape)
             points="2,14 8,3 20,3 26,14 20,25 8,25"
             fill="#0e0d0d"
             stroke={stroke}
@@ -24,15 +22,12 @@ const HexIcon = ({ stroke, children }) => (
     </svg>
 );
 
-// Hexagons owned — dot grid pattern
-// Hexagons owned — matches leaderboard HexTerritoryIcon style
 const HexOwnedIcon = () => (
     <HexIcon stroke="#10b981">
         <text x="14" y="17" textAnchor="middle" fontSize="8" fill="#10b981" fontWeight="800">HEX</text>
     </HexIcon>
 );
 
-// Distance — matches leaderboard HexDistanceIcon style
 const HexDistanceIcon = () => (
     <HexIcon stroke="#3b82f6">
         <line x1="8" y1="14" x2="20" y2="14" stroke="#3b82f6" strokeWidth="1.5" strokeLinecap="round"/>
@@ -41,21 +36,19 @@ const HexDistanceIcon = () => (
     </HexIcon>
 );
 
-// Activities — lightning bolt
 const HexActivitiesIcon = () => (
     <HexIcon stroke="#a855f7">
         <polyline
-        points="5,14 8,14 11,9 15,19 18,12 21,14 24,14"
-        stroke="#a855f7"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        fill="none"
-    />
+            points="5,14 8,14 11,9 15,19 18,12 21,14 24,14"
+            stroke="#a855f7"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="none"
+        />
     </HexIcon>
 );
 
-// Stolen — cross/sword shape
 const HexStolenIcon = () => (
     <HexIcon stroke="#ef4444">
         <line x1="14" y1="7" x2="14" y2="21" stroke="#ef4444" strokeWidth="1.5" strokeLinecap="round"/>
@@ -64,7 +57,6 @@ const HexStolenIcon = () => (
 );
 
 // ========== MEDAL HEXAGONS ==========
-// Exact same style as Leaderboard.jsx — dark fill, colored stroke, thick border.
 function MedalHex({ rank }) {
     const configs = {
         1: { fill: '#0e0d0d', stroke: '#ffb004', textColor: '#ffffff', label: '1' },
@@ -72,18 +64,17 @@ function MedalHex({ rank }) {
         3: { fill: '#000000', stroke: '#ad4d11', textColor: '#ffffff', label: '3' },
     };
 
-const config = configs[rank];
+    const config = configs[rank];
 
-if (config) {
-    return (
-        <svg width="36" height="36" viewBox="0 0 28 28" fill="none">
-            <polygon
-                // Flat-top (matches HexBackground — CORRECT shape)
-                points="2,14 8,3 20,3 26,14 20,25 8,25"                
-                fill={config.fill}
-                stroke={config.stroke}
-                strokeWidth="2"
-            />
+    if (config) {
+        return (
+            <svg width="36" height="36" viewBox="0 0 28 28" fill="none">
+                <polygon
+                    points="2,14 8,3 20,3 26,14 20,25 8,25"
+                    fill={config.fill}
+                    stroke={config.stroke}
+                    strokeWidth="2"
+                />
                 <text
                     x="14"
                     y="15"
@@ -95,20 +86,19 @@ if (config) {
                     fontFamily="Oxanium, sans-serif"
                 >
                     {config.label}
-            </text>
-        </svg>
-    );
-}
+                </text>
+            </svg>
+        );
+    }
 
-return (
-    <svg width="32" height="32" viewBox="0 0 28 28" fill="none">
-        <polygon
-            // Flat-top (matches HexBackground — CORRECT shape)
-            points="2,14 8,3 20,3 26,14 20,25 8,25"            
-            fill="none"
-            stroke="#4b5563"
-            strokeWidth="1.5"
-        />
+    return (
+        <svg width="32" height="32" viewBox="0 0 28 28" fill="none">
+            <polygon
+                points="2,14 8,3 20,3 26,14 20,25 8,25"
+                fill="none"
+                stroke="#4b5563"
+                strokeWidth="1.5"
+            />
             <text
                 x="14"
                 y="15"
@@ -125,8 +115,13 @@ return (
     );
 }
 
+// ========== MAIN COMPONENT ==========
 export default function Dashboard() {
     const navigate = useNavigate();
+    const { user: currentUser } = useAuth();
+
+    // Normalize ID — getProfile() returns 'id', context may store 'id' or '_id'
+    const currentUserId = currentUser?.id ?? currentUser?._id;
 
     const [profile, setProfile] = useState(null);
     const [feed, setFeed] = useState([]);
@@ -167,6 +162,23 @@ export default function Dashboard() {
 
     const stats = profile?.stats || {};
 
+    const handleLeaderboardClick = (entry) => {
+        if (String(entry.id) === String(currentUserId)) {
+            navigate('/profile');
+        } else {
+            navigate(`/profile/${entry.id}`);
+        }
+    };
+
+    const handleActivityUserClick = (userId) => {
+        if (!userId) return;
+        if (String(userId) === String(currentUserId)) {
+            navigate('/profile');
+        } else {
+            navigate(`/profile/${userId}`);
+        }
+    };
+
     // ========== RENDER ==========
     return (
         <div className="min-h-screen bg-gray-950 text-white relative">
@@ -189,7 +201,7 @@ export default function Dashboard() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     <StatCard
                         label="Hexagons Owned"
-                        value={stats.territoriesOwned ?? 0}
+                        value={stats.totalHexagonsCaptured ?? 0}
                         accent="emerald"
                         icon={<HexOwnedIcon />}
                     />
@@ -201,13 +213,13 @@ export default function Dashboard() {
                     />
                     <StatCard
                         label="Activities"
-                        value={stats.totalActivities ?? 0}
+                        value={(stats.totalWalks ?? 0) + (stats.totalRuns ?? 0)}
                         accent="purple"
                         icon={<HexActivitiesIcon />}
                     />
                     <StatCard
                         label="Stolen"
-                        value={stats.territoriesStolenFrom ?? 0}
+                        value={stats.totalStolenTerritories ?? 0}
                         accent="red"
                         icon={<HexStolenIcon />}
                     />
@@ -236,7 +248,11 @@ export default function Dashboard() {
                         ) : (
                             <div className="space-y-3">
                                 {feed.slice(0, 4).map(activity => (
-                                    <ActivityItem key={activity._id} activity={activity} />
+                                    <ActivityItem
+                                        key={activity._id}
+                                        activity={activity}
+                                        onUserClick={handleActivityUserClick}
+                                    />
                                 ))}
                             </div>
                         )}
@@ -267,7 +283,8 @@ export default function Dashboard() {
                                         key={entry.id}
                                         entry={entry}
                                         rank={index + 1}
-                                        currentUserId={profile?._id}
+                                        currentUserId={currentUserId}
+                                        onClick={() => handleLeaderboardClick(entry)}
                                     />
                                 ))}
                             </div>
@@ -280,7 +297,6 @@ export default function Dashboard() {
 }
 
 // ========== STAT CARD ==========
-// Icon on the left, value and label centered in the remaining space.
 function StatCard({ label, value, accent, icon }) {
     const accentColors = {
         emerald: 'text-emerald-400',
@@ -291,15 +307,9 @@ function StatCard({ label, value, accent, icon }) {
 
     return (
         <div className="bg-gray-900 rounded-2xl border border-gray-800 p-4 flex items-center gap-3">
-            {/* Icon on the left */}
-            <div className="flex-shrink-0">
-                {icon}
-            </div>
-            {/* Value + label centered in remaining space */}
+            <div className="flex-shrink-0">{icon}</div>
             <div className="flex-1 text-center">
-                <div className={`text-2xl font-black ${accentColors[accent]}`}>
-                    {value}
-                </div>
+                <div className={`text-2xl font-black ${accentColors[accent]}`}>{value}</div>
                 <div className="text-gray-400 text-xs mt-0.5 font-bold">{label}</div>
             </div>
         </div>
@@ -307,10 +317,16 @@ function StatCard({ label, value, accent, icon }) {
 }
 
 // ========== ACTIVITY ITEM ==========
-function ActivityItem({ activity }) {
-    const isWalk = activity.activityType === 'WALKING';
+// capturedHexagons from feed is a Number (projected via $size), not an array.
+// activity.userId is flat on the feed response — use it for navigation.
+function ActivityItem({ activity, onUserClick }) {
+    const isWalk = activity.activityType === 'walk' || activity.activityType === 'WALK';
     const distance = (activity.distance ?? 0).toFixed(2);
-    const hexCount = activity.capturedHexagons ?? 0;
+
+    // Feed endpoint projects capturedHexagons as $size (Number), not array
+    const hexCount = typeof activity.capturedHexagons === 'number'
+        ? activity.capturedHexagons
+        : (Array.isArray(activity.capturedHexagons) ? activity.capturedHexagons.length : 0);
 
     return (
         <div className="flex items-center gap-3 py-2 border-b border-gray-800 last:border-0">
@@ -320,9 +336,14 @@ function ActivityItem({ activity }) {
                 {isWalk ? '🚶' : '🏃'}
             </div>
             <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold truncate">
+                {/* Clickable username → profile */}
+                <button
+                    type="button"
+                    onClick={() => onUserClick(activity.userId)}
+                    className="text-sm font-semibold text-white hover:text-emerald-400 transition-colors truncate block text-left w-full"
+                >
                     {activity.username ?? 'Unknown'}
-                </p>
+                </button>
                 <p className="text-gray-500 text-xs">
                     {distance}mi · {hexCount} hexagons
                 </p>
@@ -335,13 +356,19 @@ function ActivityItem({ activity }) {
 }
 
 // ========== LEADERBOARD ITEM ==========
-function LeaderboardItem({ entry, rank, currentUserId }) {
-    const isCurrentUser = entry.id === currentUserId;
+function LeaderboardItem({ entry, rank, currentUserId, onClick }) {
+    const isCurrentUser = String(entry.id) === String(currentUserId);
 
     return (
-        <div className={`flex items-center gap-3 px-3 py-2 rounded-xl ${
-            isCurrentUser ? 'bg-emerald-500/10 border border-emerald-500/30' : 'hover:bg-gray-800'
-        } transition-colors`}>
+        <button
+            type="button"
+            onClick={onClick}
+            className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl transition-colors text-left ${
+                isCurrentUser
+                    ? 'bg-emerald-500/10 border border-emerald-500/30 hover:border-emerald-500/60'
+                    : 'hover:bg-gray-800 border border-transparent'
+            }`}
+        >
             <div className="flex items-center justify-center flex-shrink-0">
                 <MedalHex rank={rank} />
             </div>
@@ -349,10 +376,13 @@ function LeaderboardItem({ entry, rank, currentUserId }) {
                 isCurrentUser ? 'text-emerald-400' : 'text-white'
             }`}>
                 {entry.username}
+                {isCurrentUser && (
+                    <span className="font-bold text-yellow-400 text-xs ml-2">you</span>
+                )}
             </span>
             <span className="text-emerald-400 text-sm font-bold flex-shrink-0">
                 {entry.hexagons} hex
             </span>
-        </div>
+        </button>
     );
 }

@@ -5,10 +5,12 @@
 // 3. Summary - review before submitting to backend
 // 4. Result - show what was captured including new achievements
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createActivity } from '../services/api';
 import HexBackground from '../components/HexBackground';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 
 // ========== CONSTANTS ==========
 // Only accept GPS readings with accuracy better than 30 meters.
@@ -18,9 +20,6 @@ const MAX_ACCEPTABLE_ACCURACY = 30;
 // Minimum distance (meters) between points to avoid recording duplicates
 // while standing still. Prevents hexagon inflation.
 const MIN_DISTANCE_BETWEEN_POINTS = 5;
-
-// How often we try to collect a GPS point (milliseconds)
-const GPS_INTERVAL = 3000;
 
 // ========== HAVERSINE DISTANCE ==========
 // Calculate distance in meters between two GPS points.
@@ -307,6 +306,7 @@ export default function LogActivity() {
                         elapsedSeconds={elapsedSeconds}
                         distanceMeters={distanceMeters}
                         coordinateCount={coordinates.length}
+                        coordinates={coordinates}
                         gpsStatus={gpsStatus}
                         gpsAccuracy={gpsAccuracy}
                         onStop={handleStop}
@@ -496,14 +496,86 @@ function TrackingPhase({
     elapsedSeconds,
     distanceMeters,
     coordinateCount,
+    coordinates,
     gpsStatus,
     gpsAccuracy,
     onStop,
 }) {
     const isWalk = activityType === 'walk';
+    const leafletMapRef = useRef(null);
+    const polylineRef = useRef(null);
+    const markerRef = useRef(null);
+
+    // ========== INITIALIZE MAP ==========
+    const mapContainerRef = useCallback((node) => {
+        if (!node || leafletMapRef.current) return;
+        if (!document.body.contains(node)) return;
+
+        const map = L.map(node, {
+            zoom: 17,
+            center: [0, 0],
+            zoomControl: false,
+            attributionControl: false,
+        });
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+        }).addTo(map);
+
+        // Route polyline — emerald for run, blue for walk
+        polylineRef.current = L.polyline([], {
+            color: isWalk ? '#3b82f6' : '#10b981',
+            weight: 4,
+            opacity: 0.9,
+        }).addTo(map);
+
+        // Blue dot for current position
+        const locationIcon = L.divIcon({
+            className: '',
+            html: `<div style="
+                width: 16px;
+                height: 16px;
+                background: #3b82f6;
+                border: 3px solid white;
+                border-radius: 50%;
+                box-shadow: 0 0 0 3px rgba(59,130,246,0.4);
+            "></div>`,
+            iconSize: [16, 16],
+            iconAnchor: [8, 8],
+        });
+
+        markerRef.current = L.marker([0, 0], { icon: locationIcon }).addTo(map);
+        leafletMapRef.current = map;
+
+        return () => {
+            map.remove();
+            leafletMapRef.current = null;
+            polylineRef.current = null;
+            markerRef.current = null;
+        };
+    }, []);
+
+    // ========== UPDATE MAP ON NEW COORDINATES ==========
+    useEffect(() => {
+        if (!leafletMapRef.current || coordinates.length === 0) return;
+
+        const latest = coordinates[coordinates.length - 1];
+        const latLng = [latest.latitude, latest.longitude];
+
+        // Move blue dot to current position
+        markerRef.current?.setLatLng(latLng);
+
+        // Update polyline with full route
+        const latLngs = coordinates.map(c => [c.latitude, c.longitude]);
+        polylineRef.current?.setLatLngs(latLngs);
+
+        // Re-center map on current position
+        leafletMapRef.current.setView(latLng, 17);
+
+    }, [coordinates]);
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-4">
 
             {/* GPS status indicator */}
             <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm w-fit ${
@@ -540,7 +612,7 @@ function TrackingPhase({
 
             {/* Big timer */}
             <div>
-                <div className="text-7xl font-black tabular-nums tracking-tight">
+                <div className="text-6xl font-black tabular-nums tracking-tight">
                     {formatTime(elapsedSeconds)}
                 </div>
                 <div className="font-bold text-gray-300 text-sm mt-1">Elapsed time</div>
@@ -560,6 +632,24 @@ function TrackingPhase({
                     </div>
                     <div className="font-bold text-gray-300 text-xs mt-1">GPS points</div>
                 </div>
+            </div>
+
+            {/* ========== LIVE MAP ========== */}
+            <div
+                className="relative rounded-2xl overflow-hidden border border-gray-800 shadow-2xl"
+                style={{ height: '280px' }}
+            >
+                {gpsStatus === 'acquiring' && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-gray-900 rounded-2xl z-10">
+                        <p className="text-yellow-400 font-bold text-sm animate-pulse">
+                            Acquiring GPS signal...
+                        </p>
+                    </div>
+                )}
+                <div
+                    ref={mapContainerRef}
+                    style={{ width: '100%', height: '100%' }}
+                />
             </div>
 
             {/* Acquiring GPS message */}

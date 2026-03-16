@@ -33,11 +33,11 @@ app.use(cors({
     credentials: true,
 }));
 
-// Rate limiting for auth endpoints (prevent brute force)
+// Auth rate limiter — strict, for login/signup/verification
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 50, // 50 requests per window
-    message: 'Too many login attempts. Please try again later.',
+    max: 50,
+    message: { status: 'error', code: 'RATE_LIMITED', message: 'Too many attempts. Please try again later.' },
     standardHeaders: true,
     legacyHeaders: false
 });
@@ -45,8 +45,8 @@ const authLimiter = rateLimit({
 // General API rate limiter
 const apiLimiter = rateLimit({
     windowMs: 60 * 1000, // 1 minute
-    max: 100, // 100 requests per minute
-    message: 'Too many requests. Please try again later.',
+    max: 100,
+    message: { status: 'error', code: 'RATE_LIMITED', message: 'Too many requests. Please try again later.' },
     standardHeaders: true,
     legacyHeaders: false
 });
@@ -54,13 +54,12 @@ const apiLimiter = rateLimit({
 // ========== DATABASE ==========
 connectDB();
 
-// ========== ROUTES ==========
-
+// ========== HEALTH CHECK ==========
 app.get('/health', (req, res) => {
     res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-// Route registration with rate limiters
+// ========== RATE LIMITERS (must be registered before routes) ==========
 app.use('/api/auth', authLimiter);
 app.use('/api/activities', apiLimiter);
 app.use('/api/users', apiLimiter);
@@ -71,6 +70,7 @@ app.use('/api/leaderboard', apiLimiter);
 app.use('/api/achievements', apiLimiter);
 app.use('/api/notifications', apiLimiter);
 
+// ========== ROUTES ==========
 app.use('/api/auth', authRouter);
 app.use('/api/activities', activitiesRouter);
 app.use('/api/user', userRouter);
@@ -81,7 +81,18 @@ app.use('/api/segments', segmentsRouter);
 app.use('/api/routes', routesRouter);
 app.use('/api/notifications', notificationsRouter);
 
+// ========== 404 HANDLER ==========
+// Must come BEFORE the global error handler
+app.use((req, res) => {
+    res.status(404).json({
+        status: 'error',
+        code: 'NOT_FOUND',
+        message: 'Route not found'
+    });
+});
+
 // ========== GLOBAL ERROR HANDLER ==========
+// Must come LAST — Express identifies error handlers by the 4-param signature
 app.use((err, req, res, next) => {
     console.error('Error:', err.message);
 
@@ -98,7 +109,7 @@ app.use((err, req, res, next) => {
         });
     }
 
-    // MongoDB duplicate key error
+    // MongoDB duplicate key
     if (err.code === 11000) {
         const field = Object.keys(err.keyPattern)[0];
         return res.status(409).json({
@@ -108,23 +119,13 @@ app.use((err, req, res, next) => {
         });
     }
 
-    // Default error
     res.status(err.status || 500).json({
         status: 'error',
         code: 'INTERNAL_SERVER_ERROR',
-        message: process.env.NODE_ENV === 'development' 
-            ? err.message 
+        message: process.env.NODE_ENV === 'development'
+            ? err.message
             : 'Internal server error',
         ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
-    });
-});
-
-// ========== 404 HANDLER ==========
-app.use((req, res) => {
-    res.status(404).json({
-        status: 'error',
-        code: 'NOT_FOUND',
-        message: 'Route not found'
     });
 });
 

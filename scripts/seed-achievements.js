@@ -140,13 +140,13 @@ const achievements = [
     // ========== RUNS: EPIC ==========
     {
         name: 'Territory Master',
-        description: 'Hold the fastest time on any segment',
+        description: 'Capture 250+ hexagons in a single run',
         category: 'TERRITORY',
         activityType: 'RUN',
         condition: {
-            field: 'hasSegmentRecord',
+            field: 'singleActivityHexagons',
             operator: '>=',
-            value: 1
+            value: 250
         },
         rarity: 'EPIC'
     },

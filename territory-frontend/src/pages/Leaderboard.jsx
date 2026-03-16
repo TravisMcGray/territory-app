@@ -1,21 +1,19 @@
 // ========== LEADERBOARD PAGE ==========
 // Shows three leaderboards: hexagons owned, total distance, and total activities.
 // Tabs switch between categories without re-fetching — all data loads at once.
+// Rows are clickable — navigates to /profile/:userId for other users.
 
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getHexagonLeaderboard, getDistanceLeaderboard, getActivityLeaderboard } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import HexBackground from '../components/HexBackground';
 import Navbar from '../components/Navbar';
 
 // ========== HEX ICONS ==========
-// Color and fill props let active/inactive states change dynamically.
-// Active tabs get a faint emerald fill inside the hexagon.
-
 const HexIcon = ({ color, fill = 'none', children }) => (
     <svg width="36" height="36" viewBox="0 0 28 28" fill="none">
         <polygon
-            // Flat-top (matches HexBackground — CORRECT shape)
             points="2,14 8,3 20,3 26,14 20,25 8,25"
             stroke={color}
             strokeWidth="1.5"
@@ -42,18 +40,17 @@ const HexDistanceIcon = ({ color, active }) => (
 const HexActivityIcon = ({ color, active }) => (
     <HexIcon color={color} fill={active ? '#10b98122' : 'none'}>
         <polyline
-        points="5,14 8,14 11,9 15,19 18,12 21,14 24,14"
-        stroke={color}
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        fill="none"
-    />
+            points="5,14 8,14 11,9 15,19 18,12 21,14 24,14"
+            stroke={color}
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="none"
+        />
     </HexIcon>
 );
 
 // ========== TAB DEFINITIONS ==========
-// Centralized so adding a new leaderboard category is one line change.
 const TABS = [
     { key: 'hexagons', label: 'Hexagons', description: 'Most territory owned', icon: HexTerritoryIcon },
     { key: 'distance', label: 'Distance', description: 'Most miles logged', icon: HexDistanceIcon },
@@ -63,20 +60,17 @@ const TABS = [
 // ========== MAIN COMPONENT ==========
 export default function Leaderboard() {
     const { user } = useAuth();
-
-    // FIX 1: Removed debug console.log('Auth user object:', user)
+    const navigate = useNavigate();
 
     const [activeTab, setActiveTab] = useState('hexagons');
-    const [data, setData] = useState({
-        hexagons: [],
-        distance: [],
-        activity: [],
-    });
+    const [data, setData] = useState({ hexagons: [], distance: [], activity: [] });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
+    // Normalize current user ID — getProfile() returns 'id', context may store either
+    const currentUserId = user?.id ?? user?._id;
+
     // ========== LOAD ALL THREE LEADERBOARDS ==========
-    // Fetch all at once using Promise.all so switching tabs is instant.
     useEffect(() => {
         const loadLeaderboards = async () => {
             try {
@@ -102,16 +96,26 @@ export default function Leaderboard() {
     const currentList = data[activeTab];
     const currentTab = TABS.find(t => t.key === activeTab);
 
+    const handleRowClick = (entry) => {
+        const isCurrentUser = String(entry.id) === String(currentUserId);
+        if (isCurrentUser) {
+            // Navigate to own profile page
+            navigate('/profile');
+        } else {
+            navigate(`/profile/${entry.id}`);
+        }
+    };
+
     // ========== RENDER ==========
     if (loading) {
-    return (
-        <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-            <div className="text-emerald-400 text-lg font-semibold animate-pulse">
-                Loading leaderboard data...
+        return (
+            <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+                <div className="text-emerald-400 text-lg font-semibold animate-pulse">
+                    Loading leaderboard data...
+                </div>
             </div>
-        </div>
-    );
-}
+        );
+    }
 
     return (
         <div className="min-h-screen bg-gray-950 text-white relative">
@@ -146,22 +150,6 @@ export default function Leaderboard() {
                     })}
                 </div>
 
-                {/* ========== LOADING STATE ========== */}
-                {loading && (
-                    <div className="space-y-2">
-                        {[1, 2, 3, 4, 5].map(i => (
-                            <div
-                                key={i}
-                                className="bg-gray-900 border border-gray-800 rounded-xl p-4 animate-pulse flex items-center gap-3"
-                            >
-                                <div className="w-8 h-4 bg-gray-800 rounded" />
-                                <div className="flex-1 h-4 bg-gray-800 rounded" />
-                                <div className="w-16 h-4 bg-gray-800 rounded" />
-                            </div>
-                        ))}
-                    </div>
-                )}
-
                 {/* ========== ERROR STATE ========== */}
                 {error && (
                     <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-400 text-sm">
@@ -170,29 +158,30 @@ export default function Leaderboard() {
                 )}
 
                 {/* ========== EMPTY STATE ========== */}
-                {!loading && !error && currentList.length === 0 && (
+                {!error && currentList.length === 0 && (
                     <div className="text-center py-16">
                         <div className="text-5xl mb-4">🏆</div>
                         <h3 className="text-xl font-bold mb-2">No data yet</h3>
-                        <p className="text-gray-500 text-sm">
-                            Be the first to claim the top spot!
-                        </p>
+                        <p className="text-gray-500 text-sm">Be the first to claim the top spot!</p>
                     </div>
                 )}
 
                 {/* ========== LEADERBOARD LIST ========== */}
-                {!loading && !error && currentList.length > 0 && (
+                {!error && currentList.length > 0 && (
                     <div className="space-y-2">
-                        {currentList.map((entry, index) => (
-                            <LeaderboardRow
-                                key={entry.id}
-                                entry={entry}
-                                rank={index + 1}
-                                tab={activeTab}
-                                // FIX 2: String comparison prevents ObjectId vs string mismatch
-                                isCurrentUser={!!(user?.id && String(entry.id) === String(user.id))}
-                            />
-                        ))}
+                        {currentList.map((entry, index) => {
+                            const isCurrentUser = String(entry.id) === String(currentUserId);
+                            return (
+                                <LeaderboardRow
+                                    key={entry.id}
+                                    entry={entry}
+                                    rank={index + 1}
+                                    tab={activeTab}
+                                    isCurrentUser={isCurrentUser}
+                                    onClick={() => handleRowClick(entry)}
+                                />
+                            );
+                        })}
                     </div>
                 )}
             </div>
@@ -201,8 +190,6 @@ export default function Leaderboard() {
 }
 
 // ========== MEDAL HEXAGONS ==========
-// Gold/silver/bronze filled hexagons for top 3.
-// Plain gray outline with rank number for everyone else.
 function MedalHex({ rank }) {
     const configs = {
         1: { fill: '#0e0d0d', stroke: '#ffb004', textColor: '#ffffff', label: '1' },
@@ -216,23 +203,22 @@ function MedalHex({ rank }) {
         return (
             <svg width="36" height="36" viewBox="0 0 28 28" fill="none">
                 <polygon
-                    // Flat-top (matches HexBackground — CORRECT shape)
-                    points="2,14 8,3 20,3 26,14 20,25 8,25"                
+                    points="2,14 8,3 20,3 26,14 20,25 8,25"
                     fill={config.fill}
                     stroke={config.stroke}
                     strokeWidth="2"
                 />
-                    <text
-                        x="14"
-                        y="15"
-                        textAnchor="middle"
-                        dominantBaseline="middle"
-                        fontSize="12"
-                        fill={config.textColor}
-                        fontWeight="700"
-                        fontFamily="Oxanium, sans-serif"
-                    >
-                        {config.label}
+                <text
+                    x="14"
+                    y="15"
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    fontSize="12"
+                    fill={config.textColor}
+                    fontWeight="700"
+                    fontFamily="Oxanium, sans-serif"
+                >
+                    {config.label}
                 </text>
             </svg>
         );
@@ -240,13 +226,12 @@ function MedalHex({ rank }) {
 
     return (
         <svg width="32" height="32" viewBox="0 0 28 28" fill="none">
-        <polygon
-            // Flat-top (matches HexBackground — CORRECT shape)
-            points="2,14 8,3 20,3 26,14 20,25 8,25"            
-            fill="none"
-            stroke="#4b5563"
-            strokeWidth="1.5"
-        />
+            <polygon
+                points="2,14 8,3 20,3 26,14 20,25 8,25"
+                fill="none"
+                stroke="#4b5563"
+                strokeWidth="1.5"
+            />
             <text
                 x="14"
                 y="15"
@@ -264,40 +249,39 @@ function MedalHex({ rank }) {
 }
 
 // ========== LEADERBOARD ROW ==========
-// Displays a single entry. Highlights the current user's row
-// so they can instantly find themselves in the rankings.
-function LeaderboardRow({ entry, rank, tab, isCurrentUser }) {
-
+function LeaderboardRow({ entry, rank, tab, isCurrentUser, onClick }) {
     const formatValue = () => {
         if (tab === 'hexagons') return `${entry.hexagons ?? 0} hex`;
-        // FIX 3: Backend returns 'distance' not 'totalDistance'
         if (tab === 'distance') return `${(entry.distance ?? 0).toFixed(1)} mi`;
-        // FIX 4: Use backend's pre-calculated totalActivities instead of manual sum
         if (tab === 'activity') return `${entry.totalActivities ?? 0} activities`;
         return '';
     };
 
     return (
-        <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors ${
-            isCurrentUser
-                ? 'bg-gray-900 border-emerald-500/30'
-                : 'bg-gray-900 border-gray-800 hover:border-gray-700'
-        }`}>
-
+        <button
+            type="button"
+            onClick={onClick}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors text-left ${
+                isCurrentUser
+                    ? 'bg-gray-900 border-emerald-500/30 hover:border-emerald-500/60'
+                    : 'bg-gray-900 border-gray-800 hover:border-emerald-500/50 hover:bg-gray-800'
+            }`}
+        >
             {/* Medal / rank hexagon */}
-            <div className="flex items-center justify-center flex-shrink-0"
-                style={{ 
-                    transform: rank === 1 ? 'scale(1.4)' 
-                            : rank === 2 ? 'scale(1.3)' 
-                            : rank === 3 ? 'scale(1.2)' 
-                            : 'scale(1.1)', 
-                    transition: 'transform 0.2s' 
+            <div
+                className="flex items-center justify-center flex-shrink-0"
+                style={{
+                    transform: rank === 1 ? 'scale(1.4)'
+                            : rank === 2 ? 'scale(1.3)'
+                            : rank === 3 ? 'scale(1.2)'
+                            : 'scale(1.1)',
+                    transition: 'transform 0.2s'
                 }}
             >
                 <MedalHex rank={rank} />
             </div>
 
-            {/* Avatar */}
+            {/* Avatar initial */}
             <div className="w-8 h-8 rounded-full bg-gray-800 border border-gray-700 flex items-center justify-center text-xs font-bold text-emerald-400 flex-shrink-0">
                 {entry.username?.[0]?.toUpperCase() ?? '?'}
             </div>
@@ -318,6 +302,6 @@ function LeaderboardRow({ entry, rank, tab, isCurrentUser }) {
             }`}>
                 {formatValue()}
             </span>
-        </div>
+        </button>
     );
 }

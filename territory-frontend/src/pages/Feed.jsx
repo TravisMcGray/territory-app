@@ -1,6 +1,7 @@
 // ========== FEED PAGE ==========
 // Shows activities from users you follow.
 // Supports kudos toggling with optimistic UI and inline comments.
+// Usernames are clickable and navigate to /profile/:userId.
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -10,8 +11,6 @@ import HexBackground from '../components/HexBackground';
 import Navbar from '../components/Navbar';
 
 // ========== TIME HELPER ==========
-// Converts a timestamp to a human-readable relative time string.
-// e.g. "2 hours ago", "just now", "3 days ago"
 const timeAgo = (dateString) => {
     const seconds = Math.floor((new Date() - new Date(dateString)) / 1000);
     if (seconds < 60) return 'just now';
@@ -30,6 +29,7 @@ const timeAgo = (dateString) => {
 // ========== MAIN COMPONENT ==========
 export default function Feed() {
     const { user } = useAuth();
+    const navigate = useNavigate();
 
     const [activities, setActivities] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -55,10 +55,8 @@ export default function Feed() {
     // Optimistic update: change UI immediately, then sync with server.
     // If server fails, revert to previous state so nothing looks broken.
     const handleKudos = async (activityId, hasGivenKudos) => {
-        // Save current state in case we need to revert
         const previous = activities;
 
-        // Optimistically update UI before server responds
         setActivities(prev =>
             prev.map(a => {
                 if (a._id !== activityId) return a;
@@ -70,7 +68,6 @@ export default function Feed() {
             })
         );
 
-        // Sync with server in background
         try {
             if (hasGivenKudos) {
                 await removeKudos(activityId);
@@ -78,14 +75,11 @@ export default function Feed() {
                 await addKudos(activityId);
             }
         } catch (err) {
-            // Server rejected — revert to previous state
             setActivities(previous);
         }
     };
 
     // ========== COMMENT HANDLER ==========
-    // Called from ActivityCard when a comment is submitted.
-    // Updates the comment count on the activity in our local state.
     const handleCommentAdded = (activityId) => {
         setActivities(prev =>
             prev.map(a => {
@@ -96,52 +90,34 @@ export default function Feed() {
     };
 
     // ========== RENDER ==========
-
     if (loading) {
-    return (
-        <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-            <div className="text-emerald-400 text-lg font-semibold animate-pulse">
-                Loading feed data...
+        return (
+            <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+                <div className="text-emerald-400 text-lg font-semibold animate-pulse">
+                    Loading feed data...
+                </div>
             </div>
-        </div>
-    );
-}
+        );
+    }
 
     return (
         <div className="min-h-screen bg-gray-950 text-white relative">
             <HexBackground />
-
-            {/* Navbar */}
             <Navbar />
 
             <div className="max-w-lg mx-auto px-4 py-6 relative z-10">
 
                 <h2 className="text-2xl font-black mb-6">Activity Feed</h2>
 
-                {/* Loading state */}
-                {loading && (
-                    <div className="space-y-4">
-                        {[1, 2, 3].map(i => (
-                            <div
-                                key={i}
-                                className="bg-gray-900 border border-gray-800 rounded-2xl p-5 animate-pulse"
-                            >
-                                <div className="h-4 bg-gray-800 rounded w-1/3 mb-3" />
-                                <div className="h-3 bg-gray-800 rounded w-1/2" />
-                            </div>
-                        ))}
-                    </div>
-                )}
-
                 {/* Error state */}
                 {error && (
-                    <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-400 text-sm">
+                    <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-400 text-sm mb-4">
                         {error}
                     </div>
                 )}
 
                 {/* Empty state */}
-                {!loading && !error && activities.length === 0 && (
+                {!error && activities.length === 0 && (
                     <div className="text-center py-16">
                         <div className="text-5xl mb-4">🗺️</div>
                         <h3 className="text-xl font-bold text-white mb-2">
@@ -157,7 +133,7 @@ export default function Feed() {
                 )}
 
                 {/* Activity list */}
-                {!loading && activities.length > 0 && (
+                {activities.length > 0 && (
                     <div className="space-y-4">
                         {activities.map(activity => (
                             <ActivityCard
@@ -166,6 +142,7 @@ export default function Feed() {
                                 currentUserId={user?._id}
                                 onKudos={handleKudos}
                                 onCommentAdded={handleCommentAdded}
+                                onNavigateToProfile={(userId) => navigate(`/profile/${userId}`)}
                             />
                         ))}
                     </div>
@@ -176,22 +153,27 @@ export default function Feed() {
 }
 
 // ========== ACTIVITY CARD ==========
-// Self-contained card component for a single activity.
-// Manages its own comment expansion state locally.
-function ActivityCard({ activity, currentUserId, onKudos, onCommentAdded }) {
+function ActivityCard({ activity, currentUserId, onKudos, onCommentAdded, onNavigateToProfile }) {
     const [commentsOpen, setCommentsOpen] = useState(false);
     const [comments, setComments] = useState([]);
     const [commentsLoading, setCommentsLoading] = useState(false);
     const [commentText, setCommentText] = useState('');
     const [submittingComment, setSubmittingComment] = useState(false);
 
-    const isWalk = activity.activityType === 'walk' || activity.activityType === 'WALKING';
+    const isWalk = activity.activityType === 'walk' || activity.activityType === 'WALK';
+
+    // From the feed endpoint, userId is flat on the activity object (not nested)
     const isOwnActivity = activity.userId?.toString() === currentUserId?.toString();
+
     const distanceMiles = typeof activity.distance === 'number'
         ? activity.distance.toFixed(2)
         : '0.00';
 
-    // Format duration from seconds to readable string
+    // capturedHexagons from the feed is a Number (projected via $size), not an array
+    const hexCount = typeof activity.capturedHexagons === 'number'
+        ? activity.capturedHexagons
+        : (Array.isArray(activity.capturedHexagons) ? activity.capturedHexagons.length : 0);
+
     const formatDuration = (seconds) => {
         if (!seconds) return '0m';
         const h = Math.floor(seconds / 3600);
@@ -201,13 +183,10 @@ function ActivityCard({ activity, currentUserId, onKudos, onCommentAdded }) {
     };
 
     // ========== LOAD COMMENTS ==========
-    // Only fetch comments when user opens the comment section.
-    // Avoids loading comments for every card on page load.
     const handleToggleComments = async () => {
         if (!commentsOpen && comments.length === 0) {
             setCommentsLoading(true);
             try {
-                // Import getActivity here to avoid circular imports at top level
                 const { getActivity } = await import('../services/api');
                 const res = await getActivity(activity._id);
                 setComments(res.data.social.comments || []);
@@ -229,8 +208,6 @@ function ActivityCard({ activity, currentUserId, onKudos, onCommentAdded }) {
         try {
             const { addComment } = await import('../services/api');
             const res = await addComment(activity._id, { text: commentText.trim() });
-
-            // Add new comment to local list immediately
             setComments(prev => [res.data.comment, ...prev]);
             setCommentText('');
             onCommentAdded(activity._id);
@@ -248,14 +225,23 @@ function ActivityCard({ activity, currentUserId, onKudos, onCommentAdded }) {
             <div className="p-5">
                 <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-3">
-                        {/* Avatar placeholder */}
-                        <div className="w-10 h-10 rounded-full bg-gray-800 border border-gray-700 flex items-center justify-center text-sm font-bold text-emerald-400 flex-shrink-0">
+                        {/* Clickable avatar → profile */}
+                        <button
+                            type="button"
+                            onClick={() => activity.userId && onNavigateToProfile(activity.userId)}
+                            className="w-10 h-10 rounded-full bg-gray-800 border border-gray-700 flex items-center justify-center text-sm font-bold text-emerald-400 flex-shrink-0 hover:border-emerald-500 transition-colors"
+                        >
                             {activity.username?.[0]?.toUpperCase() ?? '?'}
-                        </div>
+                        </button>
                         <div>
-                            <p className="font-bold text-white text-sm">
+                            {/* Clickable username → profile */}
+                            <button
+                                type="button"
+                                onClick={() => activity.userId && onNavigateToProfile(activity.userId)}
+                                className="font-bold text-white text-sm hover:text-emerald-400 transition-colors"
+                            >
                                 {activity.username ?? 'Unknown'}
-                            </p>
+                            </button>
                             <p className="text-gray-500 text-xs">
                                 {timeAgo(activity.createdAt)}
                             </p>
@@ -273,17 +259,14 @@ function ActivityCard({ activity, currentUserId, onKudos, onCommentAdded }) {
                 </div>
 
                 {/* Stats row */}
-                <div className="grid grid-cols-3 gap-2 mb-4">
+                <div className="grid grid-cols-2 gap-2 mb-4">
                     <StatPill label="Distance" value={`${distanceMiles}mi`} />
                     <StatPill label="Duration" value={formatDuration(activity.duration)} />
-                    <StatPill
-                        label="Hexagons"
-                        value={activity.capturedHexagons ?? 0}
-                        accent="emerald"
-                    />
+                    <StatPill label="Hexagons" value={hexCount} accent="emerald" />
+                    <StatPill label="Calories" value={`${activity.estimatedCalories ?? 0} kcal`} />
                 </div>
 
-                {/* Stolen hexagons — only show if any were stolen */}
+                {/* Stolen hexagons */}
                 {activity.stolenHexagons > 0 && (
                     <p className="text-red-400 text-xs mb-3">
                         ⚔️ Stole {activity.stolenHexagons} hexagon{activity.stolenHexagons !== 1 ? 's' : ''}
@@ -306,9 +289,7 @@ function ActivityCard({ activity, currentUserId, onKudos, onCommentAdded }) {
                                 : 'text-gray-500 hover:text-emerald-400'
                         }`}
                     >
-                        <span className="text-base">
-                            {activity.hasGivenKudos ? '⚡' : '⚡'}
-                        </span>
+                        <span className="text-base">⚡</span>
                         <span>{activity.kudosCount ?? 0}</span>
                     </button>
 
