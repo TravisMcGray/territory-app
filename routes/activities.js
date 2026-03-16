@@ -17,6 +17,91 @@ const {
     createTerritoryStolenNotification
 } = require('../utils/notifications');
 
+// ========== SPEED THRESHOLDS ==========
+// Maximum sustained speed allowed per activity type.
+// These are intentionally generous to avoid false flags from GPS drift.
+// Walk: 6 mph — faster than any human walks, slower than any vehicle
+// Run:  20 mph — faster than any sustained human run
+const SPEED_LIMITS_MPH = {
+    walk: 6,
+    run: 20
+};
+
+// If more than this fraction of GPS points are dropped as too fast,
+// the whole activity is rejected — user was clearly not on foot
+const MAX_DROPPED_FRACTION = 0.30; // 30%
+
+// ========== SPEED FILTER ==========
+/**
+ * Filters out GPS coordinates where the speed between consecutive points
+ * exceeds the threshold for the given activity type.
+ *
+ * Checks both timestamp-based speed (if coordinates have timestamps) and
+ * falls back to evenly distributing the total duration across all points.
+ * Always compares against the last KEPT point to avoid inflated speeds
+ * from a chain of dropped points.
+ *
+ * @param {Array} coordinates - Array of { latitude, longitude, timestamp? }
+ * @param {string} activityType - 'walk' or 'run'
+ * @param {number} durationSeconds - Total activity duration in seconds
+ * @returns {{ filtered: Array, droppedCount: number, droppedFraction: number }}
+ */
+const filterSpeedCoordinates = (coordinates, activityType, durationSeconds) => {
+    if (coordinates.length < 2) {
+        return { filtered: coordinates, droppedCount: 0, droppedFraction: 0 };
+    }
+
+    const maxMph = SPEED_LIMITS_MPH[activityType];
+    const maxMetersPerSecond = maxMph * 0.44704; // convert mph → m/s
+
+    // If coordinates have timestamps, use them for accurate speed calculation.
+    // If not, distribute duration evenly across all points.
+    const hasTimestamps = coordinates.every(c => c.timestamp != null);
+    const intervalSeconds = hasTimestamps ? null : durationSeconds / (coordinates.length - 1);
+
+    const filtered = [coordinates[0]]; // Always keep the first point
+    let droppedCount = 0;
+
+    for (let i = 1; i < coordinates.length; i++) {
+        const prev = filtered[filtered.length - 1]; // Compare against last KEPT point
+        const curr = coordinates[i];
+
+        // Calculate distance between points in meters
+        const distanceMeters = geolib.getDistance(
+            { latitude: prev.latitude, longitude: prev.longitude },
+            { latitude: curr.latitude, longitude: curr.longitude }
+        );
+
+        // Calculate time between points in seconds
+        let timeSecs;
+        if (hasTimestamps) {
+            timeSecs = (new Date(curr.timestamp) - new Date(prev.timestamp)) / 1000;
+        } else {
+            timeSecs = intervalSeconds;
+        }
+
+        // Skip if time is zero or negative (duplicate or out-of-order points)
+        if (timeSecs <= 0) {
+            droppedCount++;
+            continue;
+        }
+
+        const speedMetersPerSecond = distanceMeters / timeSecs;
+
+        if (speedMetersPerSecond <= maxMetersPerSecond) {
+            // Speed is acceptable — keep this point
+            filtered.push(curr);
+        } else {
+            // Too fast — drop this point silently
+            droppedCount++;
+        }
+    }
+
+    const droppedFraction = droppedCount / (coordinates.length - 1);
+
+    return { filtered, droppedCount, droppedFraction };
+};
+
 // ========== VALIDATION HELPERS ==========
 
 // Validate coordinate is within valid ranges
@@ -177,11 +262,43 @@ router.post('/', authenticateToken, async (req, res) => {
             });
         }
 
-        // Calculate distance in miles
+        // ========== SPEED FILTER ==========
+        // Run BEFORE distance/hexagon calculation so cheated points
+        // never contribute to stats or territory capture.
+        // Silently drops points that exceed the speed threshold.
+        // If 30%+ of points are dropped, the whole activity is rejected.
+        const { filtered, droppedCount, droppedFraction } = filterSpeedCoordinates(
+            coordinates,
+            activityType,
+            duration
+        );
+
+        // Too many points dropped — user was clearly not on foot
+        if (droppedFraction >= MAX_DROPPED_FRACTION && coordinates.length > 2) {
+            return res.status(400).json({
+                status: 'error',
+                code: 'SPEED_VIOLATION',
+                message: `This ${activityType} was recorded at speeds not possible on foot. Please only record walking and running activities.`
+            });
+        }
+
+        // Use filtered coordinates for everything downstream
+        const cleanCoordinates = filtered;
+
+        // Need at least 2 points after filtering to record a meaningful activity
+        if (cleanCoordinates.length < 2) {
+            return res.status(400).json({
+                status: 'error',
+                code: 'INSUFFICIENT_COORDINATES',
+                message: 'Not enough valid GPS points to record this activity.'
+            });
+        }
+
+        // Calculate distance in miles (using cleaned coordinates)
         let distance = 0;
-        if (coordinates.length > 1) {
+        if (cleanCoordinates.length > 1) {
             const metersDistance = geolib.getPathLength(
-                coordinates.map(coord => ({
+                cleanCoordinates.map(coord => ({
                     latitude: coord.latitude,
                     longitude: coord.longitude
                 }))
@@ -189,8 +306,8 @@ router.post('/', authenticateToken, async (req, res) => {
             distance = parseFloat((metersDistance * 0.000621371).toFixed(2));
         }
 
-        // Convert GPS to H3 hexagons (resolution 10)
-        const hexagons = coordinates.map(coord =>
+        // Convert GPS to H3 hexagons (resolution 10) using cleaned coordinates
+        const hexagons = cleanCoordinates.map(coord =>
             latLngToCell(coord.latitude, coord.longitude, 10)
         );
         const uniqueHexagons = [...new Set(hexagons)];
@@ -199,7 +316,7 @@ router.post('/', authenticateToken, async (req, res) => {
         const activity = await Activity.create({
             userId,
             activityType,
-            coordinates,
+            coordinates: cleanCoordinates,
             distance,
             duration,
             elevationGain: elevationGain || 0,

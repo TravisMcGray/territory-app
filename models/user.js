@@ -40,7 +40,7 @@ const userSchema = new mongoose.Schema({
         trim: true,
         minlength: 3,
         maxlength: 20,
-        match: [/^[a-zA-Z][a-zA-Z0-9_]*$/, 'Username must start with letter, contain only alphanumeric and underscore']
+        match: [/^[a-zA-Z][a-zA-Z0-9]{2,19}$/, 'Username must start with a letter and contain only letters and numbers']
     },
     firstName: { type: String, trim: true, maxlength: 50 },
     lastName:  { type: String, trim: true, maxlength: 50 },

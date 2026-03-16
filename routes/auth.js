@@ -6,6 +6,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/user');
 const { JWT_SECRET } = require('../middleware/auth');
 const { validatePasswordStrength, validateEmailFormat } = require('../middleware/validation');
+const { validateUsername } = require('../middleware/profanity');
 const { Resend } = require('resend');
 
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -51,11 +52,13 @@ router.post('/signup', validateEmailFormat, validatePasswordStrength, async (req
     try {
         const { email, password, username } = req.body;
 
-        if (!username || username.length < 3 || username.length > 20) {
+        // Validate username format + profanity check
+        const usernameCheck = validateUsername(username);
+        if (!usernameCheck.valid) {
             return res.status(400).json({
                 status: 'error',
                 code: 'INVALID_USERNAME',
-                message: 'Username must be 3-20 characters'
+                message: usernameCheck.message
             });
         }
 

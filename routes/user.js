@@ -8,25 +8,23 @@ const { Resend } = require('resend');
 const resend = new Resend(process.env.RESEND_API_KEY);
 const { authenticateToken, JWT_SECRET } = require('../middleware/auth');
 const { validatePasswordStrength, validateEmailFormat } = require('../middleware/validation');
+const { validateUsername } = require('../middleware/profanity');
 
-// GET /api/user/profile - Get current user's profile
+// ========== GET /api/user/profile ==========
 router.get('/profile', authenticateToken, async (req, res) => {
     try {
         const user = await User.findById(req.user.userId);
-
         if (!user) {
             return res.status(404).json({
-            status: 'error',
-            code: 'USER_NOT_FOUND',
-            message: 'User not found'
-        });
+                status: 'error',
+                code: 'USER_NOT_FOUND',
+                message: 'User not found'
+            });
         }
-
         return res.json({
             message: 'Profile retrieved successfully',
             profile: user.toProfileJSON()
         });
-
     } catch (err) {
         return res.status(500).json({
             status: 'error',
@@ -36,12 +34,11 @@ router.get('/profile', authenticateToken, async (req, res) => {
     }
 });
 
-// PUT /api/user/profile - Update profile (firstName, lastName, avatar)
+// ========== PUT /api/user/profile ==========
 router.put('/profile', authenticateToken, async (req, res) => {
     try {
         const { firstName, lastName, avatar } = req.body;
         const user = await User.findById(req.user.userId);
-
         if (!user) {
             return res.status(404).json({
                 status: 'error',
@@ -49,13 +46,10 @@ router.put('/profile', authenticateToken, async (req, res) => {
                 message: 'User not found'
             });
         }
-
         if (firstName !== undefined) user.firstName = firstName;
         if (lastName !== undefined) user.lastName = lastName;
         if (avatar !== undefined) user.avatar = avatar;
-
         await user.save();
-
         return res.json({
             message: 'Profile updated successfully',
             profile: user.toProfileJSON()
@@ -69,12 +63,12 @@ router.put('/profile', authenticateToken, async (req, res) => {
     }
 });
 
-// PUT /api/user/username - Change username (requires 100 hexagons)
+// ========== PUT /api/user/username ==========
+// Requires 100 hexagons captured. Validates format + profanity.
 router.put('/username', authenticateToken, async (req, res) => {
     try {
         const { newUsername } = req.body;
         const user = await User.findById(req.user.userId);
-
         if (!user) {
             return res.status(404).json({
                 status: 'error',
@@ -83,15 +77,17 @@ router.put('/username', authenticateToken, async (req, res) => {
             });
         }
 
-        if (!newUsername || newUsername.length < 3 || newUsername.length > 20) {
+        // Validate format + profanity in one call
+        const usernameCheck = validateUsername(newUsername);
+        if (!usernameCheck.valid) {
             return res.status(400).json({
                 status: 'error',
                 code: 'INVALID_USERNAME',
-                message: 'Username must be 3-20 characters, alphanumeric + underscore, start with letter'
+                message: usernameCheck.message
             });
         }
 
-        // Check if username already exists
+        // Check if username already taken
         const existingUser = await User.findOne({ username: newUsername });
         if (existingUser && existingUser._id.toString() !== user._id.toString()) {
             return res.status(409).json({
@@ -101,7 +97,7 @@ router.put('/username', authenticateToken, async (req, res) => {
             });
         }
 
-        // Check achievement: 100 hexagons captured
+        // Check 100 hexagon requirement
         if (!user.canChangeUsername()) {
             return res.status(403).json({
                 status: 'error',
@@ -128,12 +124,11 @@ router.put('/username', authenticateToken, async (req, res) => {
     }
 });
 
-// PUT /api/user/email - Change email (requires password verification)
+// ========== PUT /api/user/email ==========
 router.put('/email', authenticateToken, async (req, res) => {
     try {
         const { newEmail, password } = req.body;
         const user = await User.findById(req.user.userId).select('+password');
-
         if (!user) {
             return res.status(404).json({
                 status: 'error',
@@ -141,7 +136,6 @@ router.put('/email', authenticateToken, async (req, res) => {
                 message: 'User not found'
             });
         }
-
         if (!newEmail || !password) {
             return res.status(400).json({
                 status: 'error',
@@ -149,8 +143,6 @@ router.put('/email', authenticateToken, async (req, res) => {
                 message: 'New email and current password are required'
             });
         }
-
-        // Verify current password
         const isPasswordValid = await bcrypt.compare(password, user.password);
         if (!isPasswordValid) {
             return res.status(401).json({
@@ -159,8 +151,6 @@ router.put('/email', authenticateToken, async (req, res) => {
                 message: 'Incorrect password'
             });
         }
-
-        // Check if email already exists
         const existingEmail = await User.findOne({ email: newEmail.toLowerCase() });
         if (existingEmail && existingEmail._id.toString() !== user._id.toString()) {
             return res.status(409).json({
@@ -169,14 +159,9 @@ router.put('/email', authenticateToken, async (req, res) => {
                 message: 'Email already in use'
             });
         }
-
         user.email = newEmail.toLowerCase();
         await user.save();
-
-        res.json({
-            message: 'Email updated successfully',
-            email: user.email
-        });
+        res.json({ message: 'Email updated successfully', email: user.email });
     } catch (err) {
         res.status(500).json({
             status: 'error',
@@ -186,12 +171,11 @@ router.put('/email', authenticateToken, async (req, res) => {
     }
 });
 
-// PUT /api/user/password - Change password
+// ========== PUT /api/user/password ==========
 router.put('/password', authenticateToken, validatePasswordStrength, async (req, res) => {
     try {
         const { currentPassword, password } = req.body;
         const user = await User.findById(req.user.userId).select('+password');
-
         if (!user) {
             return res.status(404).json({
                 status: 'error',
@@ -199,7 +183,6 @@ router.put('/password', authenticateToken, validatePasswordStrength, async (req,
                 message: 'User not found'
             });
         }
-
         if (!currentPassword) {
             return res.status(400).json({
                 status: 'error',
@@ -207,8 +190,6 @@ router.put('/password', authenticateToken, validatePasswordStrength, async (req,
                 message: 'Current password is required'
             });
         }
-
-        // Verify current password
         const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
         if (!isPasswordValid) {
             return res.status(401).json({
@@ -217,10 +198,8 @@ router.put('/password', authenticateToken, validatePasswordStrength, async (req,
                 message: 'Current password is incorrect'
             });
         }
-
-        user.password = password; // Will be hashed by pre-save middleware
+        user.password = password;
         await user.save();
-
         res.json({ message: 'Password changed successfully' });
     } catch (err) {
         res.status(500).json({
@@ -231,58 +210,46 @@ router.put('/password', authenticateToken, validatePasswordStrength, async (req,
     }
 });
 
-// POST /api/user/forgot-password - Request password reset
+// ========== POST /api/user/forgot-password ==========
 router.post('/forgot-password', validateEmailFormat, async (req, res) => {
     try {
         const { email } = req.body;
         const user = await User.findByEmail(email);
-
-        // Don't reveal if email exists (security best practice)
-        // Always return same message whether user exists or not
         if (!user) {
             return res.json({
                 message: 'If an account exists with this email, reset instructions have been sent'
             });
         }
-
-        // Generate reset token (expires in 1 hour)
         const resetToken = jwt.sign(
             { userId: user._id, type: 'password-reset' },
             JWT_SECRET,
             { expiresIn: '1h' }
         );
-
-        // Build reset URL using frontend env var
         const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
-
-        // Send reset email via Resend
         await resend.emails.send({
             from: 'TerritoryCapture <onboarding@resend.dev>',
             to: user.email,
             subject: 'Reset your TerritoryCapture password',
             html: `
-                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #030712; color: #ffffff; padding: 32px; border-radius: 16px;">
                     <h2 style="color: #10b981;">TerritoryCapture</h2>
-                    <p>Hi ${user.username},</p>
-                    <p>You requested a password reset. Click the button below to reset your password.</p>
-                    <p>This link expires in <strong>1 hour</strong>.</p>
-                    <a href="${resetUrl}" 
-                        style="display: inline-block; background: #10b981; color: white; 
-                                padding: 12px 24px; border-radius: 8px; text-decoration: none; 
+                    <p style="color: #9ca3af;">Hi ${user.username},</p>
+                    <p style="color: #9ca3af;">You requested a password reset. Click the button below to reset your password.</p>
+                    <p style="color: #9ca3af;">This link expires in <strong style="color: #ffffff;">1 hour</strong>.</p>
+                    <a href="${resetUrl}"
+                        style="display: inline-block; background: #10b981; color: white;
+                                padding: 12px 24px; border-radius: 8px; text-decoration: none;
                                 font-weight: bold; margin: 16px 0;">
                         Reset Password
                     </a>
-                    <p>If you didn't request this, you can safely ignore this email.</p>
-                    <p>If the button doesn't work, copy and paste this link into your browser:</p>
-                    <p style="color: #6b7280; font-size: 12px;">${resetUrl}</p>
+                    <p style="color: #6b7280; font-size: 12px;">If you didn't request this, you can safely ignore this email.</p>
+                    <p style="color: #6b7280; font-size: 12px;">If the button doesn't work, copy and paste this link:<br>${resetUrl}</p>
                 </div>
             `
         });
-
         return res.json({
             message: 'If an account exists with this email, reset instructions have been sent'
         });
-
     } catch (err) {
         return res.status(500).json({
             status: 'error',
@@ -292,11 +259,10 @@ router.post('/forgot-password', validateEmailFormat, async (req, res) => {
     }
 });
 
-// POST /api/user/reset-password - Reset password with token
+// ========== POST /api/user/reset-password ==========
 router.post('/reset-password', validatePasswordStrength, async (req, res) => {
     try {
         const { token, password } = req.body;
-
         if (!token) {
             return res.status(400).json({
                 status: 'error',
@@ -304,8 +270,6 @@ router.post('/reset-password', validatePasswordStrength, async (req, res) => {
                 message: 'Reset token is required'
             });
         }
-
-        // Verify reset token
         let decoded;
         try {
             decoded = jwt.verify(token, JWT_SECRET);
@@ -316,7 +280,6 @@ router.post('/reset-password', validatePasswordStrength, async (req, res) => {
                 message: 'Invalid or expired token'
             });
         }
-
         if (decoded.type !== 'password-reset') {
             return res.status(403).json({
                 status: 'error',
@@ -324,7 +287,6 @@ router.post('/reset-password', validatePasswordStrength, async (req, res) => {
                 message: 'Invalid token type'
             });
         }
-
         const user = await User.findById(decoded.userId);
         if (!user) {
             return res.status(404).json({
@@ -333,13 +295,9 @@ router.post('/reset-password', validatePasswordStrength, async (req, res) => {
                 message: 'User not found'
             });
         }
-
-        user.password = password; // Will be hashed by pre-save middleware
+        user.password = password;
         await user.save();
-
-        res.json({
-            message: 'Password reset successful. You can now login with your new password.'
-        });
+        res.json({ message: 'Password reset successful. You can now login with your new password.' });
     } catch (err) {
         res.status(500).json({
             status: 'error',
@@ -349,12 +307,13 @@ router.post('/reset-password', validatePasswordStrength, async (req, res) => {
     }
 });
 
-// DELETE /api/user/account - Delete user account
+// ========== DELETE /api/user/account ==========
+// Soft delete only — sets isActive to false.
+// Full hard delete with cleanup is handled by admin tooling.
 router.delete('/account', authenticateToken, async (req, res) => {
     try {
         const { password } = req.body;
         const user = await User.findById(req.user.userId).select('+password');
-
         if (!user) {
             return res.status(404).json({
                 status: 'error',
@@ -362,7 +321,6 @@ router.delete('/account', authenticateToken, async (req, res) => {
                 message: 'User not found'
             });
         }
-
         if (!password) {
             return res.status(400).json({
                 status: 'error',
@@ -370,8 +328,6 @@ router.delete('/account', authenticateToken, async (req, res) => {
                 message: 'Password is required to delete account'
             });
         }
-
-        // Verify password before deletion
         const isPasswordValid = await bcrypt.compare(password, user.password);
         if (!isPasswordValid) {
             return res.status(401).json({
@@ -380,13 +336,10 @@ router.delete('/account', authenticateToken, async (req, res) => {
                 message: 'Incorrect password'
             });
         }
-
-        // Soft delete (set isActive to false instead of hard delete)
         user.isActive = false;
         await user.save();
-
         res.json({
-            message: 'Account deactivated successfully. Your data will be removed shortly.'
+            message: 'Account deactivated successfully.'
         });
     } catch (err) {
         res.status(500).json({
@@ -397,12 +350,10 @@ router.delete('/account', authenticateToken, async (req, res) => {
     }
 });
 
-// ========== GET /api/user/territories - Get all captured territories for the map ==========
-// Returns every hex tile in the database with owner info so the frontend
-// can render the full global territory map using H3 polygon boundaries.
+// ========== GET /api/user/territories ==========
 router.get('/territories', authenticateToken, async (req, res) => {
     try {
-        const territories = await Territory.find({ 'ownerId': { $exists: true } })
+        const territories = await Territory.find({ ownerId: { $exists: true } })
             .populate({ path: 'ownerId', match: { isActive: true }, select: 'username' })
             .select('hexagonId ownerId ownerActivityType capturedAt')
             .lean();
@@ -411,10 +362,7 @@ router.get('/territories', authenticateToken, async (req, res) => {
             .filter(t => t.ownerId !== null)
             .map(t => ({
                 hexagonId: t.hexagonId,
-                owner: {
-                    id: t.ownerId._id,
-                    username: t.ownerId.username
-                },
+                owner: { id: t.ownerId._id, username: t.ownerId.username },
                 activityType: t.ownerActivityType,
                 capturedAt: t.capturedAt
             }));
@@ -424,7 +372,6 @@ router.get('/territories', authenticateToken, async (req, res) => {
             count: formatted.length,
             territories: formatted
         });
-
     } catch (err) {
         res.status(500).json({
             status: 'error',
