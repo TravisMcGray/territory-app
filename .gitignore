@@ -27,4 +27,4 @@ npm-debug.log*
 
 # Testing
 coverage/
-.nyc_output/
+.nyc_output/wipe-all-users.js
