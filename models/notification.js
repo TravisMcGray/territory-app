@@ -19,7 +19,8 @@ const notificationSchema = new mongoose.Schema({
             'SEGMENT_RECORD',
             'NEW_FOLLOWER',
             'COMMENT',
-            'KUDOS'
+            'KUDOS',
+            'SYSTEM'    // Admin/moderator system messages e.g. username resets
         ],
         required: true
         // No standalone index needed — covered by compound indexes below
@@ -27,13 +28,13 @@ const notificationSchema = new mongoose.Schema({
     title: {
         type: String,
         required: true,
-        trim: true, // Strips leading/trailing whitespace
+        trim: true,
         maxlength: 100
     },
     message: {
         type: String,
         required: true,
-        trim: true, // Strips leading/trailing whitespace
+        trim: true,
         maxlength: 500
     },
 
@@ -77,8 +78,8 @@ const notificationSchema = new mongoose.Schema({
 });
 
 // ========== INDEXES FOR EFFICIENT QUERIES ==========
-notificationSchema.index({ createdAt: -1 }); // Timestamp-based sorting
-notificationSchema.index({ user: 1, read: 1, createdAt: -1 }); // User's notifications timeline + unread count queries
-notificationSchema.index({ user: 1, type: 1 }); // Filter by type
+notificationSchema.index({ createdAt: -1 });
+notificationSchema.index({ user: 1, read: 1, createdAt: -1 });
+notificationSchema.index({ user: 1, type: 1 });
 
 module.exports = mongoose.model('Notification', notificationSchema);

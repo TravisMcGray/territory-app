@@ -28,7 +28,7 @@ const BLOCKLIST = [
     'numbskull', 'moron', 'idiot', 'retard', 'retarded',
     'motherfucker', 'motherf', 'mf', 'mfer',
     'wtf', 'stfu', 'gtfo',
-    'hellhole',
+    'hellhole', 'effing', 'effen', 'effin',
 
     // ===== SEXUAL =====
     'sex', 'sexy', 'sexxy',
