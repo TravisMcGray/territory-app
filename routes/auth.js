@@ -22,7 +22,7 @@ const generateVerificationToken = () => {
 };
 
 const sendVerificationEmail = async (email, username, rawToken) => {
-    const verifyUrl = `${process.env.FRONTEND_URL}/verify-email?token=${rawToken}`;
+    const verifyUrl = `${process.env.BACKEND_URL}/api/auth/verify-email?token=${rawToken}`;
     await resend.emails.send({
         from: 'TerritoryCapture <onboarding@resend.dev>',
         to: email,

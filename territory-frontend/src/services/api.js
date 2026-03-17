@@ -37,6 +37,12 @@ export const updateUsername = (data) => api.put('/api/user/username', data);
 export const getUserTerritories = () => api.get('/api/user/territories');
 export const getTerritories = () => api.get('/api/user/territories');
 
+// Account deletion — two step process:
+// 1. requestAccountDeletion() → sends 6-digit code to user's email
+// 2. confirmAccountDeletion({ code }) → validates code and permanently deletes everything
+export const requestAccountDeletion = () => api.post('/api/user/account/delete-request');
+export const confirmAccountDeletion = (data) => api.delete('/api/user/account/confirm', { data });
+
 // ========== USERS (public profiles) ==========
 export const getUserById = (id) => api.get(`/api/users/${id}`);
 

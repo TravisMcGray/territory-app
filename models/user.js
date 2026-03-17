@@ -32,6 +32,17 @@ const userSchema = new mongoose.Schema({
         select: false
     },
 
+    // ========== ACCOUNT DELETION ==========
+    // 6-digit code hashed before storage — expires in 15 minutes
+    accountDeletionCode: {
+        type: String,
+        select: false
+    },
+    accountDeletionExpires: {
+        type: Date,
+        select: false
+    },
+
     // ========== PROFILE ==========
     username: {
         type: String,
@@ -103,20 +114,20 @@ userSchema.methods.getFollowingCount = function () {
 // Own profile — includes private fields
 userSchema.methods.toProfileJSON = function () {
     return {
-        id:               this._id,
-        email:            this.email,
-        username:         this.username,
-        firstName:        this.firstName,
-        lastName:         this.lastName,
-        avatar:           this.avatar,
-        weight:           this.weight,
-        isEmailVerified:  this.isEmailVerified,
-        stats:            this.stats,
-        followers:        this.followers ? this.followers.length : 0,
-        following:        this.following ? this.following.length : 0,
+        id:                this._id,
+        email:             this.email,
+        username:          this.username,
+        firstName:         this.firstName,
+        lastName:          this.lastName,
+        avatar:            this.avatar,
+        weight:            this.weight,
+        isEmailVerified:   this.isEmailVerified,
+        stats:             this.stats,
+        followers:         this.followers ? this.followers.length : 0,
+        following:         this.following ? this.following.length : 0,
         canChangeUsername: this.canChangeUsername(),
-        createdAt:        this.createdAt,
-        lastLogin:        this.lastLogin
+        createdAt:         this.createdAt,
+        lastLogin:         this.lastLogin
     };
 };
 

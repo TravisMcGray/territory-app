@@ -16,6 +16,8 @@ import {
     getActivities,
     followUser,
     unfollowUser,
+    requestAccountDeletion,
+    confirmAccountDeletion,
 } from '../services/api';
 import HexBackground from '../components/HexBackground';
 import Navbar from '../components/Navbar';
@@ -61,11 +63,212 @@ const timeAgo = (dateString) => {
     });
 };
 
+// ========== DELETE ACCOUNT MODAL ==========
+// Three states:
+// 'warning'  → scary confirmation screen listing what gets deleted
+// 'code'     → enter the 6-digit code from email
+// 'success'  → deleted, redirecting to login
+function DeleteAccountModal({ profile, onClose, onDeleted }) {
+    const [step, setStep] = useState('warning');
+    const [code, setCode] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+
+    // ===== Step 1: User clicks "Yes, delete my account" =====
+    // Sends the code to their email and moves to code entry screen
+    const handleRequestDeletion = async () => {
+        setLoading(true);
+        setError('');
+        try {
+            await requestAccountDeletion();
+            setStep('code');
+        } catch (err) {
+            setError(err.response?.data?.message || 'Failed to send code. Please try again.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // ===== Step 2: User submits their 6-digit code =====
+    const handleConfirmDeletion = async () => {
+        if (code.trim().length !== 6) {
+            setError('Please enter the 6-digit code from your email.');
+            return;
+        }
+        setLoading(true);
+        setError('');
+        try {
+            await confirmAccountDeletion({ code: code.trim() });
+            setStep('success');
+            // Give user 3 seconds to read the success message before redirecting
+            setTimeout(() => onDeleted(), 3000);
+        } catch (err) {
+            setError(err.response?.data?.message || 'Invalid or expired code. Please try again.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 px-4">
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-md">
+
+                {/* ===== WARNING SCREEN ===== */}
+                {step === 'warning' && (
+                    <>
+                        <div className="text-center mb-6">
+                            <div className="text-4xl mb-3">⚠️</div>
+                            <h2 className="text-xl font-black text-white mb-2">
+                                Delete Account
+                            </h2>
+                            <p className="text-gray-400 text-sm font-bold">
+                                This action is <span className="text-red-400">permanent and cannot be undone.</span>
+                            </p>
+                        </div>
+
+                        {/* What gets deleted */}
+                        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 mb-6 space-y-2">
+                            <p className="text-red-400 text-xs font-black uppercase tracking-wide mb-3">
+                                The following will be permanently deleted:
+                            </p>
+                            {[
+                                'Your account and profile',
+                                'All captured territories on the map',
+                                'All activities and route history',
+                                'All comments and kudos',
+                                'All followers and following',
+                                'All achievements and stats',
+                            ].map((item, i) => (
+                                <div key={i} className="flex items-center gap-2">
+                                    <span className="text-red-400 text-xs">✕</span>
+                                    <span className="text-gray-300 text-sm">{item}</span>
+                                </div>
+                            ))}
+                        </div>
+
+                        <p className="text-gray-400 text-sm text-center mb-6">
+                            We'll send a confirmation code to{' '}
+                            <span className="text-white font-bold">{profile?.email}</span>
+                        </p>
+
+                        {error && (
+                            <p className="text-red-400 text-sm text-center mb-4">{error}</p>
+                        )}
+
+                        <div className="space-y-3">
+                            <button
+                                type="button"
+                                onClick={handleRequestDeletion}
+                                disabled={loading}
+                                className="w-full bg-red-500 hover:bg-red-600 disabled:bg-gray-800 disabled:text-gray-600 text-white font-black py-3 rounded-xl transition-colors"
+                            >
+                                {loading ? 'Sending code...' : 'Yes, delete my account'}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={onClose}
+                                disabled={loading}
+                                className="w-full bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold py-3 rounded-xl transition-colors"
+                            >
+                                Cancel — keep my account
+                            </button>
+                        </div>
+                    </>
+                )}
+
+                {/* ===== CODE ENTRY SCREEN ===== */}
+                {step === 'code' && (
+                    <>
+                        <div className="text-center mb-6">
+                            <div className="text-4xl mb-3">📧</div>
+                            <h2 className="text-xl font-black text-white mb-2">
+                                Check your email
+                            </h2>
+                            <p className="text-gray-400 text-sm font-bold">
+                                We sent a 6-digit code to{' '}
+                                <span className="text-white">{profile?.email}</span>
+                            </p>
+                            <p className="text-gray-500 text-xs mt-1">
+                                Code expires in 15 minutes
+                            </p>
+                        </div>
+
+                        <input
+                            type="text"
+                            value={code}
+                            onChange={e => {
+                                // Only allow digits, max 6
+                                const val = e.target.value.replace(/\D/g, '').slice(0, 6);
+                                setCode(val);
+                                setError('');
+                            }}
+                            placeholder="000000"
+                            maxLength={6}
+                            className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-4 text-white text-center text-2xl font-black tracking-widest placeholder-gray-600 focus:outline-none focus:border-red-500 transition-colors mb-4"
+                        />
+
+                        {error && (
+                            <p className="text-red-400 text-sm text-center mb-4">{error}</p>
+                        )}
+
+                        <div className="space-y-3">
+                            <button
+                                type="button"
+                                onClick={handleConfirmDeletion}
+                                disabled={loading || code.length !== 6}
+                                className="w-full bg-red-500 hover:bg-red-600 disabled:bg-gray-800 disabled:text-gray-600 text-white font-black py-3 rounded-xl transition-colors"
+                            >
+                                {loading ? 'Deleting account...' : 'Permanently delete my account'}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={onClose}
+                                disabled={loading}
+                                className="w-full bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold py-3 rounded-xl transition-colors"
+                            >
+                                Cancel — keep my account
+                            </button>
+                        </div>
+
+                        {/* Resend option */}
+                        <p className="text-center mt-4">
+                            <button
+                                type="button"
+                                onClick={handleRequestDeletion}
+                                disabled={loading}
+                                className="text-gray-500 hover:text-gray-300 text-xs font-bold transition-colors"
+                            >
+                                Didn't receive it? Resend code
+                            </button>
+                        </p>
+                    </>
+                )}
+
+                {/* ===== SUCCESS SCREEN ===== */}
+                {step === 'success' && (
+                    <div className="text-center py-4">
+                        <div className="text-4xl mb-4">👋</div>
+                        <h2 className="text-xl font-black text-white mb-2">
+                            Account deleted
+                        </h2>
+                        <p className="text-gray-400 text-sm font-bold">
+                            Your account has been permanently deleted. Thanks for being part of TerritoryCapture.
+                        </p>
+                        <p className="text-gray-500 text-xs mt-3">
+                            Redirecting you now...
+                        </p>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
 // ========== MAIN COMPONENT ==========
 export default function Profile() {
     const navigate = useNavigate();
     const { userId } = useParams();
-    const { user: currentUser } = useAuth();
+    const { user: currentUser, logoutUser } = useAuth();
 
     // Normalize: getProfile() returns 'id', AuthContext may store '_id' or 'id'
     // Use whichever is populated to avoid "undefined" string comparison bugs
@@ -82,39 +285,32 @@ export default function Profile() {
     const [followLoading, setFollowLoading] = useState(false);
     const [error, setError] = useState('');
     const [activeTab, setActiveTab] = useState('activities');
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
 
     // ========== LOAD PROFILE DATA ==========
     useEffect(() => {
         const loadProfile = async () => {
             try {
                 if (isOwnProfile) {
-                    // Own profile: load profile + unlocked achievements + activity history
                     const [profileRes, achievementsRes, activitiesRes] = await Promise.all([
                         getProfile(),
-                        getUserAchievements(),  // GET /api/achievements/user → populated unlocked list
+                        getUserAchievements(),
                         getActivities(),
                     ]);
 
                     const profileData = profileRes.data.profile;
                     setProfile(profileData);
                     setActivities(activitiesRes.data.activities || []);
-
-                    // followers/following are Numbers on own profile response
                     setFollowersCount(profileData.followers ?? 0);
                     setFollowingCount(profileData.following ?? 0);
-
-                    // Each achievement: { achievementId: { name, description, rarity, ... }, unlockedAt }
                     setAchievements(achievementsRes.data.achievements || []);
 
                 } else {
-                    // Other user: GET /api/users/:userId → toPublicJSON + relationshipStatus
                     const profileRes = await getUserById(userId);
                     const userData = profileRes.data.user;
                     const relationship = profileRes.data.relationshipStatus;
 
                     setProfile(userData);
-
-                    // followers/following are Numbers on toPublicJSON
                     setFollowersCount(userData.followers ?? 0);
                     setFollowingCount(userData.following ?? 0);
                     setIsFollowing(relationship?.isFollowing ?? false);
@@ -148,6 +344,14 @@ export default function Profile() {
         } finally {
             setFollowLoading(false);
         }
+    };
+
+    // ========== ACCOUNT DELETED CALLBACK ==========
+    // Called by the modal after successful deletion.
+    // Logs user out and redirects to login.
+    const handleAccountDeleted = () => {
+        if (logoutUser) logoutUser();
+        navigate('/login');
     };
 
     // ========== LOADING STATE ==========
@@ -184,6 +388,15 @@ export default function Profile() {
         <div className="min-h-screen bg-gray-950 text-white relative">
             <HexBackground />
             <Navbar />
+
+            {/* Delete account modal */}
+            {showDeleteModal && (
+                <DeleteAccountModal
+                    profile={profile}
+                    onClose={() => setShowDeleteModal(false)}
+                    onDeleted={handleAccountDeleted}
+                />
+            )}
 
             <div className="max-w-lg mx-auto px-4 py-6 relative z-10 space-y-6">
 
@@ -225,7 +438,6 @@ export default function Profile() {
                     </div>
 
                     {/* ========== STATS GRID ========== */}
-                    {/* totalStolenTerritories is included in toPublicJSON — intentional, it's a competitive stat */}
                     <div className="grid grid-cols-3 gap-4 mt-5 pt-5 border-t border-gray-800">
                         <div className="text-center">
                             <div className="text-xl font-black text-white">{followersCount}</div>
@@ -263,7 +475,6 @@ export default function Profile() {
                 </div>
 
                 {/* ========== TABS — own profile only ========== */}
-                {/* No public endpoint exists for other users' activity history or achievements */}
                 {isOwnProfile && (
                     <>
                         <div className="flex bg-gray-900 border border-gray-800 rounded-xl p-1 gap-1">
@@ -346,6 +557,29 @@ export default function Profile() {
                                 )}
                             </div>
                         )}
+
+                        {/* ========== DANGER ZONE ========== */}
+                        {/* Shown at the bottom of own profile only */}
+                        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+                            <h3 className="text-sm font-black text-gray-400 uppercase tracking-wide mb-4">
+                                Danger Zone
+                            </h3>
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-white font-bold text-sm">Delete Account</p>
+                                    <p className="text-gray-500 text-xs mt-0.5">
+                                        Permanently delete your account and all data
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowDeleteModal(true)}
+                                    className="px-4 py-2 rounded-xl text-sm font-bold bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-colors"
+                                >
+                                    Delete
+                                </button>
+                            </div>
+                        </div>
                     </>
                 )}
             </div>
