@@ -208,6 +208,8 @@ const checkAndUnlockAchievements = async (user, activityData) => {
 
     } catch (error) {
         // Silent fail - achievement check errors should not break activity recording
+        // but we need visibility into failures
+        console.error('[ACHIEVEMENT CHECK ERROR]', error.message);
         return [];
     }
 };

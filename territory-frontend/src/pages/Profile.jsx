@@ -13,6 +13,7 @@ import {
     getProfile,
     getUserById,
     getUserAchievements,
+    getAllAchievements,
     getActivities,
     followUser,
     unfollowUser,
@@ -292,8 +293,9 @@ export default function Profile() {
         const loadProfile = async () => {
             try {
                 if (isOwnProfile) {
-                    const [profileRes, achievementsRes, activitiesRes] = await Promise.all([
+                    const [profileRes, allAchievementsRes, userAchievementsRes, activitiesRes] = await Promise.all([
                         getProfile(),
+                        getAllAchievements(),
                         getUserAchievements(),
                         getActivities(),
                     ]);
@@ -303,7 +305,35 @@ export default function Profile() {
                     setActivities(activitiesRes.data.activities || []);
                     setFollowersCount(profileData.followers ?? 0);
                     setFollowingCount(profileData.following ?? 0);
-                    setAchievements(achievementsRes.data.achievements || []);
+
+                    // Merge all achievements with user's unlock status
+                    // getAllAchievements → master list of all 12
+                    // getUserAchievements → only unlocked ones with unlockedAt
+                    const allList = allAchievementsRes.data.achievements || [];
+                    const userList = userAchievementsRes.data.achievements || [];
+
+                    // Build lookup: achievementId → unlockedAt
+                    const unlockedMap = new Map();
+                    for (const ua of userList) {
+                        const id = ua.achievementId?._id ?? ua.achievementId;
+                        if (id) unlockedMap.set(String(id), ua.unlockedAt);
+                    }
+
+                    // Merge: every achievement gets an isUnlocked flag + unlockedAt
+                    const merged = allList.map(a => ({
+                        ...a,
+                        isUnlocked: unlockedMap.has(String(a._id)),
+                        unlockedAt: unlockedMap.get(String(a._id)) || null,
+                    }));
+
+                    // Sort: unlocked first, then by rarity weight
+                    const rarityOrder = { LEGENDARY: 5, EPIC: 4, RARE: 3, UNCOMMON: 2, COMMON: 1 };
+                    merged.sort((a, b) => {
+                        if (a.isUnlocked !== b.isUnlocked) return a.isUnlocked ? -1 : 1;
+                        return (rarityOrder[b.rarity] || 0) - (rarityOrder[a.rarity] || 0);
+                    });
+
+                    setAchievements(merged);
 
                 } else {
                     const profileRes = await getUserById(userId);
@@ -386,6 +416,19 @@ export default function Profile() {
     // ========== RENDER ==========
     return (
         <div className="min-h-screen bg-gray-950 text-white relative">
+            {/* Cascading achievement animation */}
+            <style>{`
+                @keyframes achievementSlideIn {
+                    from {
+                        opacity: 0;
+                        transform: translateY(12px);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateY(0);
+                    }
+                }
+            `}</style>
             <HexBackground />
             <Navbar />
 
@@ -552,6 +595,7 @@ export default function Profile() {
                                         <AchievementRow
                                             key={achievement._id ?? achievement.achievementId?._id ?? index}
                                             achievement={achievement}
+                                            index={index}
                                         />
                                     ))
                                 )}
@@ -628,30 +672,56 @@ function ActivityRow({ activity }) {
 }
 
 // ========== ACHIEVEMENT ROW ==========
-// Shape from GET /api/achievements/user:
-// { achievementId: { name, description, rarity, points, badgeUrl }, unlockedAt }
-// Every item from this endpoint is already unlocked — no locked state needed.
-function AchievementRow({ achievement }) {
-    const details = achievement.achievementId ?? {};
-    const name = details.name ?? 'Achievement';
-    const description = details.description ?? '';
-    const rarity = details.rarity ?? '';
+// Merged shape from getAllAchievements + getUserAchievements:
+// { _id, name, description, rarity, points, category, activityType, isUnlocked, unlockedAt }
+// Unlocked = emerald glow, Locked = slightly transparent but still readable
+function AchievementRow({ achievement, index = 0 }) {
+    const name = achievement.name ?? 'Achievement';
+    const description = achievement.description ?? '';
+    const rarity = achievement.rarity ?? '';
+    const isUnlocked = achievement.isUnlocked;
     const unlockedAt = achievement.unlockedAt;
 
+    // Rarity colors for the badge label
+    const rarityColors = {
+        COMMON: 'text-gray-400',
+        UNCOMMON: 'text-green-400',
+        RARE: 'text-blue-400',
+        EPIC: 'text-purple-400',
+        LEGENDARY: 'text-yellow-400',
+    };
+
     return (
-        <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 flex items-center gap-3">
-            <div className="text-2xl flex-shrink-0">🏆</div>
+        <div
+            className={`rounded-xl p-4 flex items-center gap-3 transition-all ${
+                isUnlocked
+                    ? 'bg-emerald-500/10 border border-emerald-500/30'
+                    : 'bg-gray-900 border border-gray-800 opacity-60'
+            }`}
+            style={{
+                animation: `achievementSlideIn 0.3s ease-out ${index * 0.06}s both`,
+            }}
+        >
+            <div className={`text-2xl flex-shrink-0 ${isUnlocked ? '' : 'grayscale'}`}>
+                {isUnlocked ? '🏆' : '🔒'}
+            </div>
             <div className="flex-1 min-w-0">
-                <p className="font-bold text-sm text-white">{name}</p>
-                <p className="text-gray-400 text-xs font-bold mt-0.5">{description}</p>
-                {unlockedAt && (
+                <p className={`font-bold text-sm ${isUnlocked ? 'text-white' : 'text-gray-400'}`}>
+                    {name}
+                </p>
+                <p className={`text-xs font-bold mt-0.5 ${isUnlocked ? 'text-gray-400' : 'text-gray-500'}`}>
+                    {description}
+                </p>
+                {isUnlocked && unlockedAt && (
                     <p className="text-emerald-400 text-xs mt-1 font-bold">
                         Unlocked {timeAgo(unlockedAt)}
                     </p>
                 )}
             </div>
             {rarity && (
-                <div className="text-emerald-400 text-xs font-bold uppercase tracking-wide flex-shrink-0">
+                <div className={`text-xs font-bold uppercase tracking-wide flex-shrink-0 ${
+                    isUnlocked ? (rarityColors[rarity] || 'text-emerald-400') : 'text-gray-600'
+                }`}>
                     {rarity}
                 </div>
             )}
