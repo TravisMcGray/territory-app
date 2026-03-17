@@ -194,7 +194,7 @@ export default function LogActivity() {
                 // uncertainty in meters. Lower = more accurate.
                 if (accuracy > MAX_ACCEPTABLE_ACCURACY) return;
 
-                const newPoint = { latitude, longitude };
+                const newPoint = { latitude, longitude, timestamp: Date.now() };
                 const current = coordinatesRef.current;
 
                 // Reject duplicate points — if user is standing still,
