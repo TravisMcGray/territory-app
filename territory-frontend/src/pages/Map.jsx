@@ -1,38 +1,35 @@
 // ========== MAP PAGE ==========
 // Full-screen territory map showing every captured hex tile in the world.
+// Built on MapLibre GL JS + OpenFreeMap vector tiles (free, no API key).
+//
+// CUSTOM DARK STYLE:
+// Instead of using OpenFreeMap's dark style as-is (where everything blends
+// into the same dark gray), we fetch the style JSON and customize every
+// layer: water is blue, parks are green, roads have clear hierarchy,
+// buildings have visible outlines, labels are crisp. See utils/mapStyle.js.
+//
 // Your tiles render in emerald green, everyone else's in neon purple/pink.
 // Tap any tile to see who owns it and when they captured it.
 // Centers on your GPS location on load so you immediately see your neighborhood.
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getTerritories } from '../services/api';
 import HexBackground from '../components/HexBackground';
 import Navbar from '../components/Navbar';
 import { cellToBoundary } from 'h3-js';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
-import markerIcon from 'leaflet/dist/images/marker-icon.png';
-import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
-import markerShadow from 'leaflet/dist/images/marker-shadow.png';
-
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-    iconUrl: markerIcon,
-    iconRetinaUrl: markerIcon2x,
-    shadowUrl: markerShadow,
-});
+import maplibregl from 'maplibre-gl';
+import 'maplibre-gl/dist/maplibre-gl.css';
+import { getCustomDarkStyle } from '../utils/mapStyle';
 
 // ========== CONSTANTS ==========
 // Colors chosen for outdoor visibility and instant ownership recognition.
 // Emerald = yours, neon purple = theirs. No ambiguity.
 const COLOR_MINE = '#10b981';
-const COLOR_MINE_FILL = '#10b98133';
 const COLOR_THEIRS = '#e879f9';
-const COLOR_THEIRS_FILL = '#e879f933';
 const DEFAULT_ZOOM = 15;
-const FALLBACK_LAT = 27.9506;  
+const FALLBACK_LAT = 27.9506;
 const FALLBACK_LNG = -82.4572;
 
 export default function Map() {
@@ -44,78 +41,92 @@ export default function Map() {
     const [loading, setLoading] = useState(true);
     const [locationError, setLocationError] = useState(null);
     const [tileCount, setTileCount] = useState({ mine: 0, total: 0 });
+    // Tracks when MapLibre's style has fully loaded — you CANNOT add
+    // sources or layers until this is true. Attempting to do so throws.
+    const [mapLoaded, setMapLoaded] = useState(false);
 
     // ========== REFS ==========
-    // Map and layer refs live outside React state because Leaflet manages
-    // its own DOM — putting them in state would cause double-render issues.
+    // Map ref lives outside React state because MapLibre manages its own
+    // DOM and WebGL context — putting it in state would cause issues.
     const mapRef = useRef(null);
-    const hexLayerRef = useRef(null);
+    const mapContainerRef = useRef(null);
     const locationMarkerRef = useRef(null);
 
+    // ========== INITIALIZE MAP ==========
+    // Async init: fetches the style JSON, customizes colors for visibility,
+    // then creates the MapLibre instance. Building outlines are baked into
+    // the customized style — no need to add them manually after load.
+    useEffect(() => {
+        if (mapRef.current) return;
 
-    // ========== MAP REF CALLBACK ==========
-// useCallback ref fires the instant the DOM node attaches — guarantees
-// Leaflet always gets a real node, unlike useEffect which can fire too early.
-const mapContainerRef = useCallback((node) => {
-    if (!node || mapRef.current) return;
-    if (!document.body.contains(node)) return;
+        let cancelled = false;
 
-    const map = L.map(node, {
-        center: [FALLBACK_LAT, FALLBACK_LNG],
-        zoom: DEFAULT_ZOOM,
-        zoomControl: true,
-    });
+        async function initMap() {
+            // Fetch and customize the dark style for our premium look.
+            // Falls back to raw URL if fetch fails (ugly but functional).
+            const style = await getCustomDarkStyle();
+            if (cancelled) return;
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors',
-        maxZoom: 19,
-    }).addTo(map);
-
-    hexLayerRef.current = L.layerGroup().addTo(map);
-    mapRef.current = map;
-
-    navigator.geolocation.getCurrentPosition(
-        (position) => {
-            const { latitude, longitude } = position.coords;
-            map.setView([latitude, longitude], DEFAULT_ZOOM);
-
-            // Blue dot marker for current location
-            const locationIcon = L.divIcon({
-                className: '',
-                html: `<div style="
-                    width: 16px;
-                    height: 16px;
-                    background: #3b82f6;
-                    border: 3px solid white;
-                    border-radius: 50%;
-                    box-shadow: 0 0 0 3px rgba(59,130,246,0.4);
-                "></div>`,
-                iconSize: [16, 16],
-                iconAnchor: [8, 8],
+            const map = new maplibregl.Map({
+                container: mapContainerRef.current,
+                style,
+                center: [FALLBACK_LNG, FALLBACK_LAT],  // MapLibre uses [lng, lat]
+                zoom: DEFAULT_ZOOM,
+                attributionControl: true,
             });
 
-            locationMarkerRef.current = L.marker([latitude, longitude], { icon: locationIcon })
-                .addTo(map);
-        },
-        (err) => {
-            console.warn('GPS unavailable:', err.message);
-            if (err.code === 1) {
-                setLocationError('Location access denied — enable location permissions for this site in your browser settings, then refresh.');
-            } else if (err.code === 3) {
-                setLocationError('Location timed out — tap "My Location" to try again.');
-            } else {
-                setLocationError('Could not get your location — tap "My Location" to try again.');
-            }
-        },
-        { enableHighAccuracy: true, timeout: 30000 }
-    );
+            // Zoom +/- buttons (no compass — not useful for a 2D territory map)
+            map.addControl(
+                new maplibregl.NavigationControl({ showCompass: false }),
+                'top-left'
+            );
 
-    return () => {
-        map.remove();
-        mapRef.current = null;
-        hexLayerRef.current = null;
-    };
-}, []);
+            // ---- Style loaded — safe to add sources/layers now ----
+            // Building outlines are already in the customized style,
+            // so we just need to signal that layers can be added.
+            map.on('load', () => {
+                setMapLoaded(true);
+            });
+
+            // ---- GPS location ----
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const { latitude, longitude } = position.coords;
+                    map.flyTo({ center: [longitude, latitude], zoom: DEFAULT_ZOOM });
+
+                    // Blue dot marker for current location
+                    const el = document.createElement('div');
+                    el.className = 'location-dot';
+                    locationMarkerRef.current = new maplibregl.Marker({ element: el })
+                        .setLngLat([longitude, latitude])
+                        .addTo(map);
+                },
+                (err) => {
+                    console.warn('GPS unavailable:', err.message);
+                    if (err.code === 1) {
+                        setLocationError('Location access denied — enable location permissions for this site in your browser settings, then refresh.');
+                    } else if (err.code === 3) {
+                        setLocationError('Location timed out — tap "My Location" to try again.');
+                    } else {
+                        setLocationError('Could not get your location — tap "My Location" to try again.');
+                    }
+                },
+                { enableHighAccuracy: true, timeout: 30000 }
+            );
+
+            mapRef.current = map;
+        }
+
+        initMap();
+
+        return () => {
+            cancelled = true;
+            if (mapRef.current) {
+                mapRef.current.remove();
+                mapRef.current = null;
+            }
+        };
+    }, []);
 
     // ========== LOAD TERRITORIES ==========
     useEffect(() => {
@@ -133,21 +144,29 @@ const mapContainerRef = useCallback((node) => {
     }, []);
 
     // ========== DRAW HEX TILES ==========
-    // Runs whenever territories load or the user profile changes.
-    // Clears and redraws all tiles so ownership colors stay accurate.
+    // Runs whenever territories load, user changes, or map finishes loading.
+    // Converts territory data into GeoJSON and renders via MapLibre layers.
+    //
+    // WHY GEOJSON SOURCE INSTEAD OF INDIVIDUAL POLYGONS:
+    // Leaflet created one L.polygon per hex — 1,000 hexes = 1,000 DOM elements.
+    // MapLibre takes a single GeoJSON FeatureCollection and renders ALL hexes
+    // in one GPU draw call. This scales to tens of thousands of hexes without
+    // any performance degradation.
     useEffect(() => {
-        if (!hexLayerRef.current || !user) return;
+        const map = mapRef.current;
+        if (!map || !mapLoaded || !user) return;
 
-        hexLayerRef.current.clearLayers();
-
+        // ID normalization — profile returns 'id', AuthContext may store '_id'
+        const currentUserId = (user?.id ?? user?._id)?.toString();
         let mineCount = 0;
 
+        // ---- Build GeoJSON from territory data ----
+        const features = [];
+
         territories.forEach((territory) => {
-            const isMyTile = territory.owner?.id?.toString() === user._id?.toString();
+            const isMine = territory.owner?.id?.toString() === currentUserId;
+            if (isMine) mineCount++;
 
-            if (isMyTile) mineCount++;
-
-            // cellToBoundary returns [[lat, lng], ...] — exactly what Leaflet needs
             let boundary;
             try {
                 boundary = cellToBoundary(territory.hexagonId);
@@ -157,60 +176,163 @@ const mapContainerRef = useCallback((node) => {
                 return;
             }
 
-            const color = isMyTile ? COLOR_MINE : COLOR_THEIRS;
-            const fillColor = isMyTile ? COLOR_MINE_FILL : COLOR_THEIRS_FILL;
+            // CRITICAL: h3-js cellToBoundary returns [[lat, lng], ...]
+            // but GeoJSON spec requires [lng, lat]. Flipping these is the
+            // single most common mapping bug — hexes render in the ocean.
+            const coordinates = boundary.map(([lat, lng]) => [lng, lat]);
+            // GeoJSON polygon rings MUST be closed (first point = last point)
+            coordinates.push(coordinates[0]);
 
             const capturedDate = territory.capturedAt
                 ? new Date(territory.capturedAt).toLocaleDateString('en-US', {
                     month: 'short',
                     day: 'numeric',
-                    year: 'numeric'
+                    year: 'numeric',
                 })
                 : 'Unknown';
 
-            const activityLabel = territory.activityType === 'WALK' ? '🚶 Walk' : '🏃 Run';
-
-            const popupContent = `
-                <div style="
-                    background: #111827;
-                    color: #f9fafb;
-                    border-radius: 10px;
-                    padding: 10px 14px;
-                    min-width: 160px;
-                    font-family: sans-serif;
-                ">
-                    <div style="font-size: 15px; font-weight: 800; color: ${color}; margin-bottom: 4px;">
-                        ${territory.owner?.username ?? 'Unknown'}
-                    </div>
-                    <div style="font-size: 12px; color: #9ca3af; margin-bottom: 2px;">
-                        ${activityLabel}
-                    </div>
-                    <div style="font-size: 12px; color: #6b7280;">
-                        Captured ${capturedDate}
-                    </div>
-                </div>
-            `;
-
-            const polygon = L.polygon(boundary, {
-                color,
-                fillColor,
-                weight: 1.5,
-                opacity: 0.9,
-                fillOpacity: 0.35,
+            features.push({
+                type: 'Feature',
+                geometry: {
+                    type: 'Polygon',
+                    coordinates: [coordinates],
+                },
+                properties: {
+                    isMine,
+                    owner: territory.owner?.username ?? 'Unknown',
+                    ownerId: territory.owner?.id,
+                    activityType: territory.activityType,
+                    capturedAt: capturedDate,
+                },
             });
-
-            polygon.bindPopup(popupContent, {
-                className: 'hex-popup',
-                closeButton: false,
-                maxWidth: 220,
-            });
-
-            hexLayerRef.current.addLayer(polygon);
         });
+
+        const geojson = { type: 'FeatureCollection', features };
+
+        // ---- Update existing source or create fresh ----
+        // If territories reload (e.g. after logging a new activity),
+        // we just swap the GeoJSON data — no need to recreate layers.
+        if (map.getSource('territories')) {
+            map.getSource('territories').setData(geojson);
+        } else {
+            map.addSource('territories', {
+                type: 'geojson',
+                data: geojson,
+            });
+
+            // Hex fill — semi-transparent so map detail shows through
+            map.addLayer({
+                id: 'hex-fill',
+                type: 'fill',
+                source: 'territories',
+                paint: {
+                    'fill-color': [
+                        'case',
+                        ['get', 'isMine'],
+                        COLOR_MINE,
+                        COLOR_THEIRS,
+                    ],
+                    'fill-opacity': 0.35,
+                },
+            });
+
+            // Hex outlines — slightly brighter stroke for definition
+            map.addLayer({
+                id: 'hex-outline',
+                type: 'line',
+                source: 'territories',
+                paint: {
+                    'line-color': [
+                        'case',
+                        ['get', 'isMine'],
+                        COLOR_MINE,
+                        COLOR_THEIRS,
+                    ],
+                    'line-width': 1.5,
+                    'line-opacity': 0.9,
+                },
+            });
+
+            // ---- Click → popup showing owner info ----
+            map.on('click', 'hex-fill', (e) => {
+                if (!e.features?.length) return;
+
+                const props = e.features[0].properties;
+                // MapLibre may serialize booleans as strings when reading
+                // back from queried features — handle both forms safely
+                const isMine = props.isMine === true || props.isMine === 'true';
+                const color = isMine ? COLOR_MINE : COLOR_THEIRS;
+                const activityLabel = props.activityType === 'WALK' ? '🚶 Walk' : '🏃 Run';
+
+                const html = `
+                    <div class="hex-popup-inner">
+                        <div style="font-size: 15px; font-weight: 800; color: ${color}; margin-bottom: 4px;">
+                            ${props.owner}
+                        </div>
+                        <div style="font-size: 12px; color: #9ca3af; margin-bottom: 2px;">
+                            ${activityLabel}
+                        </div>
+                        <div style="font-size: 12px; color: #6b7280;">
+                            Captured ${props.capturedAt}
+                        </div>
+                    </div>
+                `;
+
+                new maplibregl.Popup({
+                    closeButton: false,
+                    maxWidth: '220px',
+                })
+                    .setLngLat(e.lngLat)
+                    .setHTML(html)
+                    .addTo(map);
+            });
+
+            // Pointer cursor on hex hover so users know tiles are tappable
+            map.on('mouseenter', 'hex-fill', () => {
+                map.getCanvas().style.cursor = 'pointer';
+            });
+            map.on('mouseleave', 'hex-fill', () => {
+                map.getCanvas().style.cursor = '';
+            });
+        }
 
         setTileCount({ mine: mineCount, total: territories.length });
 
-    }, [territories, user]);
+    }, [territories, user, mapLoaded]);
+
+    // ========== MY LOCATION HANDLER ==========
+    const handleMyLocation = () => {
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const { latitude, longitude } = position.coords;
+                mapRef.current?.flyTo({
+                    center: [longitude, latitude],
+                    zoom: DEFAULT_ZOOM,
+                });
+                setLocationError(null);
+
+                if (locationMarkerRef.current) {
+                    locationMarkerRef.current.setLngLat([longitude, latitude]);
+                } else {
+                    const el = document.createElement('div');
+                    el.className = 'location-dot';
+                    locationMarkerRef.current = new maplibregl.Marker({ element: el })
+                        .setLngLat([longitude, latitude])
+                        .addTo(mapRef.current);
+                }
+            },
+            (err) => {
+                if (err.code === 1) {
+                    setLocationError('Location access denied — enable location permissions for this site in your browser settings, then refresh.');
+                } else if (err.code === 3) {
+                    setLocationError('Location timed out — please try again.');
+                } else {
+                    setLocationError('Could not get your location — please try again.');
+                }
+            },
+            { enableHighAccuracy: true, timeout: 30000 }
+        );
+    };
 
     // ========== RENDER ==========
     return (
@@ -221,11 +343,9 @@ const mapContainerRef = useCallback((node) => {
             <Navbar />
 
             {/* ========== CONTENT ========== */}
-            {/* relative z-10 here so header sits above HexBackground */}
             <div className="max-w-6xl mx-auto px-4 py-6 relative z-10">
 
                 {/* ========== HEADER + LEGEND ========== */}
-                {/* HexBackground is visible behind this section */}
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
                     <div>
                         <h2 className="text-2xl font-bold">Territory Map</h2>
@@ -256,47 +376,10 @@ const mapContainerRef = useCallback((node) => {
                     </div>
                 )}
 
-{/* ========== MY LOCATION BUTTON ========== */}
+                {/* ========== MY LOCATION BUTTON ========== */}
                 <div className="mb-4 flex justify-end">
                     <button
-                        onClick={() => {
-                            navigator.geolocation.getCurrentPosition(
-                                (position) => {
-                                    const { latitude, longitude } = position.coords;
-                                    mapRef.current?.setView([latitude, longitude], DEFAULT_ZOOM);
-                                    setLocationError(null);
-
-                                    const locationIcon = L.divIcon({
-                                        className: '',
-                                        html: `<div style="
-                                            width: 16px;
-                                            height: 16px;
-                                            background: #3b82f6;
-                                            border: 3px solid white;
-                                            border-radius: 50%;
-                                            box-shadow: 0 0 0 3px rgba(59,130,246,0.4);
-                                        "></div>`,
-                                        iconSize: [16, 16],
-                                        iconAnchor: [8, 8],
-                                    });
-                                    if (locationMarkerRef.current) {
-                                        locationMarkerRef.current.remove();
-                                    }
-                                    locationMarkerRef.current = L.marker([latitude, longitude], { icon: locationIcon })
-                                        .addTo(mapRef.current);
-                                },
-                                (err) => {
-                                    if (err.code === 1) {
-                                        setLocationError('Location access denied — enable location permissions for this site in your browser settings, then refresh.');
-                                    } else if (err.code === 3) {
-                                        setLocationError('Location timed out — please try again.');
-                                    } else {
-                                        setLocationError('Could not get your location — please try again.');
-                                    }
-                                },
-                                { enableHighAccuracy: true, timeout: 30000 }
-                            );
-                        }}
+                        onClick={handleMyLocation}
                         className="bg-gray-900 hover:bg-gray-800 border border-gray-700 text-emerald-400 font-bold text-sm px-4 py-2 rounded-xl transition-colors flex items-center gap-2"
                     >
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -312,9 +395,6 @@ const mapContainerRef = useCallback((node) => {
             </div>
 
             {/* ========== MAP CONTAINER ========== */}
-            {/* Intentionally outside the relative z-10 content wrapper above.
-                This lets Leaflet manage its own stacking context freely
-                without being trapped inside our z-index hierarchy. */}
             <div
                 className="mx-4 rounded-2xl overflow-hidden border border-gray-800 shadow-2xl relative"
                 style={{ height: '65vh', minHeight: '400px' }}

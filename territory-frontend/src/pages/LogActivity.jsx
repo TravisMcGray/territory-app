@@ -4,13 +4,25 @@
 // 2. Tracking - GPS running, timer counting, coordinates collecting
 // 3. Summary - review before submitting to backend
 // 4. Result - show what was captured including new achievements
+//
+// TRACKING MAP (MapLibre + OpenFreeMap):
+// During active tracking, the map shows:
+//   - Dark vector tile base map (matches app theme)
+//   - Building outlines (subtle gray-700)
+//   - Live hex grid around user's position (H3 resolution 10)
+//   - Hexagons light up as user walks through them
+//   - Route polyline showing path taken
+//   - Blue GPS dot following current position
+// This gives users real-time visual feedback of territory being captured.
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createActivity } from '../services/api';
 import HexBackground from '../components/HexBackground';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+import maplibregl from 'maplibre-gl';
+import 'maplibre-gl/dist/maplibre-gl.css';
+import { latLngToCell, gridDisk, cellToBoundary } from 'h3-js';
+import { getCustomDarkStyle } from '../utils/mapStyle';
 
 // ========== CONSTANTS ==========
 // Only accept GPS readings with accuracy better than 30 meters.
@@ -20,6 +32,14 @@ const MAX_ACCEPTABLE_ACCURACY = 30;
 // Minimum distance (meters) between points to avoid recording duplicates
 // while standing still. Prevents hexagon inflation.
 const MIN_DISTANCE_BETWEEN_POINTS = 5;
+
+// H3 hex resolution — must match backend (routes/activities.js).
+// Resolution 10 = ~130m diameter hexagons, perfect for walking/running.
+const H3_RESOLUTION = 10;
+
+// How many rings of hexagons to show around the user's current position.
+// k=5 gives 91 hexagons covering ~570m radius — fills a zoom-17 viewport.
+const HEX_GRID_RING_SIZE = 5;
 
 // ========== HAVERSINE DISTANCE ==========
 // Calculate distance in meters between two GPS points.
@@ -491,6 +511,15 @@ function SetupPhase({ activityType, setActivityType, onStart, lastActivity }) {
 }
 
 // ========== TRACKING PHASE ==========
+// This is where the magic happens. The map shows:
+//   1. A hex grid around the user's current position (faint outlines)
+//   2. Hexagons lighting up in real-time as the user walks through them
+//   3. A route polyline tracing the path taken
+//   4. A blue GPS dot at current position
+//   5. Building outlines for spatial context
+//
+// The hex grid uses H3 resolution 10 (same as backend) so what the user
+// sees during tracking exactly matches what gets captured on submission.
 function TrackingPhase({
     activityType,
     elapsedSeconds,
@@ -502,75 +531,212 @@ function TrackingPhase({
     onStop,
 }) {
     const isWalk = activityType === 'walk';
-    const leafletMapRef = useRef(null);
-    const polylineRef = useRef(null);
-    const markerRef = useRef(null);
+
+    // Activity color — blue for walk, emerald for run
+    const activityColor = isWalk ? '#3b82f6' : '#10b981';
+
+    // ---- Map refs ----
+    const mapRef = useRef(null);
+    const mapContainerRef = useRef(null);
+    const locationMarkerRef = useRef(null);
+    const mapLoadedRef = useRef(false);
+
+    // Track which H3 hexagons the user has physically entered during
+    // this activity. Persists across re-renders via ref, not state,
+    // because we don't want 91 hex updates to trigger React re-renders.
+    const visitedHexesRef = useRef(new Set());
 
     // ========== INITIALIZE MAP ==========
-    const mapContainerRef = useCallback((node) => {
-        if (!node || leafletMapRef.current) return;
-        if (!document.body.contains(node)) return;
+    // Async init: fetches the style JSON, customizes colors for visibility,
+    // then creates the MapLibre instance. Building outlines are baked into
+    // the customized style. Adds empty GeoJSON sources for the hex grid
+    // and route line. Runs once when TrackingPhase mounts.
+    useEffect(() => {
+        if (mapRef.current) return;
 
-        const map = L.map(node, {
-            zoom: 17,
-            center: [0, 0],
-            zoomControl: false,
-            attributionControl: false,
-        });
+        let cancelled = false;
 
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-        }).addTo(map);
+        async function initMap() {
+            const style = await getCustomDarkStyle();
+            if (cancelled) return;
 
-        // Route polyline — emerald for run, blue for walk
-        polylineRef.current = L.polyline([], {
-            color: isWalk ? '#3b82f6' : '#10b981',
-            weight: 4,
-            opacity: 0.9,
-        }).addTo(map);
+            const map = new maplibregl.Map({
+                container: mapContainerRef.current,
+                style,
+                center: [0, 0],
+                zoom: 17,
+                attributionControl: false,
+                // Disable rotation — not useful during activity tracking
+                // and prevents accidental rotation on mobile
+                dragRotate: false,
+                pitchWithRotate: false,
+                touchZoomRotate: true,
+            });
 
-        // Blue dot for current position
-        const locationIcon = L.divIcon({
-            className: '',
-            html: `<div style="
-                width: 16px;
-                height: 16px;
-                background: #3b82f6;
-                border: 3px solid white;
-                border-radius: 50%;
-                box-shadow: 0 0 0 3px rgba(59,130,246,0.4);
-            "></div>`,
-            iconSize: [16, 16],
-            iconAnchor: [8, 8],
-        });
+            map.on('load', () => {
+                mapLoadedRef.current = true;
 
-        markerRef.current = L.marker([0, 0], { icon: locationIcon }).addTo(map);
-        leafletMapRef.current = map;
+                // ---- Hex grid source (empty until GPS fires) ----
+                map.addSource('hex-grid', {
+                    type: 'geojson',
+                    data: { type: 'FeatureCollection', features: [] },
+                });
+
+                // Hex fill — only visited hexagons get filled with activity color.
+                // Unvisited hexagons stay transparent so only the outline shows.
+                map.addLayer({
+                    id: 'hex-visited-fill',
+                    type: 'fill',
+                    source: 'hex-grid',
+                    filter: ['==', ['get', 'visited'], true],
+                    paint: {
+                        'fill-color': activityColor,
+                        'fill-opacity': 0.35,
+                    },
+                });
+
+                // Hex outlines — visited hexes get bright activity color,
+                // unvisited hexes get a faint gray outline so the grid is
+                // visible but doesn't compete with captured territory.
+                map.addLayer({
+                    id: 'hex-grid-outline',
+                    type: 'line',
+                    source: 'hex-grid',
+                    paint: {
+                        'line-color': [
+                            'case',
+                            ['get', 'visited'],
+                            activityColor,      // bright for captured
+                            '#4b5563',           // gray-600 for uncaptured grid
+                        ],
+                        'line-width': [
+                            'case',
+                            ['get', 'visited'],
+                            1.5,                 // thicker for captured
+                            0.5,                 // thin for grid
+                        ],
+                        'line-opacity': [
+                            'case',
+                            ['get', 'visited'],
+                            0.9,                 // bright for captured
+                            0.4,                 // subtle for grid
+                        ],
+                    },
+                });
+
+                // ---- Route line source (empty until GPS fires) ----
+                map.addSource('route', {
+                    type: 'geojson',
+                    data: { type: 'Feature', geometry: { type: 'LineString', coordinates: [] } },
+                });
+
+                // Route polyline — traces the user's path in activity color
+                map.addLayer({
+                    id: 'route-line',
+                    type: 'line',
+                    source: 'route',
+                    paint: {
+                        'line-color': activityColor,
+                        'line-width': 4,
+                        'line-opacity': 0.9,
+                    },
+                });
+            });
+
+            mapRef.current = map;
+        }
+
+        initMap();
 
         return () => {
-            map.remove();
-            leafletMapRef.current = null;
-            polylineRef.current = null;
-            markerRef.current = null;
+            cancelled = true;
+            if (mapRef.current) {
+                mapRef.current.remove();
+                mapRef.current = null;
+                mapLoadedRef.current = false;
+            }
         };
     }, []);
 
     // ========== UPDATE MAP ON NEW COORDINATES ==========
+    // Every time a new GPS point arrives, this effect:
+    //   1. Determines which H3 hex the user is standing in
+    //   2. Adds it to the visited set
+    //   3. Rebuilds the hex grid GeoJSON (gridDisk around current position)
+    //   4. Updates the route polyline
+    //   5. Moves the blue dot marker
+    //   6. Smoothly pans the map to follow the user
     useEffect(() => {
-        if (!leafletMapRef.current || coordinates.length === 0) return;
+        const map = mapRef.current;
+        if (!map || !mapLoadedRef.current || coordinates.length === 0) return;
 
         const latest = coordinates[coordinates.length - 1];
-        const latLng = [latest.latitude, latest.longitude];
 
-        // Move blue dot to current position
-        markerRef.current?.setLatLng(latLng);
+        // ---- Track which hex the user just entered ----
+        // latLngToCell converts a GPS point to its containing H3 index.
+        // Same function the backend uses, so what lights up here is
+        // exactly what gets captured when the activity is submitted.
+        const currentH3 = latLngToCell(latest.latitude, latest.longitude, H3_RESOLUTION);
+        visitedHexesRef.current.add(currentH3);
 
-        // Update polyline with full route
-        const latLngs = coordinates.map(c => [c.latitude, c.longitude]);
-        polylineRef.current?.setLatLngs(latLngs);
+        // ---- Build hex grid around current position ----
+        // gridDisk returns all H3 indices within k rings of the center.
+        // k=5 gives ~91 hexagons — enough to fill the visible viewport.
+        const gridHexes = gridDisk(currentH3, HEX_GRID_RING_SIZE);
 
-        // Re-center map on current position
-        leafletMapRef.current.setView(latLng, 17);
+        const hexFeatures = [];
+        for (const h3Index of gridHexes) {
+            let boundary;
+            try {
+                boundary = cellToBoundary(h3Index);
+            } catch (err) {
+                continue; // Skip invalid indices (shouldn't happen but be safe)
+            }
+
+            // CRITICAL: h3-js returns [[lat, lng], ...], GeoJSON needs [lng, lat]
+            const coords = boundary.map(([lat, lng]) => [lng, lat]);
+            coords.push(coords[0]); // Close the polygon ring
+
+            hexFeatures.push({
+                type: 'Feature',
+                geometry: {
+                    type: 'Polygon',
+                    coordinates: [coords],
+                },
+                properties: {
+                    visited: visitedHexesRef.current.has(h3Index),
+                },
+            });
+        }
+
+        map.getSource('hex-grid')?.setData({
+            type: 'FeatureCollection',
+            features: hexFeatures,
+        });
+
+        // ---- Update route polyline ----
+        const routeCoords = coordinates.map(c => [c.longitude, c.latitude]);
+        map.getSource('route')?.setData({
+            type: 'Feature',
+            geometry: { type: 'LineString', coordinates: routeCoords },
+        });
+
+        // ---- Move or create the blue GPS dot ----
+        if (locationMarkerRef.current) {
+            locationMarkerRef.current.setLngLat([latest.longitude, latest.latitude]);
+        } else {
+            const el = document.createElement('div');
+            el.className = 'location-dot';
+            locationMarkerRef.current = new maplibregl.Marker({ element: el })
+                .setLngLat([latest.longitude, latest.latitude])
+                .addTo(map);
+        }
+
+        // ---- Smooth pan to follow the user ----
+        map.easeTo({
+            center: [latest.longitude, latest.latitude],
+            duration: 500, // ms — smooth but responsive
+        });
 
     }, [coordinates]);
 
@@ -627,10 +793,10 @@ function TrackingPhase({
                     <div className="font-bold text-gray-300 text-xs mt-1">Miles</div>
                 </div>
                 <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4">
-                    <div className="text-2xl font-black text-emerald-400">
-                        {coordinateCount}
+                    <div className={`text-2xl font-black ${isWalk ? 'text-blue-400' : 'text-emerald-400'}`}>
+                        {visitedHexesRef.current.size}
                     </div>
-                    <div className="font-bold text-gray-300 text-xs mt-1">GPS points</div>
+                    <div className="font-bold text-gray-300 text-xs mt-1">Hexagons</div>
                 </div>
             </div>
 

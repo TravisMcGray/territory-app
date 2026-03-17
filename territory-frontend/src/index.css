@@ -3,3 +3,131 @@
 body {
     background-color: #030712;
 }
+
+/* ==========================================================
+    MAPLIBRE GL JS DARK THEME OVERRIDES
+    Styles MapLibre's built-in UI to match our gray-950 theme.
+    MapLibre renders vector tiles via WebGL — the map itself is
+    styled through the OpenFreeMap style JSON, but the UI chrome
+    (zoom buttons, popups, attribution) needs CSS overrides.
+   ========================================================== */
+
+/* ---------- Navigation Controls (Zoom Buttons) ---------- */
+/* MapLibre's NavigationControl renders a button group with SVG icons.
+   Default is white background with black icons — we flip to dark. */
+.maplibregl-ctrl-group {
+    background: #111827 !important;         /* gray-900 */
+    border: 1px solid #1f2937 !important;   /* gray-800 */
+    border-radius: 8px !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4) !important;
+    overflow: hidden;
+}
+
+.maplibregl-ctrl-group button {
+    background-color: transparent !important;
+    border: none !important;
+    transition: background-color 0.2s;
+}
+
+.maplibregl-ctrl-group button + button {
+    border-top: 1px solid #1f2937 !important;  /* gray-800 divider between +/- */
+}
+
+.maplibregl-ctrl-group button:hover {
+    background-color: #1f2937 !important;   /* gray-800 */
+}
+
+/* The +/- icons are SVGs rendered as background-image on a span.
+    They're black by default. This filter chain converts black → emerald-400
+   (#34d399) to match the app's accent color. Hover shifts to emerald-500. */
+.maplibregl-ctrl-group button span.maplibregl-ctrl-icon {
+    filter: invert(62%) sepia(52%) saturate(522%) hue-rotate(107deg) brightness(96%) contrast(87%);
+    transition: filter 0.2s;
+}
+
+.maplibregl-ctrl-group button:hover span.maplibregl-ctrl-icon {
+    filter: invert(58%) sepia(78%) saturate(468%) hue-rotate(107deg) brightness(92%) contrast(92%);
+}
+
+/* ---------- Attribution ---------- */
+/* The small "© OpenStreetMap / OpenFreeMap" text in the corner.
+   Default is white background — this makes it blend into the dark map. */
+.maplibregl-ctrl-attrib {
+    background-color: rgba(3, 7, 18, 0.7) !important;  /* gray-950 semi-transparent */
+    color: #4b5563 !important;              /* gray-600 — visible but not distracting */
+    font-size: 10px !important;
+}
+
+.maplibregl-ctrl-attrib a {
+    color: #6b7280 !important;              /* gray-500 */
+}
+
+/* Hide the (i) toggle button on the attribution — it's a white circle
+   that looks out of place on our dark map. Attribution text stays visible. */
+.maplibregl-ctrl-attrib-button {
+    display: none !important;
+}
+
+/* ---------- Popup Container ---------- */
+/* MapLibre wraps popup HTML in .maplibregl-popup-content with a
+   .maplibregl-popup-tip arrow. Default is white — override to gray-900. */
+.maplibregl-popup-content {
+    background: #111827 !important;         /* gray-900 */
+    color: #f9fafb !important;              /* gray-50 */
+    border-radius: 10px !important;
+    border: 1px solid #1f2937;              /* gray-800 subtle border */
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5) !important;
+    padding: 0 !important;                  /* Our inner .hex-popup-inner handles padding */
+}
+
+/* ---------- Popup Inner Content ---------- */
+/* Padding lives here instead of on .maplibregl-popup-content so the
+   border-radius on the outer container clips cleanly. */
+.hex-popup-inner {
+    padding: 10px 14px;
+    min-width: 160px;
+    font-family: sans-serif;
+}
+
+/* ---------- Popup Tip (the triangle arrow) ---------- */
+/* MapLibre uses CSS border tricks for the arrow, with different classes
+    depending on which direction the popup opens. We need to override
+   all four directions so the arrow always matches the dark container. */
+.maplibregl-popup-anchor-bottom .maplibregl-popup-tip {
+    border-top-color: #111827 !important;
+}
+
+.maplibregl-popup-anchor-top .maplibregl-popup-tip {
+    border-bottom-color: #111827 !important;
+}
+
+.maplibregl-popup-anchor-left .maplibregl-popup-tip {
+    border-right-color: #111827 !important;
+}
+
+.maplibregl-popup-anchor-right .maplibregl-popup-tip {
+    border-left-color: #111827 !important;
+}
+
+/* Anchors with sub-directions (bottom-left, bottom-right, etc.) */
+.maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
+.maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip {
+    border-top-color: #111827 !important;
+}
+
+.maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
+.maplibregl-popup-anchor-top-right .maplibregl-popup-tip {
+    border-bottom-color: #111827 !important;
+}
+
+/* ---------- GPS Location Dot ---------- */
+/* Blue dot with white ring and glow — matches the original Leaflet
+   version but now rendered as a MapLibre Marker with a custom element. */
+.location-dot {
+    width: 16px;
+    height: 16px;
+    background: #3b82f6;                    /* blue-500 */
+    border: 3px solid white;
+    border-radius: 50%;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.4);
+}
