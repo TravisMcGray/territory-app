@@ -27,10 +27,6 @@ const SPEED_LIMITS_MPH = {
     run: 20
 };
 
-// If more than this fraction of GPS points are dropped as too fast,
-// the whole activity is rejected — user was clearly not on foot
-const MAX_DROPPED_FRACTION = 0.30; // 30%
-
 // ========== SPEED FILTER ==========
 /**
  * Filters out GPS coordinates where the speed between consecutive points
@@ -266,21 +262,12 @@ router.post('/', authenticateToken, async (req, res) => {
         // Run BEFORE distance/hexagon calculation so cheated points
         // never contribute to stats or territory capture.
         // Silently drops points that exceed the speed threshold.
-        // If 30%+ of points are dropped, the whole activity is rejected.
+        // Activity is ALWAYS saved — Strava/Niantic approach: never delete a workout.
         const { filtered, droppedCount, droppedFraction } = filterSpeedCoordinates(
             coordinates,
             activityType,
             duration
         );
-
-        // Too many points dropped — user was clearly not on foot
-        if (droppedFraction >= MAX_DROPPED_FRACTION && coordinates.length > 2) {
-            return res.status(400).json({
-                status: 'error',
-                code: 'SPEED_VIOLATION',
-                message: `This ${activityType} was recorded at speeds not possible on foot. Please only record walking and running activities.`
-            });
-        }
 
         // Use filtered coordinates for everything downstream
         const cleanCoordinates = filtered;
