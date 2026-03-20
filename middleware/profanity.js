@@ -165,7 +165,7 @@ const BLOCKLIST = [
     'onlyfan', 'fansonly',
     'admin', 'administrator', 'moderator', 'mod', // prevent impersonation
     'support', 'helpdesk',
-    'official', 'territorycapture', 'territory_capture',
+    'official', 'hexcapture', 'hex_capture',
 ];
 
 // ========== AGGRESSIVE LEET SPEAK NORMALIZER ==========

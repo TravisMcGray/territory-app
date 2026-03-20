@@ -324,7 +324,7 @@ export default function Login() {
                 </div>
 
                 <p className="font-bold text-center text-gray-400 text-xs mt-6">
-                    Territory Capture — built by Travis McGray
+                    HexCapture — built by Travis McGray
                 </p>
             </div>
         </div>
