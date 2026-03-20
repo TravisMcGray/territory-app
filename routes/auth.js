@@ -26,10 +26,10 @@ const sendVerificationEmail = async (email, username, rawToken) => {
     await resend.emails.send({
         from: 'HexCapture <noreply@hexcapture.com>',
         to: email,
-        subject: 'Verify your TerritoryCapture email',
+        subject: 'Verify your HexCapture email',
         html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #030712; color: #ffffff; padding: 32px; border-radius: 16px;">
-                <h2 style="color: #10b981; margin-bottom: 8px;">TerritoryCapture</h2>
+                <h2 style="color: #10b981; margin-bottom: 8px;">HexCapture</h2>
                 <h3 style="color: #ffffff; margin-bottom: 16px;">Verify your email address</h3>
                 <p style="color: #9ca3af;">Hi ${username},</p>
                 <p style="color: #9ca3af;">Thanks for signing up! Click the button below to verify your email and start capturing territory.</p>

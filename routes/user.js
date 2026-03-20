@@ -232,12 +232,12 @@ router.post('/forgot-password', validateEmailFormat, async (req, res) => {
         );
         const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
         await resend.emails.send({
-            from: 'TerritoryCapture <onboarding@resend.dev>',
+            from: 'HexCapture <onboarding@resend.dev>',
             to: user.email,
-            subject: 'Reset your TerritoryCapture password',
+            subject: 'Reset your HexCapture password',
             html: `
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #030712; color: #ffffff; padding: 32px; border-radius: 16px;">
-                    <h2 style="color: #10b981;">TerritoryCapture</h2>
+                    <h2 style="color: #10b981;">HexCapture</h2>
                     <p style="color: #9ca3af;">Hi ${user.username},</p>
                     <p style="color: #9ca3af;">You requested a password reset. Click the button below to reset your password.</p>
                     <p style="color: #9ca3af;">This link expires in <strong style="color: #ffffff;">1 hour</strong>.</p>
@@ -339,15 +339,15 @@ router.post('/account/delete-request', authenticateToken, async (req, res) => {
 
         // Send email with the raw code
         await resend.emails.send({
-            from: 'TerritoryCapture <onboarding@resend.dev>',
+            from: 'HexCapture <onboarding@resend.dev>',
             to: user.email,
-            subject: 'Confirm account deletion — TerritoryCapture',
+            subject: 'Confirm account deletion — HexCapture',
             html: `
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #030712; color: #ffffff; padding: 32px; border-radius: 16px;">
-                    <h2 style="color: #ef4444;">TerritoryCapture</h2>
+                    <h2 style="color: #ef4444;">HexCapture</h2>
                     <h3 style="color: #ffffff;">Account Deletion Request</h3>
                     <p style="color: #9ca3af;">Hi ${user.username},</p>
-                    <p style="color: #9ca3af;">We received a request to permanently delete your TerritoryCapture account.</p>
+                    <p style="color: #9ca3af;">We received a request to permanently delete your HexCapture account.</p>
                     <p style="color: #9ca3af;"><strong style="color: #ffffff;">This action cannot be undone.</strong> The following will be permanently deleted:</p>
                     <ul style="color: #9ca3af; padding-left: 20px;">
                         <li>Your account and profile</li>

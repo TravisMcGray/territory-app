@@ -126,7 +126,7 @@ export default function Login() {
                     </p>
                     <div className="bg-gray-900 rounded-2xl p-6 border border-gray-800 mb-6 text-left space-y-3">
                         <p className="text-gray-300 text-sm font-bold">What to do next:</p>
-                        <p className="text-gray-400 text-sm">1. Open the email from TerritoryCapture</p>
+                        <p className="text-gray-400 text-sm">1. Open the email from HexCapture</p>
                         <p className="text-gray-400 text-sm">2. Click the <span className="text-emerald-400 font-bold">Verify Email</span> button</p>
                         <p className="text-gray-400 text-sm">3. Come back here and log in</p>
                         <p className="text-gray-500 text-xs mt-2">Link expires in 24 hours. Check your spam folder if you don't see it.</p>

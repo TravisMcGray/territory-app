@@ -253,7 +253,7 @@ function DeleteAccountModal({ profile, onClose, onDeleted }) {
                             Account deleted
                         </h2>
                         <p className="text-gray-400 text-sm font-bold">
-                            Your account has been permanently deleted. Thanks for being part of TerritoryCapture.
+                            Your account has been permanently deleted. Thanks for being part of HexCapture.
                         </p>
                         <p className="text-gray-500 text-xs mt-3">
                             Redirecting you now...
