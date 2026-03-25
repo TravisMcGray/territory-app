@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const router = express.Router();
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
@@ -232,7 +233,7 @@ router.post('/forgot-password', validateEmailFormat, async (req, res) => {
         );
         const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
         await resend.emails.send({
-            from: 'HexCapture <onboarding@resend.dev>',
+            from: 'HexCapture <noreply@hexcapture.com>',
             to: user.email,
             subject: 'Reset your HexCapture password',
             html: `
@@ -339,7 +340,7 @@ router.post('/account/delete-request', authenticateToken, async (req, res) => {
 
         // Send email with the raw code
         await resend.emails.send({
-            from: 'HexCapture <onboarding@resend.dev>',
+            from: 'HexCapture <noreply@hexcapture.com>',
             to: user.email,
             subject: 'Confirm account deletion — HexCapture',
             html: `

@@ -124,10 +124,10 @@ export default function Feed() {
                             Your feed is empty
                         </h3>
                         <p className="text-gray-300 text-sm max-w-sm mx-auto font-bold">
-                            Follow other explorers to see their activities here.
+                            Your feed shows activities from people you follow.
                         </p>
                         <p className="text-gray-300 text-sm max-w-sm mx-auto mt-1 font-bold">
-                            Get out there and start capturing territory!
+                            Head to the Leaderboard to find people to follow!
                         </p>
                     </div>
                 )}

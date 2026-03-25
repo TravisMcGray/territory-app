@@ -305,7 +305,7 @@ export default function LogActivity() {
                         ← Back
                     </button>
                     <h1 className="text-lg font-black tracking-tight">
-                        Territory<span className="text-emerald-400">Capture</span>
+                        Hex<span className="text-emerald-400">Capture</span>
                     </h1>
                     <div className="w-12" /> {/* Spacer to center title */}
                 </div>

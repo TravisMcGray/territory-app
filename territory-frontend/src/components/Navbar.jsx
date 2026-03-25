@@ -39,7 +39,7 @@ const [menuOpen, setMenuOpen] = useState(false);
                     onClick={() => navigate('/dashboard')}
                     className="text-xl font-black tracking-tight"
                 >
-                    Territory<span className="text-emerald-400">Capture</span>
+                    Hex<span className="text-emerald-400">Capture</span>
                 </button>
 
                 {/* ========== DESKTOP NAV LINKS ========== */}

@@ -177,7 +177,7 @@ export default function Login() {
                 {/* Logo */}
                 <div className="text-center mb-8">
                     <h1 className="text-4xl font-black text-white tracking-tight">
-                        Territory<span className="text-emerald-400">Capture</span>
+                        Hex<span className="text-emerald-400">Capture</span>
                     </h1>
                     <p className="font-bold text-gray-400 mt-2 text-sm">
                         Claim the world one hexagon at a time
