@@ -768,10 +768,13 @@ function SettingsTab({ profile, setProfile, onShowDeleteModal }) {
     // ===== Sex tooltip =====
     const [showSexTooltip, setShowSexTooltip] = useState(false);
 
+    // Track if user manually edited step length — if so, don't auto-overwrite
+    const [stepLengthManual, setStepLengthManual] = useState(false);
+
     // Auto-calculate step length from height when height changes
     // Standard estimate: height in inches × 0.413 for walking
     useEffect(() => {
-        if (heightFeet && heightInches !== '' && !profile.stepLength) {
+        if (heightFeet && heightInches !== '' && !stepLengthManual) {
             const totalInches = (Number(heightFeet) * 12) + Number(heightInches);
             if (totalInches > 0) {
                 const estimated = Math.round(totalInches * 0.413);
@@ -941,14 +944,14 @@ function SettingsTab({ profile, setProfile, onShowDeleteModal }) {
                     <div>
                         <label className="text-gray-400 text-xs font-bold block mb-1.5">
                             Step Length (inches)
-                            {heightFeet && heightInches !== '' && !profile.stepLength && (
+                            {heightFeet && heightInches !== '' && !stepLengthManual && (
                                 <span className="text-emerald-400 ml-2">auto-estimated from height</span>
                             )}
                         </label>
                         <input
                             type="number"
                             value={stepLength}
-                            onChange={e => setStepLength(e.target.value)}
+                            onChange={e => { setStepLength(e.target.value); setStepLengthManual(true); }}
                             placeholder="24"
                             min="10"
                             max="50"
