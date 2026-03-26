@@ -53,10 +53,15 @@ const userSchema = new mongoose.Schema({
         maxlength: 20,
         match: [/^[a-zA-Z][a-zA-Z0-9]{2,19}$/, 'Username must start with a letter and contain only letters and numbers']
     },
-    firstName: { type: String, trim: true, maxlength: 50 },
-    lastName:  { type: String, trim: true, maxlength: 50 },
-    avatar:    { type: String, maxlength: 500 },
-    weight:    { type: Number, min: 50, max: 1000, default: 154 }, // lbs — used for calorie calculation
+    firstName:   { type: String, trim: true, maxlength: 50 },
+    lastName:    { type: String, trim: true, maxlength: 50 },
+    avatar:      { type: String, maxlength: 500 },
+    weight:      { type: Number, min: 50, max: 1000, default: 154 }, // lbs — used for calorie calculation
+    age:         { type: Number, min: 13, max: 120 },
+    sex:         { type: String, enum: ['male', 'female', 'prefer_not_to_say'] },
+    heightFeet:  { type: Number, min: 3, max: 8 },
+    heightInches:{ type: Number, min: 0, max: 11 },
+    stepLength:  { type: Number, min: 10, max: 50 }, // inches — auto-calculated from height if not set
 
     // ========== GAME STATS ==========
     stats: {
@@ -121,6 +126,11 @@ userSchema.methods.toProfileJSON = function () {
         lastName:          this.lastName,
         avatar:            this.avatar,
         weight:            this.weight,
+        age:               this.age,
+        sex:               this.sex,
+        heightFeet:        this.heightFeet,
+        heightInches:      this.heightInches,
+        stepLength:        this.stepLength,
         isEmailVerified:   this.isEmailVerified,
         stats:             this.stats,
         followers:         this.followers ? this.followers.length : 0,

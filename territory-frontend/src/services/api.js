@@ -45,6 +45,8 @@ export const confirmAccountDeletion = (data) => api.delete('/api/user/account/co
 
 // ========== USERS (public profiles) ==========
 export const getUserById = (id) => api.get(`/api/users/${id}`);
+export const updateBodyStats = (data) => api.put('/api/user/body-stats', data);
+export const updateProfile = (data) => api.put('/api/user/profile', data);
 
 // ========== SOCIAL ==========
 export const followUser = (id) => api.post(`/api/users/${id}/follow`);

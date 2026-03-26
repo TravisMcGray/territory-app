@@ -72,6 +72,105 @@ router.put('/profile', authenticateToken, async (req, res) => {
     }
 });
 
+// ========== PUT /api/user/body-stats ==========
+// Updates optional body measurements for calorie/distance accuracy.
+// All fields are optional — users only set what they want.
+router.put('/body-stats', authenticateToken, async (req, res) => {
+    try {
+        const { weight, age, sex, heightFeet, heightInches, stepLength } = req.body;
+        const user = await User.findById(req.user.userId);
+
+        if (!user) {
+            return res.status(404).json({
+                status: 'error',
+                code: 'USER_NOT_FOUND',
+                message: 'User not found'
+            });
+        }
+
+        // Validate and set each field only if provided
+        if (weight !== undefined) {
+            if (typeof weight !== 'number' || weight < 50 || weight > 1000) {
+                return res.status(400).json({
+                    status: 'error',
+                    code: 'INVALID_WEIGHT',
+                    message: 'Weight must be between 50 and 1000 lbs'
+                });
+            }
+            user.weight = weight;
+        }
+
+        if (age !== undefined) {
+            if (typeof age !== 'number' || age < 13 || age > 120) {
+                return res.status(400).json({
+                    status: 'error',
+                    code: 'INVALID_AGE',
+                    message: 'Age must be between 13 and 120'
+                });
+            }
+            user.age = age;
+        }
+
+        if (sex !== undefined) {
+            if (!['male', 'female', 'prefer_not_to_say'].includes(sex)) {
+                return res.status(400).json({
+                    status: 'error',
+                    code: 'INVALID_SEX',
+                    message: 'Sex must be male, female, or prefer_not_to_say'
+                });
+            }
+            user.sex = sex;
+        }
+
+        if (heightFeet !== undefined) {
+            if (typeof heightFeet !== 'number' || heightFeet < 3 || heightFeet > 8) {
+                return res.status(400).json({
+                    status: 'error',
+                    code: 'INVALID_HEIGHT',
+                    message: 'Height (feet) must be between 3 and 8'
+                });
+            }
+            user.heightFeet = heightFeet;
+        }
+
+        if (heightInches !== undefined) {
+            if (typeof heightInches !== 'number' || heightInches < 0 || heightInches > 11) {
+                return res.status(400).json({
+                    status: 'error',
+                    code: 'INVALID_HEIGHT',
+                    message: 'Height (inches) must be between 0 and 11'
+                });
+            }
+            user.heightInches = heightInches;
+        }
+
+        if (stepLength !== undefined) {
+            if (typeof stepLength !== 'number' || stepLength < 10 || stepLength > 50) {
+                return res.status(400).json({
+                    status: 'error',
+                    code: 'INVALID_STEP_LENGTH',
+                    message: 'Step length must be between 10 and 50 inches'
+                });
+            }
+            user.stepLength = stepLength;
+        }
+
+        await user.save();
+
+        res.json({
+            message: 'Body stats updated successfully',
+            profile: user.toProfileJSON()
+        });
+
+    } catch (err) {
+        res.status(500).json({
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error updating body stats'
+        });
+    }
+});
+
 // ========== PUT /api/user/username ==========
 router.put('/username', authenticateToken, async (req, res) => {
     try {

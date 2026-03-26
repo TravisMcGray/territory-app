@@ -5,6 +5,11 @@
 //
 // isOwnProfile check normalizes both user.id and user._id from AuthContext
 // because getProfile() returns 'id' but the context may hydrate either field.
+//
+// Three tabs on own profile:
+// - Activities → activity history
+// - Achievements → locked/unlocked cascade
+// - Settings → body stats, username change, danger zone
 
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -19,6 +24,8 @@ import {
     unfollowUser,
     requestAccountDeletion,
     confirmAccountDeletion,
+    updateBodyStats,
+    updateUsername,
 } from '../services/api';
 import HexBackground from '../components/HexBackground';
 import Navbar from '../components/Navbar';
@@ -46,6 +53,16 @@ const AchievementTabIcon = ({ color = 'currentColor' }) => (
             fill="none"
         />
         <circle cx="14" cy="14" r="2" fill={color} />
+    </svg>
+);
+
+const SettingsTabIcon = ({ color = 'currentColor' }) => (
+    <svg width="14" height="14" viewBox="0 0 28 28" fill="none">
+        <circle cx="14" cy="14" r="5" stroke={color} strokeWidth="2.5" fill="none" />
+        <line x1="14" y1="2" x2="14" y2="7" stroke={color} strokeWidth="2.5" strokeLinecap="round" />
+        <line x1="14" y1="21" x2="14" y2="26" stroke={color} strokeWidth="2.5" strokeLinecap="round" />
+        <line x1="2" y1="14" x2="7" y2="14" stroke={color} strokeWidth="2.5" strokeLinecap="round" />
+        <line x1="21" y1="14" x2="26" y2="14" stroke={color} strokeWidth="2.5" strokeLinecap="round" />
     </svg>
 );
 
@@ -545,6 +562,18 @@ export default function Profile() {
                                 <AchievementTabIcon color={activeTab === 'achievements' ? '#ffffff' : '#6b7280'} />
                                 Achievements
                             </button>
+                            <button
+                                type="button"
+                                onClick={() => setActiveTab('settings')}
+                                className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${
+                                    activeTab === 'settings'
+                                        ? 'bg-emerald-500 text-white'
+                                        : 'text-gray-500 hover:text-white'
+                                }`}
+                            >
+                                <SettingsTabIcon color={activeTab === 'settings' ? '#ffffff' : '#6b7280'} />
+                                Settings
+                            </button>
                         </div>
 
                         {/* ========== ACTIVITIES TAB ========== */}
@@ -602,28 +631,14 @@ export default function Profile() {
                             </div>
                         )}
 
-                        {/* ========== DANGER ZONE ========== */}
-                        {/* Shown at the bottom of own profile only */}
-                        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-                            <h3 className="text-sm font-black text-gray-400 uppercase tracking-wide mb-4">
-                                Danger Zone
-                            </h3>
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-white font-bold text-sm">Delete Account</p>
-                                    <p className="text-gray-500 text-xs mt-0.5">
-                                        Permanently delete your account and all data
-                                    </p>
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={() => setShowDeleteModal(true)}
-                                    className="px-4 py-2 rounded-xl text-sm font-bold bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-colors"
-                                >
-                                    Delete
-                                </button>
-                            </div>
-                        </div>
+                        {/* ========== SETTINGS TAB ========== */}
+                        {activeTab === 'settings' && (
+                            <SettingsTab
+                                profile={profile}
+                                setProfile={setProfile}
+                                onShowDeleteModal={() => setShowDeleteModal(true)}
+                            />
+                        )}
                     </>
                 )}
             </div>
@@ -725,6 +740,317 @@ function AchievementRow({ achievement, index = 0 }) {
                     {rarity}
                 </div>
             )}
+        </div>
+    );
+}
+
+// ========== SETTINGS TAB ==========
+// Body stats, username change, and danger zone.
+// All fields optional — helps with calorie/distance accuracy.
+function SettingsTab({ profile, setProfile, onShowDeleteModal }) {
+    // ===== Body Stats State =====
+    const [weight, setWeight] = useState(profile.weight ?? '');
+    const [age, setAge] = useState(profile.age ?? '');
+    const [sex, setSex] = useState(profile.sex ?? '');
+    const [heightFeet, setHeightFeet] = useState(profile.heightFeet ?? '');
+    const [heightInches, setHeightInches] = useState(profile.heightInches ?? '');
+    const [stepLength, setStepLength] = useState(profile.stepLength ?? '');
+    const [bodyStatsLoading, setBodyStatsLoading] = useState(false);
+    const [bodyStatsMsg, setBodyStatsMsg] = useState('');
+    const [bodyStatsError, setBodyStatsError] = useState('');
+
+    // ===== Username State =====
+    const [newUsername, setNewUsername] = useState('');
+    const [usernameLoading, setUsernameLoading] = useState(false);
+    const [usernameMsg, setUsernameMsg] = useState('');
+    const [usernameError, setUsernameError] = useState('');
+
+    // ===== Sex tooltip =====
+    const [showSexTooltip, setShowSexTooltip] = useState(false);
+
+    // Auto-calculate step length from height when height changes
+    // Standard estimate: height in inches × 0.413 for walking
+    useEffect(() => {
+        if (heightFeet && heightInches !== '' && !profile.stepLength) {
+            const totalInches = (Number(heightFeet) * 12) + Number(heightInches);
+            if (totalInches > 0) {
+                const estimated = Math.round(totalInches * 0.413);
+                setStepLength(estimated);
+            }
+        }
+    }, [heightFeet, heightInches]);
+
+    // ===== Save Body Stats =====
+    const handleSaveBodyStats = async () => {
+        setBodyStatsLoading(true);
+        setBodyStatsMsg('');
+        setBodyStatsError('');
+        try {
+            const data = {};
+            if (weight !== '') data.weight = Number(weight);
+            if (age !== '') data.age = Number(age);
+            if (sex !== '') data.sex = sex;
+            if (heightFeet !== '') data.heightFeet = Number(heightFeet);
+            if (heightInches !== '') data.heightInches = Number(heightInches);
+            if (stepLength !== '') data.stepLength = Number(stepLength);
+
+            const res = await updateBodyStats(data);
+            setProfile(res.data.profile);
+            setBodyStatsMsg('Saved!');
+            setTimeout(() => setBodyStatsMsg(''), 3000);
+        } catch (err) {
+            setBodyStatsError(err.response?.data?.message || 'Failed to save. Please try again.');
+        } finally {
+            setBodyStatsLoading(false);
+        }
+    };
+
+    // ===== Change Username =====
+    const handleChangeUsername = async () => {
+        if (!newUsername.trim()) return;
+        setUsernameLoading(true);
+        setUsernameMsg('');
+        setUsernameError('');
+        try {
+            const res = await updateUsername({ newUsername: newUsername.trim() });
+            setProfile(res.data.profile);
+            setNewUsername('');
+            setUsernameMsg('Username changed!');
+            setTimeout(() => setUsernameMsg(''), 3000);
+        } catch (err) {
+            setUsernameError(err.response?.data?.message || 'Failed to change username.');
+        } finally {
+            setUsernameLoading(false);
+        }
+    };
+
+    const inputClass = "w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-white text-sm font-bold focus:outline-none focus:border-emerald-500 transition-colors";
+
+    return (
+        <div className="space-y-6">
+
+            {/* ========== BODY STATS ========== */}
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+                <h3 className="text-sm font-black text-gray-400 uppercase tracking-wide mb-1">
+                    Body Stats
+                </h3>
+                <p className="text-gray-500 text-xs font-bold mb-5">
+                    Optional — improves calorie and distance accuracy
+                </p>
+
+                <div className="space-y-4">
+
+                    {/* Weight */}
+                    <div>
+                        <label className="text-gray-400 text-xs font-bold block mb-1.5">Weight (lbs)</label>
+                        <input
+                            type="number"
+                            value={weight}
+                            onChange={e => setWeight(e.target.value)}
+                            placeholder="154"
+                            min="50"
+                            max="1000"
+                            className={inputClass}
+                        />
+                    </div>
+
+                    {/* Age */}
+                    <div>
+                        <label className="text-gray-400 text-xs font-bold block mb-1.5">Age</label>
+                        <input
+                            type="number"
+                            value={age}
+                            onChange={e => setAge(e.target.value)}
+                            placeholder="25"
+                            min="13"
+                            max="120"
+                            className={inputClass}
+                        />
+                    </div>
+
+                    {/* Sex with tooltip */}
+                    <div>
+                        <div className="flex items-center gap-1.5 mb-1.5">
+                            <label className="text-gray-400 text-xs font-bold">Sex</label>
+                            <div className="relative">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowSexTooltip(prev => !prev)}
+                                    onMouseEnter={() => setShowSexTooltip(true)}
+                                    onMouseLeave={() => setShowSexTooltip(false)}
+                                    className="w-4 h-4 rounded-full bg-gray-700 text-gray-400 text-xs font-black flex items-center justify-center hover:bg-gray-600 transition-colors"
+                                >
+                                    !
+                                </button>
+                                {showSexTooltip && (
+                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 bg-gray-800 border border-gray-700 rounded-lg p-3 text-xs text-gray-300 font-bold shadow-xl z-30">
+                                        Biological sex affects metabolic rate, which impacts calorie burn calculations by ~10-15%. This is optional and only used for accuracy.
+                                        <div className="absolute top-full left-1/2 -translate-x-1/2 w-2 h-2 bg-gray-800 border-r border-b border-gray-700 rotate-45 -mt-1" />
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        <select
+                            value={sex}
+                            onChange={e => setSex(e.target.value)}
+                            className={`${inputClass} ${!sex ? 'text-gray-500' : ''}`}
+                        >
+                            <option value="">Select...</option>
+                            <option value="male">Male</option>
+                            <option value="female">Female</option>
+                            <option value="prefer_not_to_say">Prefer not to say</option>
+                        </select>
+                    </div>
+
+                    {/* Height — two inputs */}
+                    <div>
+                        <label className="text-gray-400 text-xs font-bold block mb-1.5">Height</label>
+                        <div className="flex gap-2">
+                            <div className="flex-1">
+                                <div className="relative">
+                                    <input
+                                        type="number"
+                                        value={heightFeet}
+                                        onChange={e => setHeightFeet(e.target.value)}
+                                        placeholder="5"
+                                        min="3"
+                                        max="8"
+                                        className={inputClass}
+                                    />
+                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs font-bold">ft</span>
+                                </div>
+                            </div>
+                            <div className="flex-1">
+                                <div className="relative">
+                                    <input
+                                        type="number"
+                                        value={heightInches}
+                                        onChange={e => setHeightInches(e.target.value)}
+                                        placeholder="10"
+                                        min="0"
+                                        max="11"
+                                        className={inputClass}
+                                    />
+                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs font-bold">in</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Step Length */}
+                    <div>
+                        <label className="text-gray-400 text-xs font-bold block mb-1.5">
+                            Step Length (inches)
+                            {heightFeet && heightInches !== '' && !profile.stepLength && (
+                                <span className="text-emerald-400 ml-2">auto-estimated from height</span>
+                            )}
+                        </label>
+                        <input
+                            type="number"
+                            value={stepLength}
+                            onChange={e => setStepLength(e.target.value)}
+                            placeholder="24"
+                            min="10"
+                            max="50"
+                            className={inputClass}
+                        />
+                    </div>
+                </div>
+
+                {/* Save button + feedback */}
+                <div className="mt-5">
+                    {bodyStatsError && (
+                        <p className="text-red-400 text-sm font-bold mb-3">{bodyStatsError}</p>
+                    )}
+                    {bodyStatsMsg && (
+                        <p className="text-emerald-400 text-sm font-bold mb-3">{bodyStatsMsg}</p>
+                    )}
+                    <button
+                        type="button"
+                        onClick={handleSaveBodyStats}
+                        disabled={bodyStatsLoading}
+                        className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:bg-gray-800 disabled:text-gray-600 text-white font-bold py-2.5 rounded-xl transition-colors text-sm"
+                    >
+                        {bodyStatsLoading ? 'Saving...' : 'Save Body Stats'}
+                    </button>
+                </div>
+            </div>
+
+            {/* ========== USERNAME CHANGE ========== */}
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+                <h3 className="text-sm font-black text-gray-400 uppercase tracking-wide mb-1">
+                    Change Username
+                </h3>
+                {profile.canChangeUsername ? (
+                    <>
+                        <p className="text-gray-500 text-xs font-bold mb-4">
+                            Current: <span className="text-white">{profile.username}</span>
+                        </p>
+                        <input
+                            type="text"
+                            value={newUsername}
+                            onChange={e => {
+                                setNewUsername(e.target.value);
+                                setUsernameError('');
+                            }}
+                            placeholder="New username"
+                            maxLength={20}
+                            className={`${inputClass} mb-3`}
+                        />
+                        {usernameError && (
+                            <p className="text-red-400 text-sm font-bold mb-3">{usernameError}</p>
+                        )}
+                        {usernameMsg && (
+                            <p className="text-emerald-400 text-sm font-bold mb-3">{usernameMsg}</p>
+                        )}
+                        <button
+                            type="button"
+                            onClick={handleChangeUsername}
+                            disabled={usernameLoading || !newUsername.trim()}
+                            className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:bg-gray-800 disabled:text-gray-600 text-white font-bold py-2.5 rounded-xl transition-colors text-sm"
+                        >
+                            {usernameLoading ? 'Changing...' : 'Change Username'}
+                        </button>
+                    </>
+                ) : (
+                    <div className="mt-2">
+                        <p className="text-gray-500 text-xs font-bold">
+                            Capture 100 hexagons to unlock username changes
+                        </p>
+                        <div className="mt-3 bg-gray-800 rounded-full h-2 overflow-hidden">
+                            <div
+                                className="bg-emerald-500 h-full rounded-full transition-all"
+                                style={{ width: `${Math.min(100, ((profile.stats?.totalHexagonsCaptured ?? 0) / 100) * 100)}%` }}
+                            />
+                        </div>
+                        <p className="text-gray-500 text-xs font-bold mt-1.5 text-right">
+                            {profile.stats?.totalHexagonsCaptured ?? 0} / 100
+                        </p>
+                    </div>
+                )}
+            </div>
+
+            {/* ========== DANGER ZONE ========== */}
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+                <h3 className="text-sm font-black text-gray-400 uppercase tracking-wide mb-4">
+                    Danger Zone
+                </h3>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <p className="text-white font-bold text-sm">Delete Account</p>
+                        <p className="text-gray-500 text-xs mt-0.5">
+                            Permanently delete your account and all data
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onShowDeleteModal}
+                        className="px-4 py-2 rounded-xl text-sm font-bold bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-colors"
+                    >
+                        Delete
+                    </button>
+                </div>
+            </div>
         </div>
     );
 }
