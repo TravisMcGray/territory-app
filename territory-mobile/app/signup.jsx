@@ -19,6 +19,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { signup as signupAPI, resendVerification } from '../services/api';
+import HexBackground from '../components/HexBackground';
 
 export default function Signup() {
     const router = useRouter();
@@ -94,6 +95,7 @@ export default function Signup() {
     if (awaitingVerification) {
         return (
             <View style={styles.container}>
+                <HexBackground />
                 <View style={styles.verificationContent}>
                     <Text style={styles.verificationEmoji}>📬</Text>
                     <Text style={styles.verificationTitle}>Check your email</Text>
@@ -154,6 +156,7 @@ export default function Signup() {
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={styles.container}
         >
+            <HexBackground />
             <ScrollView
                 contentContainerStyle={styles.scrollContent}
                 keyboardShouldPersistTaps="handled"

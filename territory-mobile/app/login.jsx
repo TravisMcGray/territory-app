@@ -20,6 +20,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
+import HexBackground from '../components/HexBackground';
 import { login as loginAPI, resendVerification } from '../services/api';
 
 export default function Login() {
@@ -81,6 +82,7 @@ export default function Login() {
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={styles.container}
         >
+            <HexBackground />
             <ScrollView
                 contentContainerStyle={styles.scrollContent}
                 keyboardShouldPersistTaps="handled"
