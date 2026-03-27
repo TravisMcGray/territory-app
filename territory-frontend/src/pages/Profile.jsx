@@ -767,6 +767,7 @@ function SettingsTab({ profile, setProfile, onShowDeleteModal }) {
 
     // ===== Sex tooltip =====
     const [showSexTooltip, setShowSexTooltip] = useState(false);
+    const [showStepTooltip, setShowStepTooltip] = useState(false);
 
     // Track if user manually edited step length — if so, don't auto-overwrite
     const [stepLengthManual, setStepLengthManual] = useState(false);
@@ -942,16 +943,35 @@ function SettingsTab({ profile, setProfile, onShowDeleteModal }) {
 
                     {/* Step Length */}
                     <div>
-                        <label className="text-gray-400 text-xs font-bold block mb-1.5">
-                            Step Length (inches)
-                            {heightFeet && heightInches !== '' && !stepLengthManual && (
-                                <span className="text-emerald-400 ml-2">auto-estimated from height</span>
-                            )}
-                        </label>
+                            <div className="flex items-center gap-1.5 mb-1.5">
+                                <label className="text-gray-400 text-xs font-bold">
+                                    Step Length (inches)
+                                    {heightFeet && heightInches !== '' && !stepLengthManual && (
+                                        <span className="text-emerald-400 ml-2">auto-estimated from height</span>
+                                    )}
+                                </label>
+                                <div className="relative">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowStepTooltip(prev => !prev)}
+                                        onMouseEnter={() => setShowStepTooltip(true)}
+                                        onMouseLeave={() => setShowStepTooltip(false)}
+                                        className="w-4 h-4 rounded-full bg-gray-700 text-gray-400 text-xs font-black flex items-center justify-center hover:bg-gray-600 transition-colors"
+                                    >
+                                        !
+                                    </button>
+                                    {showStepTooltip && (
+                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-gray-800 border border-gray-700 rounded-lg p-3 text-xs text-gray-300 font-bold shadow-xl z-30">
+                                            The auto-estimate is approximate (~5/10 accuracy). For a precise measurement: walk 10 normal steps, measure the total distance in inches, and divide by 10.
+                                            <div className="absolute top-full left-1/2 -translate-x-1/2 w-2 h-2 bg-gray-800 border-r border-b border-gray-700 rotate-45 -mt-1" />
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
                         <input
                             type="number"
                             value={stepLength}
-                            onChange={e => { setStepLength(e.target.value); setStepLengthManual(true); }}
+                            onChange={e => { setStepLength(e.target.value); setStepLengthManual(e.target.value !== ''); }}
                             placeholder="24"
                             min="10"
                             max="50"

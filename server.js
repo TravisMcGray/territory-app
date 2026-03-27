@@ -26,8 +26,9 @@ app.use(express.urlencoded({ limit: '10mb', extended: true }));
 // CORS
 app.use(cors({
     origin: [
-        'http://localhost:5173',
+        'http://localhost:5173', // npm run dev location
         'http://localhost:3000',
+        'http://localhost:8081', // expo go location
         process.env.FRONTEND_URL,
     ].filter(Boolean),
     credentials: true,
