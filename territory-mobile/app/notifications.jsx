@@ -77,7 +77,7 @@ export default function Notifications() {
         try {
             await markAsRead(id);
             setNotifications(prev =>
-                prev.map(n => n._id === id ? { ...n, read: true } : n)
+                prev.map(n => n.id === id ? { ...n, read: true } : n)
             );
         } catch (err) {
             console.error('Failed to mark as read:', err);
@@ -106,7 +106,7 @@ export default function Notifications() {
                 onPress: async () => {
                     try {
                         await deleteNotification(id);
-                        setNotifications(prev => prev.filter(n => n._id !== id));
+                        setNotifications(prev => prev.filter(n => n.id !== id));
                     } catch (err) {
                         console.error('Failed to delete notification:', err);
                     }

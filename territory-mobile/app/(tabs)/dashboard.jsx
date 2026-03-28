@@ -128,12 +128,20 @@ export default function Dashboard() {
                     <TouchableOpacity
                         onPress={() => router.push('/notifications')}
                         style={{
-                            width: 40, height: 40, borderRadius: 12,
+                            width: 44, height: 44, borderRadius: 12,
                             backgroundColor: '#111827', borderWidth: 1, borderColor: '#1f2937',
                             alignItems: 'center', justifyContent: 'center',
                         }}
                     >
-                        <Text style={{ fontSize: 18 }}>🔔</Text>
+                        <Svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+                            <Polygon
+                                points="2,14 8,3 20,3 26,14 20,25 8,25"
+                                fill="#0e0d0d"
+                                stroke="#facc15"
+                                strokeWidth="2"
+                            />
+                        </Svg>
+                        <Text style={{ position: 'absolute', fontSize: 13 }}>🔔</Text>
                         {unreadCount > 0 && (
                             <View style={{
                                 position: 'absolute', top: -4, right: -4,
