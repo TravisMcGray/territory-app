@@ -46,6 +46,7 @@ export const confirmAccountDeletion = (data) => api.delete('/api/user/account/co
 
 // ========== USERS (public profiles) ==========
 export const getUserById = (id) => api.get(`/api/users/${id}`);
+export const getNearbyHexagons = (lat, lng, rings) => api.get(`/api/user/nearby-hexagons?latitude=${lat}&longitude=${lng}&rings=${rings || 4}`);
 
 // ========== SOCIAL ==========
 export const followUser = (id) => api.post(`/api/users/${id}/follow`);

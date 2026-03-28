@@ -600,6 +600,57 @@ router.delete('/account/confirm', authenticateToken, async (req, res) => {
     }
 });
 
+// ========== GET /api/user/nearby-hexagons ==========
+// Returns hex grid polygons around a given GPS coordinate.
+// Used by mobile app to show uncaptured hexagons (gray grid).
+// Backend does all h3-js math — mobile just renders polygons.
+router.get('/nearby-hexagons', authenticateToken, async (req, res) => {
+    try {
+        const { latitude, longitude, rings } = req.query;
+
+        if (!latitude || !longitude) {
+            return res.status(400).json({
+                status: 'error',
+                code: 'MISSING_COORDINATES',
+                message: 'latitude and longitude are required'
+            });
+        }
+
+        const lat = parseFloat(latitude);
+        const lng = parseFloat(longitude);
+        const k = Math.min(parseInt(rings) || 4, 8); // Max 8 rings (~217 hexes)
+
+        const { latLngToCell, gridDisk, cellToBoundary } = require('h3-js');
+        const centerHex = latLngToCell(lat, lng, 10);
+        const nearbyHexes = gridDisk(centerHex, k);
+
+        const hexagons = nearbyHexes.map(hexId => {
+            try {
+                const boundary = cellToBoundary(hexId);
+                return {
+                    hexagonId: hexId,
+                    polygon: boundary.map(([lat, lng]) => ({ latitude: lat, longitude: lng })),
+                };
+            } catch {
+                return null;
+            }
+        }).filter(Boolean);
+
+        res.json({
+            message: 'Nearby hexagons retrieved',
+            count: hexagons.length,
+            hexagons
+        });
+
+    } catch (err) {
+        res.status(500).json({
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error computing nearby hexagons'
+        });
+    }
+});
+
 // ========== GET /api/user/territories ==========
 // Returns all captured territories with pre-computed polygon coordinates.
 // Mobile app uses the polygon field to render hexagons without needing h3-js.
