@@ -12,6 +12,7 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 const { authenticateToken, JWT_SECRET } = require('../middleware/auth');
 const { validatePasswordStrength, validateEmailFormat } = require('../middleware/validation');
 const { validateUsername } = require('../middleware/profanity');
+const { cellToBoundary } = require('h3-js');
 
 // Lazy-load social models
 let ActivityComment, ActivityKudos, Notification;
@@ -600,6 +601,9 @@ router.delete('/account/confirm', authenticateToken, async (req, res) => {
 });
 
 // ========== GET /api/user/territories ==========
+// Returns all captured territories with pre-computed polygon coordinates.
+// Mobile app uses the polygon field to render hexagons without needing h3-js.
+// Web app can use either hexagonId (with client-side h3-js) or polygon.
 router.get('/territories', authenticateToken, async (req, res) => {
     try {
         const territories = await Territory.find({ ownerId: { $exists: true } })
@@ -609,12 +613,28 @@ router.get('/territories', authenticateToken, async (req, res) => {
 
         const formatted = territories
             .filter(t => t.ownerId !== null)
-            .map(t => ({
-                hexagonId: t.hexagonId,
-                owner: { id: t.ownerId._id, username: t.ownerId.username },
-                activityType: t.ownerActivityType,
-                capturedAt: t.capturedAt
-            }));
+            .map(t => {
+                // Pre-compute polygon boundary for mobile rendering
+                let polygon = null;
+                try {
+                    const boundary = cellToBoundary(t.hexagonId);
+                    // cellToBoundary returns [[lat, lng], ...]
+                    // Mobile needs [{ latitude, longitude }]
+                    polygon = boundary.map(([lat, lng]) => ({ latitude: lat, longitude: lng }));
+                } catch (err) {
+                    // Skip malformed H3 indices
+                    console.warn('Invalid H3 index:', t.hexagonId);
+                }
+
+                return {
+                    hexagonId: t.hexagonId,
+                    owner: { id: t.ownerId._id, username: t.ownerId.username },
+                    activityType: t.ownerActivityType,
+                    capturedAt: t.capturedAt,
+                    polygon
+                };
+            })
+            .filter(t => t.polygon !== null);
 
         res.json({
             message: 'Territories retrieved successfully',
