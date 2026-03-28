@@ -148,13 +148,14 @@ export default function MapScreen() {
     const [routeSegments, setRouteSegments] = useState([[]]);
     const [distance, setDistance] = useState(0);
     const [duration, setDuration] = useState(0);
-    const [saving, setSaving] = useState(false);
-    const [result, setResult] = useState(null);
+    const [elevationGain, setElevationGain] = useState(0);
+    const [elevationLoss, setElevationLoss] = useState(0);
 
     // Refs
     const locationSubscription = useRef(null);
     const timerInterval = useRef(null);
     const lastCoord = useRef(null);
+    const lastAltitude = useRef(null);
 
     // Animations
     const pulseAnim = useRef(new Animated.Value(0)).current;
@@ -234,7 +235,7 @@ export default function MapScreen() {
         locationSubscription.current = await Location.watchPositionAsync(
             { accuracy: Location.Accuracy.High, distanceInterval: 5, timeInterval: 3000 },
             (loc) => {
-                const { latitude, longitude } = loc.coords;
+                const { latitude, longitude, altitude } = loc.coords;
                 const timestamp = Date.now();
                 const newPoint = { latitude, longitude, timestamp };
                 setLocation(loc.coords);
@@ -246,6 +247,16 @@ export default function MapScreen() {
                     setDistance(prev => prev + segDist);
                 }
                 lastCoord.current = newPoint;
+                // Track elevation changes
+                if (altitude != null && lastAltitude.current != null) {
+                    const diff = altitude - lastAltitude.current;
+                    if (diff > 0.5) {
+                        setElevationGain(prev => prev + diff);
+                    } else if (diff < -0.5) {
+                        setElevationLoss(prev => prev + Math.abs(diff));
+                    }
+                }
+                if (altitude != null) lastAltitude.current = altitude;
                 setCoordinates(prev => [...prev, newPoint]);
                 setRouteSegments(prev => {
                     const updated = [...prev];
@@ -291,6 +302,9 @@ export default function MapScreen() {
         setDuration(0);
         setResult(null);
         lastCoord.current = null;
+        lastAltitude.current = null;
+        setElevationGain(0);
+        setElevationLoss(0);
         setMode('tracking');
         startTimer();
         await startGPSWatch();
@@ -332,6 +346,7 @@ export default function MapScreen() {
                 })),
                 activityType,
                 duration,
+                elevationGain: Math.round(elevationGain),
             });
             setResult(res.data);
             setMode('result');
@@ -372,6 +387,8 @@ export default function MapScreen() {
         setDuration(0);
         setResult(null);
         setActivityType('walk');
+        setElevationGain(0);
+        setElevationLoss(0);
         setMode('explore');
     };
 
@@ -563,13 +580,25 @@ export default function MapScreen() {
                                 </Text>
                                 <Text style={styles.resultStatLabel}>stolen</Text>
                             </View>
+                            <View style={styles.resultStatItem}>
+                                <Text style={[styles.resultStatValue, { color: '#60a5fa' }]}>
+                                    {Math.round(elevationGain * 3.281)} ft
+                                </Text>
+                                <Text style={styles.resultStatLabel}>↑ elevation</Text>
+                            </View>
+                            <View style={styles.resultStatItem}>
+                                <Text style={[styles.resultStatValue, { color: '#f59e0b' }]}>
+                                    {Math.round(elevationLoss * 3.281)} ft
+                                </Text>
+                                <Text style={styles.resultStatLabel}>↓ elevation</Text>
+                            </View>
                         </View>
                         <View style={styles.resultCalories}>
                             <Text style={{ color: '#ffffff', fontWeight: '900' }}>
                                 {activity.estimatedCalories ?? 0} kcal
                             </Text>
                             <Text style={{ color: '#6b7280', fontSize: 11, marginLeft: 8 }}>
-                                estimated calories
+                                estimated calories burned
                             </Text>
                         </View>
                     </View>
@@ -716,8 +745,8 @@ export default function MapScreen() {
                             </View>
                             <View style={[styles.trackingStatDivider, { backgroundColor: '#1f2937' }]} />
                             <View style={styles.trackingStat}>
-                                <Text style={styles.trackingStatValue}>{coordinates.length}</Text>
-                                <Text style={styles.trackingStatLabel}>points</Text>
+                                <Text style={styles.trackingStatValue}>{Math.round(elevationGain * 3.281)}</Text>
+                                <Text style={styles.trackingStatLabel}>↑ ft</Text>
                             </View>
                         </View>
                     </View>
@@ -760,9 +789,19 @@ export default function MapScreen() {
                                         <Text style={styles.summaryStatValue}>{distance.toFixed(2)}</Text>
                                         <Text style={styles.summaryStatLabel}>miles</Text>
                                     </View>
+                                </View>
+                                <View style={styles.summaryStatsRow}>
                                     <View style={styles.summaryStatItem}>
-                                        <Text style={[styles.summaryStatValue, { color: '#10b981' }]}>{coordinates.length}</Text>
-                                        <Text style={styles.summaryStatLabel}>GPS points</Text>
+                                        <Text style={[styles.summaryStatValue, { color: '#10b981' }]}>
+                                            {Math.round(elevationGain * 3.281)}
+                                        </Text>
+                                        <Text style={styles.summaryStatLabel}>↑ elev ft</Text>
+                                    </View>
+                                    <View style={styles.summaryStatItem}>
+                                        <Text style={[styles.summaryStatValue, { color: '#f87171' }]}>
+                                            {Math.round(elevationLoss * 3.281)}
+                                        </Text>
+                                        <Text style={styles.summaryStatLabel}>↓ elev ft</Text>
                                     </View>
                                 </View>
 
