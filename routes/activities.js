@@ -302,6 +302,42 @@ router.post('/', authenticateToken, async (req, res) => {
         const uniqueHexagons = [...new Set(hexagons)];
 
         // Create activity record (with duration and elevationGain)
+        // ========== CALORIE CALCULATION ==========
+        // Uses MET-based formula with user's body stats for accuracy.
+        // MET (Metabolic Equivalent of Task):
+        //   Walking: 3.5 METs (moderate pace ~3mph)
+        //   Running: estimated from speed — roughly 1.0 × mph
+        // Formula: calories = MET × 3.5 × weight(kg) / 200 × duration(min)
+        // Falls back to weight-only formula if no duration data.
+        const activityUser = await User.findById(userId).select('weight age sex');
+        const weightLbs = activityUser?.weight || 154; // default 154 lbs
+        const weightKg = weightLbs * 0.453592;
+        const durationMinutes = duration / 60;
+        const speedMph = durationMinutes > 0 ? (distance / (durationMinutes / 60)) : 0;
+
+        let met;
+        if (activityType === 'walk') {
+            // Walking MET ranges from 2.0 (slow) to 5.0 (brisk)
+            if (speedMph <= 2.0) met = 2.0;
+            else if (speedMph <= 2.5) met = 2.8;
+            else if (speedMph <= 3.0) met = 3.5;
+            else if (speedMph <= 3.5) met = 4.3;
+            else met = 5.0;
+        } else {
+            // Running MET ranges from 6.0 (slow jog) to 16.0 (sprint)
+            if (speedMph <= 4.0) met = 6.0;
+            else if (speedMph <= 5.0) met = 8.3;
+            else if (speedMph <= 6.0) met = 9.8;
+            else if (speedMph <= 7.0) met = 11.0;
+            else if (speedMph <= 8.0) met = 11.8;
+            else if (speedMph <= 9.0) met = 12.8;
+            else if (speedMph <= 10.0) met = 14.5;
+            else met = 16.0;
+        }
+
+        // ACSM calorie formula: MET × 3.5 × weight(kg) / 200 × duration(min)
+        const estimatedCalories = Math.round(met * 3.5 * weightKg / 200 * durationMinutes);
+
         const activity = await Activity.create({
             userId,
             activityType,
@@ -309,9 +345,9 @@ router.post('/', authenticateToken, async (req, res) => {
             distance,
             duration,
             elevationGain: elevationGain || 0,
-            capturedHexagons: uniqueHexagons
+            capturedHexagons: uniqueHexagons,
+            estimatedCalories
         });
-
         // ===== ATOMIC CAPTURE - PREVENTS RACE CONDITIONS =====
         // Instead of: fetch territories, loop, save each one
         // I do: atomic update for each territory (all at once)    
@@ -485,7 +521,7 @@ router.post('/', authenticateToken, async (req, res) => {
                 pace: `${activity.pace.toFixed(2)} min/mile`,
                 speed: `${activity.averageSpeed.toFixed(2)} mph`,
                 elevationGain: `${activity.elevationGain} m (${Math.round(activity.elevationGain * 3.28084)} ft)`,
-                estimatedCalories: Math.round(distance * (activityType === 'run' ? 0.63 : 0.30) * (updatedUser.weight || 154)),
+                estimatedCalories,
                 hexagonsCaptured: uniqueHexagons.length,
                 newTerritory: captured,
                 stolenTerritory: stolen
@@ -779,15 +815,21 @@ router.get('/feed', authenticateToken, async (req, res) => {
                                 duration: 1,
                                 elevationGain: 1,
                                 estimatedCalories: {
-                                    $round: [
+                                    $cond: [
+                                        { $gt: ['$estimatedCalories', 0] },
+                                        '$estimatedCalories',
                                         {
-                                            $multiply: [
-                                                '$distance',
-                                                { $cond: [{ $eq: ['$activityType', 'run'] }, 0.63, 0.30] },
-                                                154
+                                            $round: [
+                                                {
+                                                    $multiply: [
+                                                        '$distance',
+                                                        { $cond: [{ $eq: ['$activityType', 'run'] }, 0.63, 0.30] },
+                                                        154
+                                                    ]
+                                                },
+                                                0
                                             ]
-                                        },
-                                        0
+                                        }
                                     ]
                                 },
                                 capturedHexagons: { $size: '$capturedHexagons' },

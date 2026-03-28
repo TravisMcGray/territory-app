@@ -47,7 +47,12 @@ const activitySchema = new mongoose.Schema({
             type: Number,
             default: 0,
             min: 0
-        }
+        },
+        estimatedCalories: {
+            type: Number,
+            default: 0,
+            min: 0
+        },
     },
 {
     timestamps: true
@@ -72,10 +77,11 @@ activitySchema.virtual('averageSpeed').get(function() {
     return parseFloat((this.distance / hours).toFixed(2));
 });
 
-// Estimate calories burned (rough formula)
-// Assumes 70kg person
-// Running burns ~100 cal/mile, walking ~50 cal/mile
-activitySchema.virtual('estimatedCalories').get(function() {
+// estimatedCalories is now stored as a real field (calculated at creation time
+// using the user's body stats). This virtual is kept as a fallback only for
+// old activities that don't have the field set.
+activitySchema.virtual('caloriesFallback').get(function() {
+    if (this.estimatedCalories > 0) return this.estimatedCalories;
     const caloriesPerMile = this.activityType === 'run' ? 100 : 50;
     return Math.round(this.distance * caloriesPerMile);
 });
