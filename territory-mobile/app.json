@@ -16,14 +16,19 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.hexcapture.app"
     },
-    "android": {
+"android": {
       "adaptiveIcon": {
         "backgroundColor": "#030712",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "package": "com.hexcapture.app"
+      "package": "com.hexcapture.app",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyAh7DoThqWCLVx_kcVHmyp-0ZRva4qQlZw"
+        }
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png"

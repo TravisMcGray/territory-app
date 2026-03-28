@@ -7,7 +7,7 @@ import { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
-import { getProfile, getFeed, getHexagonLeaderboard } from '../../services/api';
+import { getProfile, getFeed, getHexagonLeaderboard, getUnreadCount } from '../../services/api';
 import HexBackground from '../../components/HexBackground';
 import Svg, { Polygon, Line, Polyline, G } from 'react-native-svg';
 
@@ -70,6 +70,7 @@ export default function Dashboard() {
 
     const [profile, setProfile] = useState(null);
     const [feed, setFeed] = useState([]);
+    const [unreadCount, setUnreadCount] = useState(0);
     const [leaderboard, setLeaderboard] = useState([]);
     const [loading, setLoading] = useState(true);
 
@@ -94,6 +95,16 @@ export default function Dashboard() {
         loadDashboard();
     }, []);
 
+    useEffect(() => {
+        const loadUnread = async () => {
+            try {
+                const res = await getUnreadCount();
+                setUnreadCount(res.data.unreadCount ?? 0);
+            } catch (err) {}
+        };
+        loadUnread();
+    }, []);
+
     if (loading) {
         return (
             <View style={styles.loadingContainer}>
@@ -109,17 +120,33 @@ export default function Dashboard() {
             <HexBackground />
             <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
 
-                {/* ===== HEADER ===== */}
-                <Text style={styles.logoText}>
-                    Hex<Text style={styles.logoAccent}>Capture</Text>
-                </Text>
-
-                {/* ===== WELCOME ===== */}
-                <View style={styles.welcomeCard}>
-                    <Text style={styles.welcomeText}>
-                        Welcome back, <Text style={styles.usernameText}>{profile?.username}</Text>
+{/* ===== HEADER ===== */}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                    <Text style={styles.logoText}>
+                        Hex<Text style={styles.logoAccent}>Capture</Text>
                     </Text>
-                    <Text style={styles.subtitle}>Ready to capture more territory?</Text>
+                    <TouchableOpacity
+                        onPress={() => router.push('/notifications')}
+                        style={{
+                            width: 40, height: 40, borderRadius: 12,
+                            backgroundColor: '#111827', borderWidth: 1, borderColor: '#1f2937',
+                            alignItems: 'center', justifyContent: 'center',
+                        }}
+                    >
+                        <Text style={{ fontSize: 18 }}>🔔</Text>
+                        {unreadCount > 0 && (
+                            <View style={{
+                                position: 'absolute', top: -4, right: -4,
+                                backgroundColor: '#ef4444', borderRadius: 8,
+                                minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center',
+                                paddingHorizontal: 4,
+                            }}>
+                                <Text style={{ color: '#ffffff', fontSize: 9, fontWeight: '900' }}>
+                                    {unreadCount > 99 ? '99+' : unreadCount}
+                                </Text>
+                            </View>
+                        )}
+                    </TouchableOpacity>
                 </View>
 
                 {/* ===== STATS GRID ===== */}

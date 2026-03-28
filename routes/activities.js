@@ -342,8 +342,16 @@ router.post('/', authenticateToken, async (req, res) => {
                                     $cond: [
                                         // If this is a WALK activity
                                         { $eq: [activityType, 'walk'] },
-                                        // Walkers: Keep the current owner (never steal)
-                                        '$ownerId',
+                                        // Walkers: Keep current owner if exists, claim if new
+                                        {
+                                            $cond: [
+                                                { $ifNull: ['$ownerId', false] },
+                                                // Territory has an owner — keep them (walkers never steal)
+                                                '$ownerId',
+                                                // No owner — this is new territory, claim it
+                                                new mongoose.Types.ObjectId(userId)
+                                            ]
+                                        },
                                         // Runners: Check if we can steal
                                         {
                                             $cond: [
@@ -351,8 +359,8 @@ router.post('/', authenticateToken, async (req, res) => {
                                                 { $eq: ['$ownerActivityType', 'WALK'] },
                                                 // Can't steal from walkers, keep their ownership
                                                 '$ownerId',
-                                                // Owner is a runner, we can steal!
-                                                userId
+                                                // Owner is a runner (or new territory), we take it
+                                                new mongoose.Types.ObjectId(userId)
                                             ]
                                         }
                                     ]
