@@ -155,7 +155,7 @@ export default function Dashboard() {
                                     if (id === currentUserId) {
                                         router.push('/profile');
                                     } else if (id) {
-                                        router.push(`/profile/${id}`);
+                                        router.push(`/user/${id}`);
                                     }
                                 }}
                             >
@@ -214,7 +214,7 @@ export default function Dashboard() {
                                         if (isCurrentUser) {
                                             router.push('/profile');
                                         } else {
-                                            router.push(`/profile/${entry.id}`);
+                                            router.push(`/user/${entry.id}`);
                                         }
                                     }}
                                 >

@@ -147,7 +147,7 @@ export default function Feed() {
                             if (userId === currentUserId) {
                                 router.push('/profile');
                             } else {
-                                router.push(`/profile/${userId}`);
+                                router.push(`/user/${userId}`);
                             }
                         }}
                     />

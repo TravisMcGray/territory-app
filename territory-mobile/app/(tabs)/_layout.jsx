@@ -1,13 +1,12 @@
 // ========== TAB NAVIGATION LAYOUT ==========
-// Bottom tab bar with four tabs: Dashboard, Feed, Leaderboard, Profile.
-// Matches the web app's Navbar links.
+// Bottom tab bar with five tabs: Home, Feed, Map (center), Ranks, Profile.
+// Map is positioned in the center as the primary action — the heart of the app.
 // Uses custom dark styling to match the HexCapture design system.
 
 import { Tabs } from 'expo-router';
-import Svg, { Polygon, Polyline, Circle, Line, G } from 'react-native-svg';
+import Svg, { Polygon, Polyline, Circle, Line } from 'react-native-svg';
 
 // ========== TAB ICONS ==========
-// Custom hex-themed icons matching the web app's visual language.
 
 function DashboardIcon({ color, size }) {
     return (
@@ -39,6 +38,21 @@ function FeedIcon({ color, size }) {
                 strokeLinejoin="round"
                 fill="none"
             />
+        </Svg>
+    );
+}
+
+function MapIcon({ color, size }) {
+    return (
+        <Svg width={size} height={size} viewBox="0 0 28 28" fill="none">
+            <Polygon
+                points="2,14 8,3 20,3 26,14 20,25 8,25"
+                stroke={color}
+                strokeWidth="2.5"
+                fill="none"
+            />
+            <Circle cx="14" cy="12" r="2.5" stroke={color} strokeWidth="1.5" fill="none" />
+            <Line x1="14" y1="14.5" x2="14" y2="20" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
         </Svg>
     );
 }
@@ -108,6 +122,13 @@ export default function TabLayout() {
                 options={{
                     title: 'Feed',
                     tabBarIcon: ({ color }) => <FeedIcon color={color} size={24} />,
+                }}
+            />
+            <Tabs.Screen
+                name="map"
+                options={{
+                    title: 'Map',
+                    tabBarIcon: ({ color }) => <MapIcon color={color} size={28} />,
                 }}
             />
             <Tabs.Screen

@@ -165,7 +165,7 @@ export default function Leaderboard() {
                                 if (isCurrentUser) {
                                     router.push('/profile');
                                 } else {
-                                    router.push(`/profile/${entry.id}`);
+                                    router.push(`/user/${entry.id}`);
                                 }
                             }}
                         >

@@ -19,11 +19,11 @@ function AuthGate() {
         if (!isReady || loading) return;
 
         const onAuthScreen = segments[0] === 'login' || segments[0] === 'signup';
-        const onTabsScreen = segments[0] === '(tabs)';
+        const onAppScreen = segments[0] === '(tabs)' || segments[0] === 'user';
 
         if (!user && !onAuthScreen) {
             router.replace('/login');
-        } else if (user && !onTabsScreen) {
+        } else if (user && !onAppScreen) {
             router.replace('/(tabs)/dashboard');
         }
     }, [user, loading, segments, isReady]);
