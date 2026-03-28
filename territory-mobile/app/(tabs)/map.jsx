@@ -4,6 +4,7 @@ import MapView, { Polygon, Marker } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { useAuth } from '../../context/AuthContext';
 import { getTerritories } from '../../services/api';
+import { getTerritories, getNearbyHexagons } from '../../services/api';
 
 const DEFAULT_ZOOM_DELTA = 0.008;
 
@@ -11,6 +12,8 @@ const COLOR_MINE_FILL = 'rgba(16, 185, 129, 0.45)';
 const COLOR_MINE_STROKE = '#10b981';
 const COLOR_OTHERS_FILL = 'rgba(168, 85, 247, 0.35)';
 const COLOR_OTHERS_STROKE = '#a855f7';
+const COLOR_GRID_FILL = 'rgba(107, 114, 128, 0.08)';
+const COLOR_GRID_STROKE = 'rgba(107, 114, 128, 0.25)';
 
 const LIGHT_MAP_STYLE = [
     { elementType: 'geometry', stylers: [{ color: '#f5f5f5' }] },
@@ -40,6 +43,7 @@ export default function MapScreen() {
     const [loading, setLoading] = useState(true);
     const [locationError, setLocationError] = useState(null);
     const [tileCount, setTileCount] = useState({ mine: 0, total: 0 });
+    const [gridHexagons, setGridHexagons] = useState([]);
 
     // ========== REQUEST LOCATION ==========
     useEffect(() => {
@@ -55,6 +59,14 @@ export default function MapScreen() {
                     accuracy: Location.Accuracy.High,
                 });
                 setLocation(loc.coords);
+
+                // Fetch nearby hex grid from backend
+                try {
+                    const gridRes = await getNearbyHexagons(loc.coords.latitude, loc.coords.longitude, 4);
+                    setGridHexagons(gridRes.data.hexagons || []);
+                } catch (err) {
+                    console.error('Failed to load hex grid:', err);
+                }
             } catch (err) {
                 setLocationError('Could not get your location.');
             } finally {
@@ -132,6 +144,23 @@ export default function MapScreen() {
                 showsTraffic={false}
                 showsIndoors={false}
             >
+                {/* ===== UNCAPTURED HEX GRID ===== */}
+                {gridHexagons.map(hex => {
+                    // Skip if this hex is already captured (territories render it with ownership colors)
+                    const isCaptured = territories.some(t => t.hexagonId === hex.hexagonId);
+                    if (isCaptured) return null;
+
+                    return (
+                        <Polygon
+                            key={`grid-${hex.hexagonId}`}
+                            coordinates={hex.polygon}
+                            fillColor={COLOR_GRID_FILL}
+                            strokeColor={COLOR_GRID_STROKE}
+                            strokeWidth={1}
+                        />
+                    );
+                })}
+                
                 {/* ===== CAPTURED TERRITORIES ===== */}
                 {territories.map(territory => {
                     if (!territory.polygon) return null;
