@@ -423,44 +423,43 @@ function SettingsTab({ profile, setProfile, logoutUser, router }) {
         }
     };
 
-    const handleDeleteAccount = () => {
-        Alert.alert(
-            'Delete Account',
-            'This will permanently delete your account and all data. A confirmation code will be sent to your email.',
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Send Code',
-                    style: 'destructive',
-                    onPress: async () => {
-                        try {
-                            await requestAccountDeletion();
-                            Alert.prompt(
-                                'Enter Code',
-                                'Enter the 6-digit code sent to your email:',
-                                async (code) => {
-                                    if (!code || code.trim().length !== 6) {
-                                        Alert.alert('Error', 'Please enter a valid 6-digit code.');
-                                        return;
-                                    }
-                                    try {
-                                        await confirmAccountDeletion({ code: code.trim() });
-                                        Alert.alert('Account Deleted', 'Your account has been permanently deleted.');
-                                        await logoutUser();
-                                        router.replace('/login');
-                                    } catch (err) {
-                                        Alert.alert('Error', err.response?.data?.message || 'Invalid or expired code.');
-                                    }
-                                },
-                                'plain-text'
-                            );
-                        } catch (err) {
-                            Alert.alert('Error', 'Failed to send deletion code.');
-                        }
-                    },
-                },
-            ]
-        );
+// Delete account state
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [deleteCode, setDeleteCode] = useState('');
+    const [deleteStep, setDeleteStep] = useState(1); // 1 = confirm, 2 = enter code
+    const [deleteLoading, setDeleteLoading] = useState(false);
+    const [deleteError, setDeleteError] = useState('');
+
+    const handleDeleteRequest = async () => {
+        setDeleteLoading(true);
+        setDeleteError('');
+        try {
+            await requestAccountDeletion();
+            setDeleteStep(2);
+        } catch (err) {
+            setDeleteError('Failed to send deletion code.');
+        } finally {
+            setDeleteLoading(false);
+        }
+    };
+
+    const handleDeleteConfirm = async () => {
+        if (!deleteCode.trim() || deleteCode.trim().length !== 6) {
+            setDeleteError('Please enter the 6-digit code.');
+            return;
+        }
+        setDeleteLoading(true);
+        setDeleteError('');
+        try {
+            await confirmAccountDeletion({ code: deleteCode.trim() });
+            Alert.alert('Account Deleted', 'Your account has been permanently deleted.');
+            await logoutUser();
+            router.replace('/login');
+        } catch (err) {
+            setDeleteError(err.response?.data?.message || 'Invalid or expired code.');
+        } finally {
+            setDeleteLoading(false);
+        }
     };
 
     const inputStyle = {
@@ -587,9 +586,86 @@ function SettingsTab({ profile, setProfile, logoutUser, router }) {
             {/* ===== DANGER ZONE ===== */}
             <View style={[styles.settingsCard, { borderColor: 'rgba(239, 68, 68, 0.3)' }]}>
                 <Text style={[styles.settingsTitle, { color: '#f87171' }]}>DANGER ZONE</Text>
-                <TouchableOpacity onPress={handleDeleteAccount} style={styles.deleteButton}>
+                <TouchableOpacity onPress={() => { setShowDeleteModal(true); setDeleteStep(1); setDeleteCode(''); setDeleteError(''); }} style={styles.deleteButton}>
                     <Text style={styles.deleteButtonText}>Delete Account</Text>
                 </TouchableOpacity>
+
+                {showDeleteModal && (
+                    <View style={{
+                        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                        backgroundColor: 'rgba(3,7,18,0.9)', justifyContent: 'center',
+                        paddingHorizontal: 20, zIndex: 100,
+                    }}>
+                        <View style={{
+                            backgroundColor: '#111827', borderRadius: 20, padding: 24,
+                            borderWidth: 1, borderColor: 'rgba(239,68,68,0.3)',
+                        }}>
+                            {deleteStep === 1 ? (
+                                <>
+                                    <Text style={{ color: '#f87171', fontSize: 18, fontWeight: '900', marginBottom: 8 }}>
+                                        Delete Account
+                                    </Text>
+                                    <Text style={{ color: '#9ca3af', fontSize: 13, fontWeight: '700', marginBottom: 16 }}>
+                                        This will permanently delete your account and all data. A 6-digit confirmation code will be sent to your email.
+                                    </Text>
+                                    {deleteError !== '' && (
+                                        <Text style={{ color: '#f87171', fontSize: 12, fontWeight: '700', marginBottom: 12 }}>{deleteError}</Text>
+                                    )}
+                                    <TouchableOpacity
+                                        onPress={handleDeleteRequest}
+                                        disabled={deleteLoading}
+                                        style={{ backgroundColor: '#ef4444', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginBottom: 10 }}
+                                    >
+                                        <Text style={{ color: '#ffffff', fontSize: 14, fontWeight: '900' }}>
+                                            {deleteLoading ? 'Sending...' : 'Send Confirmation Code'}
+                                        </Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity onPress={() => setShowDeleteModal(false)} style={{ alignItems: 'center', paddingVertical: 10 }}>
+                                        <Text style={{ color: '#9ca3af', fontSize: 14, fontWeight: '700' }}>Cancel</Text>
+                                    </TouchableOpacity>
+                                </>
+                            ) : (
+                                <>
+                                    <Text style={{ color: '#f87171', fontSize: 18, fontWeight: '900', marginBottom: 8 }}>
+                                        Enter Confirmation Code
+                                    </Text>
+                                    <Text style={{ color: '#9ca3af', fontSize: 13, fontWeight: '700', marginBottom: 16 }}>
+                                        Check your email for the 6-digit code.
+                                    </Text>
+                                    <TextInput
+                                        style={{
+                                            backgroundColor: '#1f2937', borderWidth: 1, borderColor: '#374151',
+                                            borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14,
+                                            color: '#ffffff', fontSize: 24, fontWeight: '900',
+                                            textAlign: 'center', letterSpacing: 8, marginBottom: 16,
+                                        }}
+                                        value={deleteCode}
+                                        onChangeText={(t) => { setDeleteCode(t); setDeleteError(''); }}
+                                        placeholder="000000"
+                                        placeholderTextColor="#4b5563"
+                                        keyboardType="number-pad"
+                                        maxLength={6}
+                                    />
+                                    {deleteError !== '' && (
+                                        <Text style={{ color: '#f87171', fontSize: 12, fontWeight: '700', marginBottom: 12 }}>{deleteError}</Text>
+                                    )}
+                                    <TouchableOpacity
+                                        onPress={handleDeleteConfirm}
+                                        disabled={deleteLoading}
+                                        style={{ backgroundColor: '#ef4444', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginBottom: 10 }}
+                                    >
+                                        <Text style={{ color: '#ffffff', fontSize: 14, fontWeight: '900' }}>
+                                            {deleteLoading ? 'Deleting...' : 'Permanently Delete Account'}
+                                        </Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity onPress={() => setShowDeleteModal(false)} style={{ alignItems: 'center', paddingVertical: 10 }}>
+                                        <Text style={{ color: '#9ca3af', fontSize: 14, fontWeight: '700' }}>Cancel</Text>
+                                    </TouchableOpacity>
+                                </>
+                            )}
+                        </View>
+                    </View>
+                )}
             </View>
 
             {/* ===== LOGOUT ===== */}

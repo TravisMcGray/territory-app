@@ -21,7 +21,7 @@ import MapView, { Polygon, Polyline, Marker, } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { useAuth } from '../../context/AuthContext';
 import { getTerritories, getNearbyHexagons, createActivity } from '../../services/api';
-import Svg, { Polygon as SvgPolygon } from 'react-native-svg';
+import Svg, { Polygon as SvgPolygon, Rect } from 'react-native-svg';
 import HexBackground from '../../components/HexBackground';
 
 
@@ -124,6 +124,35 @@ function HexIcon({ size = 52, label, active, color }) {
     );
 }
 
+// ========== CONTROL HEX ICONS ==========
+function HexPauseIcon({ size = 28, color = '#ffffff' }) {
+    return (
+        <Svg width={size} height={size} viewBox="0 0 28 28" fill="none">
+            <SvgPolygon points="2,14 8,3 20,3 26,14 20,25 8,25" fill="none" stroke={color} strokeWidth="2" />
+            <Rect x="10" y="9" width="3" height="10" rx="1" fill={color} />
+            <Rect x="15" y="9" width="3" height="10" rx="1" fill={color} />
+        </Svg>
+    );
+}
+
+function HexStopIcon({ size = 28, color = '#ffffff' }) {
+    return (
+        <Svg width={size} height={size} viewBox="0 0 28 28" fill="none">
+            <SvgPolygon points="2,14 8,3 20,3 26,14 20,25 8,25" fill="none" stroke={color} strokeWidth="2" />
+            <Rect x="10" y="9" width="8" height="10" rx="1.5" fill={color} />
+        </Svg>
+    );
+}
+
+function HexPlayIcon({ size = 28, color = '#ffffff' }) {
+    return (
+        <Svg width={size} height={size} viewBox="0 0 28 28" fill="none">
+            <SvgPolygon points="2,14 8,3 20,3 26,14 20,25 8,25" fill="none" stroke={color} strokeWidth="2" />
+            <SvgPolygon points="11,8 11,20 20,14" fill={color} />
+        </Svg>
+    );
+}
+
 // ========== MAIN COMPONENT ==========
 export default function MapScreen() {
     const { user } = useAuth();
@@ -148,6 +177,8 @@ export default function MapScreen() {
     const [duration, setDuration] = useState(0);
     const [elevationGain, setElevationGain] = useState(0);
     const [elevationLoss, setElevationLoss] = useState(0);
+    const [saving, setSaving] = useState(false);
+    const [result, setResult] = useState(null);
 
     // Refs
     const locationSubscription = useRef(null);
@@ -292,20 +323,32 @@ export default function MapScreen() {
     };
 
     // ========== TRACKING CONTROLS ==========
-    const startTracking = async (type) => {
+const startTracking = async (type) => {
         setActivityType(type);
         setCoordinates([]);
         setRouteSegments([[]]);
         setDistance(0);
         setDuration(0);
+        setElevationGain(0);
+        setElevationLoss(0);
         setResult(null);
         lastCoord.current = null;
         lastAltitude.current = null;
-        setElevationGain(0);
-        setElevationLoss(0);
-        setMode('tracking');
-        startTimer();
-        await startGPSWatch();
+
+        // Request permission explicitly before starting
+        try {
+            const { status } = await Location.requestForegroundPermissionsAsync();
+            if (status !== 'granted') {
+                Alert.alert('Location Required', 'HexCapture needs location access to track your activity. Please enable it in Settings.');
+                return;
+            }
+            setMode('tracking');
+            startTimer();
+            await startGPSWatch();
+        } catch (err) {
+            console.error('Failed to start tracking:', err);
+            Alert.alert('Error', 'Could not start GPS tracking. Please try again.');
+        }
     };
 
     const pauseTracking = () => {
@@ -326,7 +369,14 @@ export default function MapScreen() {
         stopGPSWatch();
         stopTimer();
         if (coordinates.length < 2) {
-            Alert.alert('Not enough data', 'Walk a bit further before stopping.');
+            Alert.alert(
+                'No Data Recorded',
+                'Not enough GPS points to save. Discard this activity?',
+                [
+                    { text: 'Resume', onPress: resumeTracking },
+                    { text: 'Discard', style: 'destructive', onPress: returnToExplore },
+                ]
+            );
             return;
         }
         setMode('summary');
@@ -849,14 +899,20 @@ export default function MapScreen() {
                 </View>
             )}
 
-            {/* ===== TRACKING BOTTOM CONTROLS ===== */}
+{/* ===== TRACKING BOTTOM CONTROLS ===== */}
             {mode === 'tracking' && (
                 <View style={styles.bottomControls}>
                     <TouchableOpacity style={styles.ctrlPause} onPress={pauseTracking}>
-                        <Text style={styles.ctrlText}>⏸  Pause</Text>
+                        <View style={styles.ctrlContent}>
+                            <HexPauseIcon size={28} color="#ffffff" />
+                            <Text style={styles.ctrlText}>Pause</Text>
+                        </View>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.ctrlStop} onPress={stopTracking}>
-                        <Text style={styles.ctrlText}>⏹  Stop</Text>
+                        <View style={styles.ctrlContent}>
+                            <HexStopIcon size={28} color="#ffffff" />
+                            <Text style={styles.ctrlText}>Stop</Text>
+                        </View>
                     </TouchableOpacity>
                 </View>
             )}
@@ -868,10 +924,16 @@ export default function MapScreen() {
                         style={[styles.ctrlPause, { backgroundColor: accentColor }]}
                         onPress={resumeTracking}
                     >
-                        <Text style={styles.ctrlText}>▶  Resume</Text>
+                        <View style={styles.ctrlContent}>
+                            <HexPlayIcon size={28} color="#ffffff" />
+                            <Text style={styles.ctrlText}>Resume</Text>
+                        </View>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.ctrlStop} onPress={stopTracking}>
-                        <Text style={styles.ctrlText}>⏹  Stop</Text>
+                        <View style={styles.ctrlContent}>
+                            <HexStopIcon size={28} color="#ffffff" />
+                            <Text style={styles.ctrlText}>Stop</Text>
+                        </View>
                     </TouchableOpacity>
                 </View>
             )}
@@ -973,6 +1035,7 @@ const styles = {
         flex: 1, backgroundColor: '#ef4444', borderRadius: 18,
         paddingVertical: 18, alignItems: 'center',
     },
+    ctrlContent: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     ctrlText: { color: '#ffffff', fontSize: 16, fontWeight: '900' },
 
     // ===== SUMMARY =====

@@ -101,11 +101,11 @@ export default function HexBackground() {
                 Fades hexagons from visible on the left to background color on the right.
                 React Native doesn't support CSS linear-gradient on Views,
                 so we use multiple semi-transparent strips to simulate the fade. */}
-            {[...Array(10)].map((_, i) => {
-                const startPercent = 30;
-                const stripWidth = (100 - startPercent) / 10;
+            {[...Array(20)].map((_, i) => {
+                const startPercent = 25;
+                const stripWidth = (100 - startPercent) / 20;
                 const left = startPercent + (i * stripWidth);
-                const opacity = (i + 1) / 10;
+                const opacity = ((i + 1) / 20) ** 1.5;
 
                 return (
                     <View
@@ -114,7 +114,7 @@ export default function HexBackground() {
                             position: 'absolute',
                             top: 0,
                             left: `${left}%`,
-                            width: `${stripWidth + 1}%`,
+                            width: `${stripWidth + 2}%`,
                             height: '100%',
                             backgroundColor: '#030712',
                             opacity,
@@ -125,11 +125,11 @@ export default function HexBackground() {
 
             {/* ========== BOTTOM FADE OVERLAY ==========
                 Fades hexagons out at the bottom of the screen. */}
-            {[...Array(8)].map((_, i) => {
-                const startPercent = 65;
-                const stripHeight = (100 - startPercent) / 8;
+            {[...Array(20)].map((_, i) => {
+                const startPercent = 55;
+                const stripHeight = (100 - startPercent) / 20;
                 const top = startPercent + (i * stripHeight);
-                const opacity = (i + 1) / 8;
+                const opacity = ((i + 1) / 20) ** 1.5;
 
                 return (
                     <View
@@ -139,7 +139,7 @@ export default function HexBackground() {
                             left: 0,
                             top: `${top}%`,
                             width: '100%',
-                            height: `${stripHeight + 1}%`,
+                            height: `${stripHeight + 2}%`,
                             backgroundColor: '#030712',
                             opacity,
                         }}
