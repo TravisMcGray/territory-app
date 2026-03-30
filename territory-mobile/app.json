@@ -33,10 +33,16 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": [
+  "plugins": [
       "expo-secure-store",
-      "expo-router"
-    ],
+      "expo-router",
+      [
+          "expo-location",
+          {
+              "locationAlwaysAndWhenInUsePermission": "HexCapture needs your location to track activities and capture territory."
+          }
+      ]
+  ],
     "extra": {
       "router": {},
       "eas": {

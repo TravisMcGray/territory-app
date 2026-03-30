@@ -16,16 +16,14 @@ import {
     Alert,
     ScrollView,
     Animated,
-    Dimensions,
 } from 'react-native';
-import MapView, { Polygon, Polyline, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Polygon, Polyline, Marker, } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { useAuth } from '../../context/AuthContext';
 import { getTerritories, getNearbyHexagons, createActivity } from '../../services/api';
 import Svg, { Polygon as SvgPolygon } from 'react-native-svg';
 import HexBackground from '../../components/HexBackground';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // ========== CONSTANTS ==========
 const DEFAULT_ZOOM_DELTA = 0.008;
