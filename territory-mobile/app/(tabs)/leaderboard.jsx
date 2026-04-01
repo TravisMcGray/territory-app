@@ -4,17 +4,18 @@
 // Rows navigate to user profiles.
 // Matches web Leaderboard.jsx functionality.
 
-import { useState, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import {
     getHexagonLeaderboard,
     getDistanceLeaderboard,
     getActivityLeaderboard,
 } from '../../services/api';
-import HexBackground from '../../components/HexBackground';
 import Svg, { Polygon } from 'react-native-svg';
+import HexBackground from '../../components/HexBackground';
 
 // ========== TAB DEFINITIONS ==========
 const TABS = [
@@ -64,6 +65,7 @@ function MedalHex({ rank }) {
 export default function Leaderboard() {
     const { user } = useAuth();
     const router = useRouter();
+    const insets = useSafeAreaInsets();
     const currentUserId = (user?.id ?? user?._id)?.toString();
 
     const [activeTab, setActiveTab] = useState('hexagons');
@@ -72,27 +74,29 @@ export default function Leaderboard() {
     const [error, setError] = useState('');
 
     // ========== LOAD ALL THREE ==========
-    useEffect(() => {
-        const loadLeaderboards = async () => {
-            try {
-                const [hexRes, distRes, actRes] = await Promise.all([
-                    getHexagonLeaderboard(),
-                    getDistanceLeaderboard(),
-                    getActivityLeaderboard(),
-                ]);
-                setData({
-                    hexagons: hexRes.data.leaderboard || [],
-                    distance: distRes.data.leaderboard || [],
-                    activity: actRes.data.leaderboard || [],
-                });
-            } catch (err) {
-                setError('Failed to load leaderboards.');
-            } finally {
-                setLoading(false);
-            }
-        };
-        loadLeaderboards();
-    }, []);
+    useFocusEffect(
+        useCallback(() => {
+            const loadLeaderboards = async () => {
+                try {
+                    const [hexRes, distRes, actRes] = await Promise.all([
+                        getHexagonLeaderboard(),
+                        getDistanceLeaderboard(),
+                        getActivityLeaderboard(),
+                    ]);
+                    setData({
+                        hexagons: hexRes.data.leaderboard || [],
+                        distance: distRes.data.leaderboard || [],
+                        activity: actRes.data.leaderboard || [],
+                    });
+                } catch (err) {
+                    setError('Failed to load leaderboards.');
+                } finally {
+                    setLoading(false);
+                }
+            };
+            loadLeaderboards();
+        }, [])
+    );
 
     const currentList = data[activeTab];
     const currentTab = TABS.find(t => t.key === activeTab);
@@ -115,7 +119,7 @@ export default function Leaderboard() {
     return (
         <View style={styles.container}>
             <HexBackground />
-            <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+            <ScrollView style={styles.scrollView} contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 16 }]}>
 
                 <Text style={styles.pageTitle}>Leaderboard</Text>
                 <Text style={styles.pageSubtitle}>{currentTab.description}</Text>
@@ -222,7 +226,6 @@ const styles = {
     },
     scrollContent: {
         paddingHorizontal: 16,
-        paddingTop: 56,
         paddingBottom: 20,
     },
     pageTitle: {

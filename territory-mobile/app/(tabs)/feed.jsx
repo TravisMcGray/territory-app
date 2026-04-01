@@ -3,7 +3,7 @@
 // Supports kudos toggling with optimistic UI and inline comments.
 // Matches web Feed.jsx functionality.
 
-import { useState, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import {
     View,
     Text,
@@ -11,10 +11,9 @@ import {
     ScrollView,
     TextInput,
     ActivityIndicator,
-    KeyboardAvoidingView,
-    Platform,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import {
     getFeed,
@@ -44,6 +43,7 @@ const timeAgo = (dateString) => {
 export default function Feed() {
     const { user } = useAuth();
     const router = useRouter();
+    const insets = useSafeAreaInsets();
     const currentUserId = (user?.id ?? user?._id)?.toString();
 
     const [activities, setActivities] = useState([]);
@@ -51,19 +51,21 @@ export default function Feed() {
     const [error, setError] = useState('');
 
     // ========== LOAD FEED ==========
-    useEffect(() => {
-        const loadFeed = async () => {
-            try {
-                const res = await getFeed();
-                setActivities(res.data.activities || []);
-            } catch (err) {
-                setError('Failed to load feed. Please try again.');
-            } finally {
-                setLoading(false);
-            }
-        };
-        loadFeed();
-    }, []);
+    useFocusEffect(
+        useCallback(() => {
+            const loadFeed = async () => {
+                try {
+                    const res = await getFeed();
+                    setActivities(res.data.activities || []);
+                } catch (err) {
+                    setError('Failed to load feed. Please try again.');
+                } finally {
+                    setLoading(false);
+                }
+            };
+            loadFeed();
+        }, [])
+    );
 
     // ========== KUDOS HANDLER ==========
     const handleKudos = async (activityId, hasGivenKudos) => {
@@ -110,7 +112,7 @@ export default function Feed() {
     return (
         <View style={styles.container}>
             <HexBackground />
-            <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+            <ScrollView style={styles.scrollView} contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 16 }]}>
 
                 <Text style={styles.pageTitle}>Activity Feed</Text>
 
@@ -167,7 +169,7 @@ function ActivityCard({ activity, currentUserId, onKudos, onCommentAdded, onNavi
     const [commentText, setCommentText] = useState('');
     const [submitting, setSubmitting] = useState(false);
 
-    const isWalk = activity.activityType === 'walk' || activity.activityType === 'WALK';
+    const isWalk = activity.activityType === 'walk';
     const isOwnActivity = activity.userId?.toString() === currentUserId;
     const distanceMiles = (activity.distance ?? 0).toFixed(2);
 
@@ -373,7 +375,6 @@ const styles = {
     },
     scrollContent: {
         paddingHorizontal: 16,
-        paddingTop: 56,
         paddingBottom: 20,
     },
     pageTitle: {

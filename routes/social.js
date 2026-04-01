@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const User = require('../models/user');
+const Activity = require('../models/activity');
 const { createNewFollowerNotification } = require('../utils/notifications');
 const { authenticateToken } = require('../middleware/auth');
 
@@ -342,6 +343,59 @@ router.get('/:userId/following', authenticateToken, async (req, res) => {
             status: 'error',
             code: 'INTERNAL_SERVER_ERROR',
             message: 'Error retrieving following list'
+        });
+    }
+});
+
+// ========== GET /api/users/:userId/activities - Get a user's public activities ==========
+// Returns activities with coordinates so the mobile app can render route maps.
+// Excludes nothing — activities are public once posted.
+router.get('/:userId/activities', authenticateToken, async (req, res) => {
+    try {
+        const { userId } = req.params;
+
+        if (!userId || userId.length !== 24) {
+            return res.status(400).json({
+                status: 'error',
+                code: 'INVALID_USER_ID',
+                message: 'Invalid user ID format'
+            });
+        }
+
+        const user = await User.findById(userId).select('username');
+        if (!user) {
+            return res.status(404).json({
+                status: 'error',
+                code: 'USER_NOT_FOUND',
+                message: 'User not found'
+            });
+        }
+
+        const activities = await Activity.find({ userId })
+            .sort({ createdAt: -1 })
+            .limit(50)
+            .select('activityType distance duration elevationGain stolenHexagons capturedHexagons estimatedCalories coordinates kudosCount commentCount createdAt')
+            .lean();
+
+        // Attach username and compute comment/kudos counts if not stored
+        const formatted = activities.map(a => ({
+            ...a,
+            username: user.username,
+            kudosCount: a.kudosCount ?? 0,
+            commentCount: a.commentCount ?? 0,
+        }));
+
+        res.json({
+            message: 'Activities retrieved successfully',
+            count: formatted.length,
+            activities: formatted,
+        });
+
+    } catch (err) {
+        res.status(500).json({
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error retrieving activities'
         });
     }
 });

@@ -6,7 +6,6 @@
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 
-// TODO: Switch to your Render URL for production builds
 const BASE_URL = 'https://territory-app-29b7.onrender.com';
 
 // ========== AXIOS INSTANCE ==========
@@ -39,13 +38,13 @@ export const getProfile = () => api.get('/api/user/profile');
 export const updateBodyStats = (data) => api.put('/api/user/body-stats', data);
 export const updateProfile = (data) => api.put('/api/user/profile', data);
 export const updateUsername = (data) => api.put('/api/user/username', data);
-export const getUserTerritories = () => api.get('/api/user/territories');
 export const getTerritories = () => api.get('/api/user/territories');
 export const requestAccountDeletion = () => api.post('/api/user/account/delete-request');
 export const confirmAccountDeletion = (data) => api.delete('/api/user/account/confirm', { data });
 
 // ========== USERS (public profiles) ==========
 export const getUserById = (id) => api.get(`/api/users/${id}`);
+export const getUserActivities = (id) => api.get(`/api/users/${id}/activities`);
 export const getNearbyHexagons = (lat, lng, rings) => api.get(`/api/user/nearby-hexagons?latitude=${lat}&longitude=${lng}&rings=${rings || 4}`);
 
 // ========== SOCIAL ==========

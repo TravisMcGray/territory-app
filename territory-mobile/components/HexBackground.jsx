@@ -1,151 +1,141 @@
-// ========== HEX BACKGROUND (REACT NATIVE) ==========
-// Decorative hexagon grid background — same visual as web HexBackground.jsx.
-// Uses react-native-svg instead of HTML SVG elements.
-// Renders a grid of hexagons with emerald → blue → purple gradient,
-// fading out on the right and bottom edges.
+// ========== HEX BACKGROUND (REACT NATIVE — WEBVIEW) ==========
+// Decorative hexagon grid background — pixel-identical to web HexBackground.jsx.
+// Uses a WebView to render real HTML/SVG/CSS, which eliminates the sub-pixel
+// anti-aliasing artifacts (white dots/lines) that react-native-svg produces
+// when drawing adjacent polygon strokes.
+//
+// IMPORTANT: Uses useIsFocused() so only the ACTIVE tab's WebView renders.
+// Android limits concurrent WebView rendering — without this, tabs progressively
+// stop painting their WebViews as the user navigates between them.
 //
 // NOTE: This is purely decorative — NOT the game map.
 
 import { View, Dimensions } from 'react-native';
-import Svg, { Defs, LinearGradient, Stop, G, Polygon } from 'react-native-svg';
+import { WebView } from 'react-native-webview';
+import { useIsFocused } from '@react-navigation/native';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-const HEX_SIZE = 20;
-const HEX_HEIGHT = Math.sqrt(3) * HEX_SIZE;
-const COL_SPACING = HEX_SIZE * 2 * 0.75;
-const ROW_SPACING = HEX_HEIGHT;
+const hexHTML = `
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<style>
+  * { margin: 0; padding: 0; }
+  body {
+    background: #030712;
+    overflow: hidden;
+    width: 100vw;
+    height: 100vh;
+  }
+  svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
+  .fade-right {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(to right, transparent 0%, transparent 35%, #030712 55%, #030712 100%);
+  }
+  .fade-bottom {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 30%;
+    background: linear-gradient(to bottom, transparent, #030712);
+  }
+</style>
+</head>
+<body>
+<script>
+  const W = window.innerWidth;
+  const H = window.innerHeight;
+  const hexSize = 20;
+  const hexHeight = Math.sqrt(3) * hexSize;
+  const colSpacing = hexSize * 2 * 0.75;
+  const rowSpacing = hexHeight;
+  const cols = Math.ceil(W / colSpacing) + 2;
+  const rows = Math.ceil(H / rowSpacing) + 2;
+  const gridWidth = cols * colSpacing + hexSize;
 
-// Calculate grid to fill screen
-const COLS = Math.ceil(SCREEN_WIDTH / COL_SPACING) + 2;
-const ROWS = Math.ceil(SCREEN_HEIGHT / ROW_SPACING) + 2;
-const GRID_WIDTH = COLS * COL_SPACING + HEX_SIZE;
-
-// Pre-calculate hexagon points for a given center
-const hexPoints = (cx, cy) => {
+  function hexPoints(cx, cy) {
     return Array.from({ length: 6 }, (_, i) => {
-        const angle = (Math.PI / 180) * (60 * i);
-        return `${cx + HEX_SIZE * Math.cos(angle)},${cy + HEX_SIZE * Math.sin(angle)}`;
+      const angle = (Math.PI / 180) * (60 * i);
+      return (cx + hexSize * Math.cos(angle)).toFixed(1) + ',' + (cy + hexSize * Math.sin(angle)).toFixed(1);
     }).join(' ');
-};
+  }
 
-// Stroke width tapers from left (thick) to right (thin)
-const getStrokeWidth = (cx) => {
-    const progress = cx / GRID_WIDTH;
-    const maxStroke = 2.5;
-    const minStroke = 0.3;
-    return (maxStroke - (maxStroke - minStroke) * progress).toFixed(2);
-};
-
-// Pre-build hexagon data array (calculated once, not on every render)
-const hexagons = [];
-for (let col = 0; col < COLS; col++) {
-    for (let row = 0; row < ROWS; row++) {
-        const cx = col * COL_SPACING + HEX_SIZE;
-        const cy = row * ROW_SPACING + (col % 2 === 1 ? HEX_HEIGHT / 2 : 0) - HEX_HEIGHT / 2;
-        hexagons.push({ cx, cy, key: `${col}-${row}` });
+  let polys = '';
+  for (let col = 0; col < cols; col++) {
+    for (let row = 0; row < rows; row++) {
+      const cx = col * colSpacing + hexSize;
+      const cy = row * rowSpacing + (col % 2 === 1 ? hexHeight / 2 : 0) - hexHeight / 2;
+      const progress = cx / gridWidth;
+      const sw = (2.5 - (2.5 - 0.3) * progress).toFixed(2);
+      polys += '<polygon points="' + hexPoints(cx, cy) + '" stroke-width="' + sw + '"/>';
     }
-}
+  }
+
+  const gradX2 = (W * 0.8).toFixed(0);
+
+  const svg = '<svg width="' + W + '" height="' + H + '" xmlns="http://www.w3.org/2000/svg">'
+    + '<defs><linearGradient id="hexColor" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="' + gradX2 + '" y2="0">'
+    + '<stop offset="0%" stop-color="#34d399"/>'
+    + '<stop offset="10%" stop-color="#34d399"/>'
+    + '<stop offset="40%" stop-color="#60a5fa"/>'
+    + '<stop offset="60%" stop-color="#60a5fa"/>'
+    + '<stop offset="75%" stop-color="#a78bfa"/>'
+    + '<stop offset="100%" stop-color="#a78bfa"/>'
+    + '</linearGradient></defs>'
+    + '<g stroke="url(#hexColor)" fill="none" opacity="0.55">'
+    + polys
+    + '</g></svg>';
+
+  document.body.innerHTML = svg
+    + '<div class="fade-right"></div>'
+    + '<div class="fade-bottom"></div>';
+</script>
+</body>
+</html>
+`;
 
 export default function HexBackground() {
-    return (
-        <View
-            style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: SCREEN_WIDTH,
-                height: SCREEN_HEIGHT,
-                zIndex: 0,
-            }}
-            pointerEvents="none"
-        >
-            {/* ========== SVG HEXAGON GRID ========== */}
-            <Svg
-                width={SCREEN_WIDTH}
-                height={SCREEN_HEIGHT}
-                style={{ position: 'absolute', top: 0, left: 0 }}
-            >
-                <Defs>
-                    <LinearGradient
-                        id="hexColor"
-                        gradientUnits="userSpaceOnUse"
-                        x1="0" y1="0"
-                        x2={String(SCREEN_WIDTH * 0.8)} y2="0"
-                    >
-                        <Stop offset="0%" stopColor="#34d399" />
-                        <Stop offset="10%" stopColor="#34d399" />
-                        <Stop offset="40%" stopColor="#60a5fa" />
-                        <Stop offset="60%" stopColor="#60a5fa" />
-                        <Stop offset="75%" stopColor="#a78bfa" />
-                        <Stop offset="100%" stopColor="#a78bfa" />
-                    </LinearGradient>
-                </Defs>
+  const isFocused = useIsFocused();
 
-                <G
-                    stroke="url(#hexColor)"
-                    fill="none"
-                    opacity="0.45"
-                >
-                    {hexagons.map(({ cx, cy, key }) => (
-                        <Polygon
-                            key={key}
-                            points={hexPoints(cx, cy)}
-                            strokeWidth={getStrokeWidth(cx)}
-                        />
-                    ))}
-                </G>
-            </Svg>
-
-            {/* ========== RIGHT FADE OVERLAY ==========
-                Fades hexagons from visible on the left to background color on the right.
-                React Native doesn't support CSS linear-gradient on Views,
-                so we use multiple semi-transparent strips to simulate the fade. */}
-            {[...Array(20)].map((_, i) => {
-                const startPercent = 25;
-                const stripWidth = (100 - startPercent) / 20;
-                const left = startPercent + (i * stripWidth);
-                const opacity = ((i + 1) / 20) ** 1.5;
-
-                return (
-                    <View
-                        key={`right-fade-${i}`}
-                        style={{
-                            position: 'absolute',
-                            top: 0,
-                            left: `${left}%`,
-                            width: `${stripWidth + 2}%`,
-                            height: '100%',
-                            backgroundColor: '#030712',
-                            opacity,
-                        }}
-                    />
-                );
-            })}
-
-            {/* ========== BOTTOM FADE OVERLAY ==========
-                Fades hexagons out at the bottom of the screen. */}
-            {[...Array(20)].map((_, i) => {
-                const startPercent = 55;
-                const stripHeight = (100 - startPercent) / 20;
-                const top = startPercent + (i * stripHeight);
-                const opacity = ((i + 1) / 20) ** 1.5;
-
-                return (
-                    <View
-                        key={`bottom-fade-${i}`}
-                        style={{
-                            position: 'absolute',
-                            left: 0,
-                            top: `${top}%`,
-                            width: '100%',
-                            height: `${stripHeight + 2}%`,
-                            backgroundColor: '#030712',
-                            opacity,
-                        }}
-                    />
-                );
-            })}
-        </View>
-    );
+  return (
+    <View
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        width: SCREEN_WIDTH,
+        height: SCREEN_HEIGHT + 50,
+        zIndex: 0,
+      }}
+      pointerEvents="none"
+    >
+      {isFocused && (
+        <WebView
+          source={{ html: hexHTML }}
+          style={{ flex: 1, backgroundColor: '#030712' }}
+          scrollEnabled={false}
+          overScrollMode="never"
+          showsVerticalScrollIndicator={false}
+          showsHorizontalScrollIndicator={false}
+          pointerEvents="none"
+          javaScriptEnabled={true}
+          originWhitelist={['*']}
+          bounces={false}
+          scalesPageToFit={false}
+          setBuiltInZoomControls={false}
+        />
+      )}
+    </View>
+  );
 }

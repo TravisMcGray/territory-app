@@ -3,13 +3,14 @@
 // Matches web Dashboard.jsx functionality.
 // Usernames and leaderboard rows navigate to profile.
 
-import { useState, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { getProfile, getFeed, getHexagonLeaderboard, getUnreadCount } from '../../services/api';
+import Svg, { Polygon } from 'react-native-svg';
 import HexBackground from '../../components/HexBackground';
-import Svg, { Polygon, Line, Polyline, G } from 'react-native-svg';
 
 // ========== MEDAL HEXAGON ==========
 function MedalHex({ rank }) {
@@ -68,6 +69,8 @@ export default function Dashboard() {
     const { user: currentUser } = useAuth();
     const currentUserId = (currentUser?.id ?? currentUser?._id)?.toString();
 
+    const insets = useSafeAreaInsets();
+
     const [profile, setProfile] = useState(null);
     const [feed, setFeed] = useState([]);
     const [unreadCount, setUnreadCount] = useState(0);
@@ -75,35 +78,31 @@ export default function Dashboard() {
     const [loading, setLoading] = useState(true);
 
     // ========== LOAD DATA ==========
-    useEffect(() => {
-        const loadDashboard = async () => {
-            try {
-                const [profileRes, feedRes, leaderRes] = await Promise.all([
-                    getProfile(),
-                    getFeed(),
-                    getHexagonLeaderboard(),
-                ]);
-                setProfile(profileRes.data.profile);
-                setFeed(feedRes.data.activities || []);
-                setLeaderboard(leaderRes.data.leaderboard || []);
-            } catch (err) {
-                console.error('Dashboard load error:', err);
-            } finally {
-                setLoading(false);
-            }
-        };
-        loadDashboard();
-    }, []);
-
-    useEffect(() => {
-        const loadUnread = async () => {
-            try {
-                const res = await getUnreadCount();
-                setUnreadCount(res.data.unreadCount ?? 0);
-            } catch (err) {}
-        };
-        loadUnread();
-    }, []);
+    // useFocusEffect re-runs every time this tab comes into focus,
+    // so stats, feed, and badge count are always fresh.
+    useFocusEffect(
+        useCallback(() => {
+            const loadDashboard = async () => {
+                try {
+                    const [profileRes, feedRes, leaderRes, unreadRes] = await Promise.all([
+                        getProfile(),
+                        getFeed(),
+                        getHexagonLeaderboard(),
+                        getUnreadCount(),
+                    ]);
+                    setProfile(profileRes.data.profile);
+                    setFeed(feedRes.data.activities || []);
+                    setLeaderboard(leaderRes.data.leaderboard || []);
+                    setUnreadCount(unreadRes.data.unreadCount ?? 0);
+                } catch (err) {
+                    console.error('Dashboard load error:', err);
+                } finally {
+                    setLoading(false);
+                }
+            };
+            loadDashboard();
+        }, [])
+    );
 
     if (loading) {
         return (
@@ -118,7 +117,7 @@ export default function Dashboard() {
     return (
         <View style={styles.container}>
             <HexBackground />
-            <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+            <ScrollView style={styles.scrollView} contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 16 }]}>
 
 {/* ===== HEADER ===== */}
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
@@ -311,7 +310,6 @@ const styles = {
     },
     scrollContent: {
         paddingHorizontal: 16,
-        paddingTop: 56,
         paddingBottom: 20,
     },
     logoText: {
@@ -322,28 +320,6 @@ const styles = {
     },
     logoAccent: {
         color: '#10b981',
-    },
-    welcomeCard: {
-        backgroundColor: '#111827',
-        borderRadius: 20,
-        padding: 20,
-        borderWidth: 1,
-        borderColor: '#1f2937',
-        marginBottom: 16,
-    },
-    welcomeText: {
-        color: '#ffffff',
-        fontSize: 20,
-        fontWeight: '900',
-    },
-    usernameText: {
-        color: '#10b981',
-    },
-    subtitle: {
-        color: '#9ca3af',
-        fontSize: 14,
-        fontWeight: '700',
-        marginTop: 4,
     },
     statsRow: {
         flexDirection: 'row',

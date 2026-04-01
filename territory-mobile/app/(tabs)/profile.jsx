@@ -1,10 +1,8 @@
 // ========== PROFILE SCREEN ==========
-// Three tabs: Activities, Achievements, Settings.
-// Matches web Profile.jsx functionality.
-// Own profile shows all three tabs.
-// Other users' profiles show stats + follow button (no tabs).
+// Own profile: three tabs — Activities, Achievements, Settings.
+// Other users' profiles are handled by app/user/[userId].jsx.
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
     View,
     Text,
@@ -13,17 +11,16 @@ import {
     TextInput,
     ActivityIndicator,
     Alert,
+    Modal,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import {
     getProfile,
-    getUserById,
     getAllAchievements,
     getUserAchievements,
     getActivities,
-    followUser,
-    unfollowUser,
     updateBodyStats,
     updateUsername,
     requestAccountDeletion,
@@ -49,66 +46,53 @@ const timeAgo = (dateString) => {
 // ========== MAIN COMPONENT ==========
 export default function Profile() {
     const router = useRouter();
-    const { userId } = useLocalSearchParams();
-    const { user: currentUser, logoutUser } = useAuth();
-    const currentUserId = (currentUser?.id ?? currentUser?._id)?.toString();
-    const isOwnProfile = !userId || String(userId) === currentUserId;
+    const { logoutUser } = useAuth();
+    const insets = useSafeAreaInsets();
 
     const [profile, setProfile] = useState(null);
     const [achievements, setAchievements] = useState([]);
     const [activities, setActivities] = useState([]);
     const [followersCount, setFollowersCount] = useState(0);
     const [followingCount, setFollowingCount] = useState(0);
-    const [isFollowing, setIsFollowing] = useState(false);
     const [loading, setLoading] = useState(true);
-    const [followLoading, setFollowLoading] = useState(false);
     const [activeTab, setActiveTab] = useState('activities');
 
     // ========== LOAD PROFILE ==========
-    useEffect(() => {
+    useFocusEffect(
+      useCallback(() => {
         const loadProfile = async () => {
             try {
-                if (isOwnProfile) {
-                    const [profileRes, allRes, userRes, activitiesRes] = await Promise.all([
-                        getProfile(),
-                        getAllAchievements(),
-                        getUserAchievements(),
-                        getActivities(),
-                    ]);
-                    const profileData = profileRes.data.profile;
-                    setProfile(profileData);
-                    setActivities(activitiesRes.data.activities || []);
-                    setFollowersCount(profileData.followers ?? 0);
-                    setFollowingCount(profileData.following ?? 0);
+                const [profileRes, allRes, userRes, activitiesRes] = await Promise.all([
+                    getProfile(),
+                    getAllAchievements(),
+                    getUserAchievements(),
+                    getActivities(),
+                ]);
+                const profileData = profileRes.data.profile;
+                setProfile(profileData);
+                setActivities(activitiesRes.data.activities || []);
+                setFollowersCount(profileData.followers ?? 0);
+                setFollowingCount(profileData.following ?? 0);
 
-                    // Merge achievements
-                    const allList = allRes.data.achievements || [];
-                    const userList = userRes.data.achievements || [];
-                    const unlockedMap = new Map();
-                    for (const ua of userList) {
-                        const id = ua.achievementId?._id ?? ua.achievementId;
-                        if (id) unlockedMap.set(String(id), ua.unlockedAt);
-                    }
-                    const merged = allList.map(a => ({
-                        ...a,
-                        isUnlocked: unlockedMap.has(String(a._id)),
-                        unlockedAt: unlockedMap.get(String(a._id)) || null,
-                    }));
-                    const rarityOrder = { LEGENDARY: 5, EPIC: 4, RARE: 3, UNCOMMON: 2, COMMON: 1 };
-                    merged.sort((a, b) => {
-                        if (a.isUnlocked !== b.isUnlocked) return a.isUnlocked ? -1 : 1;
-                        return (rarityOrder[b.rarity] || 0) - (rarityOrder[a.rarity] || 0);
-                    });
-                    setAchievements(merged);
-                } else {
-                    const profileRes = await getUserById(userId);
-                    const userData = profileRes.data.user;
-                    const relationship = profileRes.data.relationshipStatus;
-                    setProfile(userData);
-                    setFollowersCount(userData.followers ?? 0);
-                    setFollowingCount(userData.following ?? 0);
-                    setIsFollowing(relationship?.isFollowing ?? false);
+                // Merge achievements
+                const allList = allRes.data.achievements || [];
+                const userList = userRes.data.achievements || [];
+                const unlockedMap = new Map();
+                for (const ua of userList) {
+                    const id = ua.achievementId?._id ?? ua.achievementId;
+                    if (id) unlockedMap.set(String(id), ua.unlockedAt);
                 }
+                const merged = allList.map(a => ({
+                    ...a,
+                    isUnlocked: unlockedMap.has(String(a._id)),
+                    unlockedAt: unlockedMap.get(String(a._id)) || null,
+                }));
+                const rarityOrder = { LEGENDARY: 5, EPIC: 4, RARE: 3, UNCOMMON: 2, COMMON: 1 };
+                merged.sort((a, b) => {
+                    if (a.isUnlocked !== b.isUnlocked) return a.isUnlocked ? -1 : 1;
+                    return (rarityOrder[b.rarity] || 0) - (rarityOrder[a.rarity] || 0);
+                });
+                setAchievements(merged);
             } catch (err) {
                 console.error('Profile load error:', err);
             } finally {
@@ -116,49 +100,28 @@ export default function Profile() {
             }
         };
         loadProfile();
-    }, [userId, isOwnProfile]);
+      }, [])
+    );
 
-    // ========== FOLLOW TOGGLE ==========
-    const handleFollowToggle = async () => {
-        setFollowLoading(true);
-        try {
-            if (isFollowing) {
-                await unfollowUser(userId);
-                setIsFollowing(false);
-                setFollowersCount(prev => Math.max(0, prev - 1));
-            } else {
-                await followUser(userId);
-                setIsFollowing(true);
-                setFollowersCount(prev => prev + 1);
-            }
-        } catch (err) {}
-        finally { setFollowLoading(false); }
-    };
-
-    if (loading) {
-        return (
-            <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#10b981" />
-            </View>
-        );
-    }
-
-    if (!profile) {
-        return (
-            <View style={styles.loadingContainer}>
-                <Text style={{ color: '#f87171', fontSize: 16, fontWeight: '700' }}>
-                    Profile not found
-                </Text>
-            </View>
-        );
-    }
-
-    const stats = profile.stats || {};
+    const stats = profile?.stats || {};
 
     return (
         <View style={styles.container}>
+
+            {loading ? (
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color="#10b981" />
+                </View>
+            ) : !profile ? (
+                <View style={styles.loadingContainer}>
+                    <Text style={{ color: '#f87171', fontSize: 16, fontWeight: '700' }}>
+                        Profile not found
+                    </Text>
+                </View>
+            ) : (
+            <>
             <HexBackground />
-            <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+            <ScrollView style={styles.scrollView} contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 16 }]}>
 
                 {/* ===== PROFILE HEADER ===== */}
                 <View style={styles.headerCard}>
@@ -178,17 +141,6 @@ export default function Profile() {
                                 </Text>
                             </View>
                         </View>
-                        {!isOwnProfile && (
-                            <TouchableOpacity
-                                onPress={handleFollowToggle}
-                                disabled={followLoading}
-                                style={[styles.followButton, isFollowing && styles.followButtonFollowing]}
-                            >
-                                <Text style={[styles.followButtonText, isFollowing && styles.followButtonTextFollowing]}>
-                                    {followLoading ? '...' : isFollowing ? 'Following' : 'Follow'}
-                                </Text>
-                            </TouchableOpacity>
-                        )}
                     </View>
 
                     {/* Stats grid */}
@@ -202,44 +154,42 @@ export default function Profile() {
                     </View>
                 </View>
 
-                {/* ===== TABS (own profile only) ===== */}
-                {isOwnProfile && (
-                    <>
-                        <View style={styles.tabBar}>
-                            {['activities', 'achievements', 'settings'].map(tab => (
-                                <TouchableOpacity
-                                    key={tab}
-                                    onPress={() => setActiveTab(tab)}
-                                    style={[styles.tab, activeTab === tab && styles.tabActive]}
-                                >
-                                    <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
-                                        {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                                    </Text>
-                                </TouchableOpacity>
-                            ))}
-                        </View>
+                {/* ===== TABS ===== */}
+                <View style={styles.tabBar}>
+                    {['activities', 'achievements', 'settings'].map(tab => (
+                        <TouchableOpacity
+                            key={tab}
+                            onPress={() => setActiveTab(tab)}
+                            style={[styles.tab, activeTab === tab && styles.tabActive]}
+                        >
+                            <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
+                                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
 
-                        {activeTab === 'activities' && (
-                            <ActivitiesTab activities={activities} />
-                        )}
+                {activeTab === 'activities' && (
+                    <ActivitiesTab activities={activities} />
+                )}
 
-                        {activeTab === 'achievements' && (
-                            <AchievementsTab achievements={achievements} />
-                        )}
+                {activeTab === 'achievements' && (
+                    <AchievementsTab achievements={achievements} />
+                )}
 
-                        {activeTab === 'settings' && (
-                            <SettingsTab
-                                profile={profile}
-                                setProfile={setProfile}
-                                logoutUser={logoutUser}
-                                router={router}
-                            />
-                        )}
-                    </>
+                {activeTab === 'settings' && (
+                    <SettingsTab
+                        profile={profile}
+                        setProfile={setProfile}
+                        logoutUser={logoutUser}
+                        router={router}
+                    />
                 )}
 
                 <View style={{ height: 20 }} />
             </ScrollView>
+            </>
+            )}
         </View>
     );
 }
@@ -268,7 +218,7 @@ function ActivitiesTab({ activities }) {
     return (
         <View>
             {activities.map(activity => {
-                const isWalk = activity.activityType === 'walk' || activity.activityType === 'WALK';
+                const isWalk = activity.activityType === 'walk';
                 const hexCount = Array.isArray(activity.capturedHexagons)
                     ? activity.capturedHexagons.length
                     : (activity.capturedHexagons ?? 0);
@@ -371,6 +321,8 @@ function SettingsTab({ profile, setProfile, logoutUser, router }) {
     const [usernameError, setUsernameError] = useState('');
 
     const [stepLengthManual, setStepLengthManual] = useState(false);
+    const [showSexTooltip, setShowSexTooltip] = useState(false);
+    const [showStepTooltip, setShowStepTooltip] = useState(false);
 
     // Auto-estimate step length from height
     useEffect(() => {
@@ -487,7 +439,22 @@ function SettingsTab({ profile, setProfile, logoutUser, router }) {
                 <Text style={[styles.inputLabel, { marginTop: 12 }]}>Age</Text>
                 <TextInput style={inputStyle} value={age} onChangeText={setAge} placeholder="25" placeholderTextColor="#4b5563" keyboardType="numeric" />
 
-                <Text style={[styles.inputLabel, { marginTop: 12 }]}>Sex</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12, marginBottom: 6 }}>
+                    <Text style={styles.inputLabel}>Sex</Text>
+                    <TouchableOpacity
+                        onPress={() => { setShowSexTooltip(prev => !prev); setShowStepTooltip(false); }}
+                        style={{ width: 16, height: 16, borderRadius: 8, backgroundColor: '#374151', alignItems: 'center', justifyContent: 'center' }}
+                    >
+                        <Text style={{ color: '#9ca3af', fontSize: 10, fontWeight: '900' }}>i</Text>
+                    </TouchableOpacity>
+                </View>
+                {showSexTooltip && (
+                    <View style={{ backgroundColor: '#1f2937', borderWidth: 1, borderColor: '#374151', borderRadius: 10, padding: 10, marginBottom: 8 }}>
+                        <Text style={{ color: '#9ca3af', fontSize: 11, fontWeight: '700', lineHeight: 16 }}>
+                            Biological sex affects metabolic rate, which impacts calorie burn calculations by ~10-15%. This is optional and only used for accuracy.
+                        </Text>
+                    </View>
+                )}
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                     {['male', 'female', 'prefer_not_to_say'].map(option => (
                         <TouchableOpacity
@@ -514,12 +481,27 @@ function SettingsTab({ profile, setProfile, logoutUser, router }) {
                     </View>
                 </View>
 
-                <Text style={[styles.inputLabel, { marginTop: 12 }]}>
-                    Step Length (inches)
-                    {heightFeet && heightInches !== '' && !stepLengthManual && (
-                        <Text style={{ color: '#10b981' }}> auto-estimated</Text>
-                    )}
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12, marginBottom: 6 }}>
+                    <Text style={styles.inputLabel}>
+                        Step Length (inches)
+                        {heightFeet && heightInches !== '' && !stepLengthManual && (
+                            <Text style={{ color: '#10b981' }}> auto-estimated</Text>
+                        )}
+                    </Text>
+                    <TouchableOpacity
+                        onPress={() => { setShowStepTooltip(prev => !prev); setShowSexTooltip(false); }}
+                        style={{ width: 16, height: 16, borderRadius: 8, backgroundColor: '#374151', alignItems: 'center', justifyContent: 'center' }}
+                    >
+                        <Text style={{ color: '#9ca3af', fontSize: 10, fontWeight: '900' }}>i</Text>
+                    </TouchableOpacity>
+                </View>
+                {showStepTooltip && (
+                    <View style={{ backgroundColor: '#1f2937', borderWidth: 1, borderColor: '#374151', borderRadius: 10, padding: 10, marginBottom: 8 }}>
+                        <Text style={{ color: '#9ca3af', fontSize: 11, fontWeight: '700', lineHeight: 16 }}>
+                            The auto-estimate is approximate (~5/10 accuracy). For a precise measurement: walk 10 normal steps, measure the total distance in inches, and divide by 10.
+                        </Text>
+                    </View>
+                )}
                 <TextInput
                     style={inputStyle}
                     value={stepLength}
@@ -589,84 +571,92 @@ function SettingsTab({ profile, setProfile, logoutUser, router }) {
                 <TouchableOpacity onPress={() => { setShowDeleteModal(true); setDeleteStep(1); setDeleteCode(''); setDeleteError(''); }} style={styles.deleteButton}>
                     <Text style={styles.deleteButtonText}>Delete Account</Text>
                 </TouchableOpacity>
-
-                {showDeleteModal && (
-                    <View style={{
-                        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-                        backgroundColor: 'rgba(3,7,18,0.9)', justifyContent: 'center',
-                        paddingHorizontal: 20, zIndex: 100,
-                    }}>
-                        <View style={{
-                            backgroundColor: '#111827', borderRadius: 20, padding: 24,
-                            borderWidth: 1, borderColor: 'rgba(239,68,68,0.3)',
-                        }}>
-                            {deleteStep === 1 ? (
-                                <>
-                                    <Text style={{ color: '#f87171', fontSize: 18, fontWeight: '900', marginBottom: 8 }}>
-                                        Delete Account
-                                    </Text>
-                                    <Text style={{ color: '#9ca3af', fontSize: 13, fontWeight: '700', marginBottom: 16 }}>
-                                        This will permanently delete your account and all data. A 6-digit confirmation code will be sent to your email.
-                                    </Text>
-                                    {deleteError !== '' && (
-                                        <Text style={{ color: '#f87171', fontSize: 12, fontWeight: '700', marginBottom: 12 }}>{deleteError}</Text>
-                                    )}
-                                    <TouchableOpacity
-                                        onPress={handleDeleteRequest}
-                                        disabled={deleteLoading}
-                                        style={{ backgroundColor: '#ef4444', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginBottom: 10 }}
-                                    >
-                                        <Text style={{ color: '#ffffff', fontSize: 14, fontWeight: '900' }}>
-                                            {deleteLoading ? 'Sending...' : 'Send Confirmation Code'}
-                                        </Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity onPress={() => setShowDeleteModal(false)} style={{ alignItems: 'center', paddingVertical: 10 }}>
-                                        <Text style={{ color: '#9ca3af', fontSize: 14, fontWeight: '700' }}>Cancel</Text>
-                                    </TouchableOpacity>
-                                </>
-                            ) : (
-                                <>
-                                    <Text style={{ color: '#f87171', fontSize: 18, fontWeight: '900', marginBottom: 8 }}>
-                                        Enter Confirmation Code
-                                    </Text>
-                                    <Text style={{ color: '#9ca3af', fontSize: 13, fontWeight: '700', marginBottom: 16 }}>
-                                        Check your email for the 6-digit code.
-                                    </Text>
-                                    <TextInput
-                                        style={{
-                                            backgroundColor: '#1f2937', borderWidth: 1, borderColor: '#374151',
-                                            borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14,
-                                            color: '#ffffff', fontSize: 24, fontWeight: '900',
-                                            textAlign: 'center', letterSpacing: 8, marginBottom: 16,
-                                        }}
-                                        value={deleteCode}
-                                        onChangeText={(t) => { setDeleteCode(t); setDeleteError(''); }}
-                                        placeholder="000000"
-                                        placeholderTextColor="#4b5563"
-                                        keyboardType="number-pad"
-                                        maxLength={6}
-                                    />
-                                    {deleteError !== '' && (
-                                        <Text style={{ color: '#f87171', fontSize: 12, fontWeight: '700', marginBottom: 12 }}>{deleteError}</Text>
-                                    )}
-                                    <TouchableOpacity
-                                        onPress={handleDeleteConfirm}
-                                        disabled={deleteLoading}
-                                        style={{ backgroundColor: '#ef4444', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginBottom: 10 }}
-                                    >
-                                        <Text style={{ color: '#ffffff', fontSize: 14, fontWeight: '900' }}>
-                                            {deleteLoading ? 'Deleting...' : 'Permanently Delete Account'}
-                                        </Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity onPress={() => setShowDeleteModal(false)} style={{ alignItems: 'center', paddingVertical: 10 }}>
-                                        <Text style={{ color: '#9ca3af', fontSize: 14, fontWeight: '700' }}>Cancel</Text>
-                                    </TouchableOpacity>
-                                </>
-                            )}
-                        </View>
-                    </View>
-                )}
             </View>
+
+            {/* ===== DELETE ACCOUNT MODAL (true full-screen overlay via RN Modal) ===== */}
+            <Modal
+                visible={showDeleteModal}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setShowDeleteModal(false)}
+            >
+                <View style={{
+                    flex: 1,
+                    backgroundColor: 'rgba(3,7,18,0.9)',
+                    justifyContent: 'center',
+                    paddingHorizontal: 20,
+                }}>
+                    <View style={{
+                        backgroundColor: '#111827', borderRadius: 20, padding: 24,
+                        borderWidth: 1, borderColor: 'rgba(239,68,68,0.3)',
+                    }}>
+                        {deleteStep === 1 ? (
+                            <>
+                                <Text style={{ color: '#f87171', fontSize: 18, fontWeight: '900', marginBottom: 8 }}>
+                                    Delete Account
+                                </Text>
+                                <Text style={{ color: '#9ca3af', fontSize: 13, fontWeight: '700', marginBottom: 16 }}>
+                                    This will permanently delete your account and all data. A 6-digit confirmation code will be sent to your email.
+                                </Text>
+                                {deleteError !== '' && (
+                                    <Text style={{ color: '#f87171', fontSize: 12, fontWeight: '700', marginBottom: 12 }}>{deleteError}</Text>
+                                )}
+                                <TouchableOpacity
+                                    onPress={handleDeleteRequest}
+                                    disabled={deleteLoading}
+                                    style={{ backgroundColor: '#ef4444', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginBottom: 10 }}
+                                >
+                                    <Text style={{ color: '#ffffff', fontSize: 14, fontWeight: '900' }}>
+                                        {deleteLoading ? 'Sending...' : 'Send Confirmation Code'}
+                                    </Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity onPress={() => setShowDeleteModal(false)} style={{ alignItems: 'center', paddingVertical: 10 }}>
+                                    <Text style={{ color: '#9ca3af', fontSize: 14, fontWeight: '700' }}>Cancel</Text>
+                                </TouchableOpacity>
+                            </>
+                        ) : (
+                            <>
+                                <Text style={{ color: '#f87171', fontSize: 18, fontWeight: '900', marginBottom: 8 }}>
+                                    Enter Confirmation Code
+                                </Text>
+                                <Text style={{ color: '#9ca3af', fontSize: 13, fontWeight: '700', marginBottom: 16 }}>
+                                    Check your email for the 6-digit code.
+                                </Text>
+                                <TextInput
+                                    style={{
+                                        backgroundColor: '#1f2937', borderWidth: 1, borderColor: '#374151',
+                                        borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14,
+                                        color: '#ffffff', fontSize: 24, fontWeight: '900',
+                                        textAlign: 'center', letterSpacing: 8, marginBottom: 16,
+                                    }}
+                                    value={deleteCode}
+                                    onChangeText={(t) => { setDeleteCode(t); setDeleteError(''); }}
+                                    placeholder="000000"
+                                    placeholderTextColor="#4b5563"
+                                    keyboardType="number-pad"
+                                    maxLength={6}
+                                    autoFocus={true}
+                                />
+                                {deleteError !== '' && (
+                                    <Text style={{ color: '#f87171', fontSize: 12, fontWeight: '700', marginBottom: 12 }}>{deleteError}</Text>
+                                )}
+                                <TouchableOpacity
+                                    onPress={handleDeleteConfirm}
+                                    disabled={deleteLoading}
+                                    style={{ backgroundColor: '#ef4444', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginBottom: 10 }}
+                                >
+                                    <Text style={{ color: '#ffffff', fontSize: 14, fontWeight: '900' }}>
+                                        {deleteLoading ? 'Deleting...' : 'Permanently Delete Account'}
+                                    </Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity onPress={() => setShowDeleteModal(false)} style={{ alignItems: 'center', paddingVertical: 10 }}>
+                                    <Text style={{ color: '#9ca3af', fontSize: 14, fontWeight: '700' }}>Cancel</Text>
+                                </TouchableOpacity>
+                            </>
+                        )}
+                    </View>
+                </View>
+            </Modal>
 
             {/* ===== LOGOUT ===== */}
             <TouchableOpacity
@@ -682,9 +672,9 @@ function SettingsTab({ profile, setProfile, logoutUser, router }) {
 // ========== STYLES ==========
 const styles = {
     container: { flex: 1, backgroundColor: '#030712' },
-    loadingContainer: { flex: 1, backgroundColor: '#030712', justifyContent: 'center', alignItems: 'center' },
+    loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', zIndex: 1 },
     scrollView: { flex: 1, zIndex: 1 },
-    scrollContent: { paddingHorizontal: 16, paddingTop: 56, paddingBottom: 20 },
+    scrollContent: { paddingHorizontal: 16, paddingBottom: 20 },
 
     // Header
     headerCard: { backgroundColor: '#111827', borderRadius: 20, padding: 20, borderWidth: 1, borderColor: '#1f2937', marginBottom: 16 },

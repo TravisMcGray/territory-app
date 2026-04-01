@@ -22,8 +22,6 @@ import * as Location from 'expo-location';
 import { useAuth } from '../../context/AuthContext';
 import { getTerritories, getNearbyHexagons, createActivity } from '../../services/api';
 import Svg, { Polygon as SvgPolygon, Rect } from 'react-native-svg';
-import HexBackground from '../../components/HexBackground';
-
 
 // ========== CONSTANTS ==========
 const DEFAULT_ZOOM_DELTA = 0.008;
@@ -188,10 +186,9 @@ export default function MapScreen() {
 
     // Animations
     const pulseAnim = useRef(new Animated.Value(0)).current;
-    const [tagline] = useState(() =>
+    const [currentTagline, setCurrentTagline] = useState(() =>
         TAGLINES.walk[Math.floor(Math.random() * TAGLINES.walk.length)]
     );
-    const [currentTagline, setCurrentTagline] = useState(tagline);
 
     // Pulse animation for activity selector
     useEffect(() => {
@@ -249,7 +246,7 @@ export default function MapScreen() {
                 setTerritories(terrs);
                 let mine = 0;
                 terrs.forEach(t => {
-                    if (t.owner?.id?.toString() === currentUserId) mine++;
+                    if ((t.owner?.id ?? t.owner?._id)?.toString() === currentUserId) mine++;
                 });
                 setTileCount({ mine, total: terrs.length });
             } catch (err) {
@@ -406,7 +403,7 @@ const startTracking = async (type) => {
                 setTerritories(terrs);
                 let mine = 0;
                 terrs.forEach(t => {
-                    if (t.owner?.id?.toString() === currentUserId) mine++;
+                    if ((t.owner?.id ?? t.owner?._id)?.toString() === currentUserId) mine++;
                 });
                 setTileCount({ mine, total: terrs.length });
                 if (location) {
@@ -485,7 +482,6 @@ const startTracking = async (type) => {
 
         return (
             <View style={styles.fullScreen}>
-                <HexBackground />
                 <ScrollView contentContainerStyle={styles.selectContent}>
                     <Text style={styles.selectTitle}>Let's Go!</Text>
                     <Text style={styles.selectSubtitle}>Choose your activity and claim your territory.</Text>
@@ -598,7 +594,6 @@ const startTracking = async (type) => {
 
         return (
             <View style={styles.fullScreen}>
-                <HexBackground />
                 <ScrollView contentContainerStyle={styles.resultContent}>
                     <Text style={styles.resultEmoji}>🎉</Text>
                     <Text style={styles.resultTitle}>Activity Saved!</Text>
@@ -707,7 +702,7 @@ const startTracking = async (type) => {
                 {/* Territories */}
                 {territories.map(territory => {
                     if (!territory.polygon) return null;
-                    const isMine = territory.owner?.id?.toString() === currentUserId;
+                    const isMine = (territory.owner?.id ?? territory.owner?._id)?.toString() === currentUserId;
                     return (
                         <Polygon key={territory.hexagonId} coordinates={territory.polygon}
                             fillColor={isMine ? COLOR_MINE_FILL : COLOR_OTHERS_FILL}
@@ -715,7 +710,7 @@ const startTracking = async (type) => {
                             strokeWidth={1.5} tappable={mode === 'explore'}
                             onPress={() => {
                                 if (mode !== 'explore') return;
-                                const label = territory.activityType === 'WALK' ? '🚶 Walk' : '🏃 Run';
+                                const label = territory.activityType === 'walk' ? '🚶 Walk' : '🏃 Run';
                                 const date = territory.capturedAt
                                     ? new Date(territory.capturedAt).toLocaleDateString('en-US', {
                                         month: 'short', day: 'numeric', year: 'numeric',
