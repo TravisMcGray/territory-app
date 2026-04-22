@@ -415,8 +415,13 @@ router.get('/:userId', authenticateToken, async (req, res) => {
             });
         }
 
-        // Get user
-        const user = await User.findById(userId);
+        // Get user + live tile count in parallel
+        const Territory = require('../models/territory');
+        const [user, currentUser, tilesOwned] = await Promise.all([
+            User.findById(userId),
+            User.findById(currentUserId),
+            Territory.countDocuments({ ownerId: userId }),
+        ]);
 
         if (!user) {
             return res.status(404).json({
@@ -426,8 +431,6 @@ router.get('/:userId', authenticateToken, async (req, res) => {
             });
         }
 
-        // Check if current user is following this user
-        const currentUser = await User.findById(currentUserId);
         if (!currentUser) {
             return res.status(404).json({
                 status: 'error',
@@ -442,7 +445,7 @@ router.get('/:userId', authenticateToken, async (req, res) => {
 
         res.json({
             message: 'User profile retrieved',
-            user: user.toPublicJSON(),
+            user: { ...user.toPublicJSON(), tilesOwned },
             relationshipStatus: {
                 isFollowing,
                 followerCount: user.followers.length,

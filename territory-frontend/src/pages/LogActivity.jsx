@@ -22,7 +22,7 @@ import HexBackground from '../components/HexBackground';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { latLngToCell, gridDisk, cellToBoundary } from 'h3-js';
-import { getCustomDarkStyle } from '../utils/mapStyle';
+import { getCustomLightStyle } from '../utils/mapStyle';
 
 // ========== CONSTANTS ==========
 // Only accept GPS readings with accuracy better than 30 meters.
@@ -137,6 +137,8 @@ export default function LogActivity() {
     const [coordinates, setCoordinates] = useState([]);
     const [distanceMeters, setDistanceMeters] = useState(0);
     const [elapsedSeconds, setElapsedSeconds] = useState(0);
+    const [elevationGain, setElevationGain] = useState(0);
+    const [elevationLoss, setElevationLoss] = useState(0);
     const [gpsStatus, setGpsStatus] = useState('idle'); // 'idle' | 'acquiring' | 'active' | 'error'
     const [gpsAccuracy, setGpsAccuracy] = useState(null);
 
@@ -151,6 +153,7 @@ export default function LogActivity() {
     const timerRef = useRef(null);
     const coordinatesRef = useRef([]);
     const distanceRef = useRef(0);
+    const lastAltitudeRef = useRef(null);
 
     // ========== CLEANUP ON UNMOUNT ==========
     // If user navigates away mid-activity, stop GPS and timer.
@@ -187,7 +190,7 @@ export default function LogActivity() {
 
         watchIdRef.current = navigator.geolocation.watchPosition(
             (position) => {
-                const { latitude, longitude, accuracy } = position.coords;
+                const { latitude, longitude, accuracy, altitude } = position.coords;
                 setGpsAccuracy(Math.round(accuracy));
 
                 // Reject noisy readings — accuracy value is the radius of
@@ -211,6 +214,15 @@ export default function LogActivity() {
                     distanceRef.current += dist;
                     setDistanceMeters(distanceRef.current);
                 }
+
+                // Track elevation — browser provides altitude in meters when available.
+                // iOS Safari and Android Chrome both report it outdoors; desktops do not.
+                if (altitude != null && lastAltitudeRef.current != null) {
+                    const diff = altitude - lastAltitudeRef.current;
+                    if (diff > 0.5) setElevationGain(prev => prev + diff);
+                    else if (diff < -0.5) setElevationLoss(prev => Math.abs(diff) + prev);
+                }
+                if (altitude != null) lastAltitudeRef.current = altitude;
 
                 // Add point to our collection
                 coordinatesRef.current = [...current, newPoint];
@@ -247,10 +259,25 @@ export default function LogActivity() {
         setCoordinates([]);
         setDistanceMeters(0);
         setElapsedSeconds(0);
+        setElevationGain(0);
+        setElevationLoss(0);
         setError('');
         coordinatesRef.current = [];
         distanceRef.current = 0;
+        lastAltitudeRef.current = null;
 
+        setPhase('tracking');
+        startGPS();
+        startTimer();
+    };
+
+    const handlePause = () => {
+        stopGPS();
+        stopTimer();
+        setPhase('paused');
+    };
+
+    const handleResume = () => {
         setPhase('tracking');
         startGPS();
         startTimer();
@@ -275,9 +302,9 @@ export default function LogActivity() {
         try {
             const payload = {
                 activityType,
-                coordinates,            // Array of { latitude, longitude }
-                duration: elapsedSeconds, // Seconds elapsed
-                elevationGain: 0,        // Future enhancement
+                coordinates,
+                duration: elapsedSeconds,
+                elevationGain: Math.round(elevationGain),
             };
 
             const res = await createActivity(payload);
@@ -320,15 +347,19 @@ export default function LogActivity() {
                         lastActivity={lastActivity}
                     />
                 )}
-                {phase === 'tracking' && (
+                {(phase === 'tracking' || phase === 'paused') && (
                     <TrackingPhase
                         activityType={activityType}
+                        phase={phase}
                         elapsedSeconds={elapsedSeconds}
                         distanceMeters={distanceMeters}
                         coordinateCount={coordinates.length}
                         coordinates={coordinates}
                         gpsStatus={gpsStatus}
                         gpsAccuracy={gpsAccuracy}
+                        elevationGainMeters={elevationGain}
+                        onPause={handlePause}
+                        onResume={handleResume}
                         onStop={handleStop}
                     />
                 )}
@@ -338,6 +369,8 @@ export default function LogActivity() {
                         elapsedSeconds={elapsedSeconds}
                         distanceMeters={distanceMeters}
                         coordinateCount={coordinates.length}
+                        elevationGainMeters={elevationGain}
+                        elevationLossMeters={elevationLoss}
                         submitting={submitting}
                         error={error}
                         onSubmit={handleSubmit}
@@ -522,15 +555,20 @@ function SetupPhase({ activityType, setActivityType, onStart, lastActivity }) {
 // sees during tracking exactly matches what gets captured on submission.
 function TrackingPhase({
     activityType,
+    phase,
     elapsedSeconds,
     distanceMeters,
     coordinateCount,
     coordinates,
     gpsStatus,
     gpsAccuracy,
+    elevationGainMeters,
+    onPause,
+    onResume,
     onStop,
 }) {
     const isWalk = activityType === 'walk';
+    const isPaused = phase === 'paused';
 
     // Activity color — blue for walk, emerald for run
     const activityColor = isWalk ? '#3b82f6' : '#10b981';
@@ -557,7 +595,7 @@ function TrackingPhase({
         let cancelled = false;
 
         async function initMap() {
-            const style = await getCustomDarkStyle();
+            const style = await getCustomLightStyle();
             if (cancelled) return;
 
             const map = new maplibregl.Map({
@@ -743,27 +781,37 @@ function TrackingPhase({
     return (
         <div className="space-y-4">
 
+            {/* Paused banner */}
+            {isPaused && (
+                <div className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-yellow-500/10 border border-yellow-500/30">
+                    <span className="w-2 h-2 rounded-full bg-yellow-400" />
+                    <span className="text-yellow-400 font-black text-sm tracking-widest uppercase">Paused</span>
+                </div>
+            )}
+
             {/* GPS status indicator */}
-            <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm w-fit ${
-                gpsStatus === 'active'
-                    ? 'bg-emerald-500/20 text-emerald-400'
-                    : gpsStatus === 'acquiring'
-                    ? 'bg-yellow-500/20 font-bold text-yellow-500'
-                    : 'bg-red-500/20 text-red-400'
-            }`}>
-                <span className={`w-2 h-2 rounded-full ${
+            {!isPaused && (
+                <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm w-fit ${
                     gpsStatus === 'active'
-                        ? 'bg-emerald-400 animate-pulse'
+                        ? 'bg-emerald-500/20 text-emerald-400'
                         : gpsStatus === 'acquiring'
-                        ? 'bg-yellow-400 animate-pulse'
-                        : 'bg-red-400'
-                }`} />
-                {gpsStatus === 'active'
-                    ? `GPS Active — ±${gpsAccuracy}m accuracy`
-                    : gpsStatus === 'acquiring'
-                    ? 'Acquiring GPS signal...'
-                    : 'GPS Error'}
-            </div>
+                        ? 'bg-yellow-500/20 font-bold text-yellow-500'
+                        : 'bg-red-500/20 text-red-400'
+                }`}>
+                    <span className={`w-2 h-2 rounded-full ${
+                        gpsStatus === 'active'
+                            ? 'bg-emerald-400 animate-pulse'
+                            : gpsStatus === 'acquiring'
+                            ? 'bg-yellow-400 animate-pulse'
+                            : 'bg-red-400'
+                    }`} />
+                    {gpsStatus === 'active'
+                        ? `GPS Active — ±${gpsAccuracy}m accuracy`
+                        : gpsStatus === 'acquiring'
+                        ? 'Acquiring GPS signal...'
+                        : 'GPS Error'}
+                </div>
+            )}
 
             {/* Activity type badge */}
             <div>
@@ -785,7 +833,7 @@ function TrackingPhase({
             </div>
 
             {/* Stats row */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
                 <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4">
                     <div className="text-2xl font-black text-white">
                         {formatDistance(distanceMeters)}
@@ -798,12 +846,18 @@ function TrackingPhase({
                     </div>
                     <div className="font-bold text-gray-300 text-xs mt-1">Hexagons</div>
                 </div>
+                <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4">
+                    <div className="text-2xl font-black text-amber-400">
+                        {Math.round(elevationGainMeters * 3.28084)}
+                    </div>
+                    <div className="font-bold text-gray-300 text-xs mt-1">↑ Elev ft</div>
+                </div>
             </div>
 
             {/* ========== LIVE MAP ========== */}
             <div
                 className="relative rounded-2xl overflow-hidden border border-gray-800 shadow-2xl"
-                style={{ height: '280px' }}
+                style={{ height: '45vh', minHeight: '280px' }}
             >
                 {gpsStatus === 'acquiring' && (
                     <div className="absolute inset-0 flex items-center justify-center bg-gray-900 rounded-2xl z-10">
@@ -825,14 +879,44 @@ function TrackingPhase({
                 </p>
             )}
 
-            {/* Stop button */}
-            <button
-                type="button"
-                onClick={onStop}
-                className="w-full bg-red-500 hover:bg-red-400 text-white font-black text-xl py-5 rounded-2xl transition-colors"
-            >
-                Stop Activity
-            </button>
+            {/* Controls */}
+            {isPaused ? (
+                <div className="grid grid-cols-2 gap-3">
+                    <button
+                        type="button"
+                        onClick={onResume}
+                        className={`font-black text-lg py-5 rounded-2xl transition-colors text-white ${
+                            isWalk ? 'bg-blue-500 hover:bg-blue-400' : 'bg-emerald-500 hover:bg-emerald-400'
+                        }`}
+                    >
+                        ▶ Resume
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onStop}
+                        className="bg-red-500 hover:bg-red-400 text-white font-black text-lg py-5 rounded-2xl transition-colors"
+                    >
+                        ■ Finish
+                    </button>
+                </div>
+            ) : (
+                <div className="grid grid-cols-2 gap-3">
+                    <button
+                        type="button"
+                        onClick={onPause}
+                        className="bg-gray-700 hover:bg-gray-600 text-white font-black text-lg py-5 rounded-2xl transition-colors"
+                    >
+                        ⏸ Pause
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onStop}
+                        className="bg-red-500 hover:bg-red-400 text-white font-black text-lg py-5 rounded-2xl transition-colors"
+                    >
+                        ■ Finish
+                    </button>
+                </div>
+            )}
 
             <p className="font-bold text-gray-300 text-xs text-center">
                 Keep this screen open while tracking. Locking your phone may pause GPS.
@@ -847,6 +931,8 @@ function SummaryPhase({
     elapsedSeconds,
     distanceMeters,
     coordinateCount,
+    elevationGainMeters,
+    elevationLossMeters,
     submitting,
     error,
     onSubmit,
@@ -854,6 +940,8 @@ function SummaryPhase({
 }) {
     const isWalk = activityType === 'walk';
     const hasEnoughPoints = coordinateCount >= 2;
+    const elevGainFt = Math.round(elevationGainMeters * 3.28084);
+    const elevLossFt = Math.round(elevationLossMeters * 3.28084);
 
     return (
         <div className="space-y-6">
@@ -880,7 +968,7 @@ function SummaryPhase({
                     </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-3 pt-2">
+                <div className="grid grid-cols-2 gap-3 pt-2">
                     <div className="text-center">
                         <div className="text-xl font-black">{formatTime(elapsedSeconds)}</div>
                         <div className="font-bold text-gray-300 text-xs">duration</div>
@@ -889,10 +977,18 @@ function SummaryPhase({
                         <div className="text-xl font-black">{formatDistance(distanceMeters)}</div>
                         <div className="font-bold text-gray-300 text-xs">miles</div>
                     </div>
-                    <div className="text-center">
-                        <div className="text-xl font-black text-emerald-400">{coordinateCount}</div>
-                        <div className="font-bold text-gray-300 text-xs">GPS points</div>
-                    </div>
+                    {elevGainFt > 0 && (
+                        <div className="text-center">
+                            <div className="text-xl font-black text-amber-400">{elevGainFt} ft</div>
+                            <div className="font-bold text-gray-300 text-xs">↑ elevation gain</div>
+                        </div>
+                    )}
+                    {elevLossFt > 0 && (
+                        <div className="text-center">
+                            <div className="text-xl font-black text-blue-400">{elevLossFt} ft</div>
+                            <div className="font-bold text-gray-300 text-xs">↓ elevation loss</div>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -967,11 +1063,19 @@ function ResultPhase({ result, onDone }) {
                         value={`${activity.stolenTerritory} hex`}
                         accent={activity.stolenTerritory > 0 ? 'red' : 'gray'}
                     />
+                    {(activity.elevationGain ?? 0) > 0 && (
+                        <ResultStat
+                            label="Elevation Gain"
+                            value={`${Math.round((activity.elevationGain ?? 0) * 3.28084)} ft`}
+                            accent="amber"
+                        />
+                    )}
                 </div>
                 <div className="border-t border-gray-800 pt-3 text-center">
                     <span className="text-white font-black">{activity.estimatedCalories ?? 0} kcal</span>
                     <span className="text-gray-500 text-xs ml-2">estimated calories burned</span>
-                </div>            </div>
+                </div>
+            </div>
 
             {/* New achievements */}
             {achievements.length > 0 && (
@@ -1022,6 +1126,7 @@ function ResultStat({ label, value, accent = 'white' }) {
         emerald: 'text-emerald-400',
         red: 'text-red-400',
         gray: 'text-gray-500',
+        amber: 'text-amber-400',
     };
 
     return (

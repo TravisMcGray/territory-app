@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getHexagonLeaderboard, getDistanceLeaderboard, getActivityLeaderboard } from '../services/api';
+import { getHexagonLeaderboard, getDistanceLeaderboard, getActivityLeaderboard, getTerritoryLeaderboard } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import HexBackground from '../components/HexBackground';
 import Navbar from '../components/Navbar';
@@ -50,11 +50,18 @@ const HexActivityIcon = ({ color, active }) => (
     </HexIcon>
 );
 
+const HexTerritoryControlIcon = ({ color, active }) => (
+    <HexIcon color={color} fill={active ? '#10b98122' : 'none'}>
+        <polygon points="14,6 20,10 20,18 14,22 8,18 8,10" fill={color} opacity="0.7" />
+    </HexIcon>
+);
+
 // ========== TAB DEFINITIONS ==========
 const TABS = [
-    { key: 'hexagons', label: 'Hexagons', description: 'Most territory owned', icon: HexTerritoryIcon },
-    { key: 'distance', label: 'Distance', description: 'Most miles logged', icon: HexDistanceIcon },
-    { key: 'activity', label: 'Activity', description: 'Most activities logged', icon: HexActivityIcon },
+    { key: 'territory', label: 'Territory', description: 'Most tiles owned right now', icon: HexTerritoryControlIcon },
+    { key: 'hexagons', label: 'Lifetime',   description: 'Most tiles ever captured',   icon: HexTerritoryIcon },
+    { key: 'distance', label: 'Distance',   description: 'Most miles logged',           icon: HexDistanceIcon },
+    { key: 'activity', label: 'Activity',   description: 'Most activities logged',      icon: HexActivityIcon },
 ];
 
 // ========== MAIN COMPONENT ==========
@@ -62,8 +69,8 @@ export default function Leaderboard() {
     const { user } = useAuth();
     const navigate = useNavigate();
 
-    const [activeTab, setActiveTab] = useState('hexagons');
-    const [data, setData] = useState({ hexagons: [], distance: [], activity: [] });
+    const [activeTab, setActiveTab] = useState('territory');
+    const [data, setData] = useState({ territory: [], hexagons: [], distance: [], activity: [] });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
@@ -74,15 +81,17 @@ export default function Leaderboard() {
     useEffect(() => {
         const loadLeaderboards = async () => {
             try {
-                const [hexRes, distRes, actRes] = await Promise.all([
+                const [terrRes, hexRes, distRes, actRes] = await Promise.all([
+                    getTerritoryLeaderboard(),
                     getHexagonLeaderboard(),
                     getDistanceLeaderboard(),
                     getActivityLeaderboard(),
                 ]);
                 setData({
-                    hexagons: hexRes.data.leaderboard || [],
-                    distance: distRes.data.leaderboard || [],
-                    activity: actRes.data.leaderboard || [],
+                    territory: terrRes.data.leaderboard || [],
+                    hexagons:  hexRes.data.leaderboard  || [],
+                    distance:  distRes.data.leaderboard || [],
+                    activity:  actRes.data.leaderboard  || [],
                 });
             } catch (err) {
                 setError('Failed to load leaderboards. Please try again.');
@@ -251,7 +260,8 @@ function MedalHex({ rank }) {
 // ========== LEADERBOARD ROW ==========
 function LeaderboardRow({ entry, rank, tab, isCurrentUser, onClick }) {
     const formatValue = () => {
-        if (tab === 'hexagons') return `${entry.hexagons ?? 0} hex`;
+        if (tab === 'territory') return `${entry.tilesOwned ?? 0} owned`;
+        if (tab === 'hexagons') return `${entry.hexagons ?? 0} lifetime`;
         if (tab === 'distance') return `${(entry.distance ?? 0).toFixed(1)} mi`;
         if (tab === 'activity') return `${entry.totalActivities ?? 0} activities`;
         return '';

@@ -23,7 +23,10 @@ try { Notification = require('../models/notification'); } catch {}
 // ========== GET /api/user/profile ==========
 router.get('/profile', authenticateToken, async (req, res) => {
     try {
-        const user = await User.findById(req.user.userId);
+        const [user, tilesOwned] = await Promise.all([
+            User.findById(req.user.userId),
+            Territory.countDocuments({ ownerId: req.user.userId }),
+        ]);
         if (!user) {
             return res.status(404).json({
                 status: 'error',
@@ -33,7 +36,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
         }
         return res.json({
             message: 'Profile retrieved successfully',
-            profile: user.toProfileJSON()
+            profile: { ...user.toProfileJSON(), tilesOwned },
         });
     } catch (err) {
         return res.status(500).json({
@@ -659,7 +662,7 @@ router.get('/territories', authenticateToken, async (req, res) => {
     try {
         const territories = await Territory.find({ ownerId: { $exists: true } })
             .populate({ path: 'ownerId', match: { isActive: true }, select: 'username' })
-            .select('hexagonId ownerId ownerActivityType capturedAt')
+            .select('hexagonId ownerId ownerActivityType capturedAt timesVisited')
             .lean();
 
         const formatted = territories
@@ -682,6 +685,7 @@ router.get('/territories', authenticateToken, async (req, res) => {
                     owner: { id: t.ownerId._id, username: t.ownerId.username },
                     activityType: t.ownerActivityType,
                     capturedAt: t.capturedAt,
+                    captureCount: t.timesVisited ?? 1,
                     polygon
                 };
             })

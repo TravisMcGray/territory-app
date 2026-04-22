@@ -11,12 +11,13 @@
 // - Achievements → locked/unlocked cascade
 // - Settings → body stats, username change, danger zone
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
     getProfile,
     getUserById,
+    getUserActivities,
     getUserAchievements,
     getAllAchievements,
     getActivities,
@@ -27,6 +28,9 @@ import {
     updateBodyStats,
     updateUsername,
 } from '../services/api';
+import maplibregl from 'maplibre-gl';
+import 'maplibre-gl/dist/maplibre-gl.css';
+import { getCustomLightStyle } from '../utils/mapStyle';
 import HexBackground from '../components/HexBackground';
 import Navbar from '../components/Navbar';
 
@@ -296,6 +300,8 @@ export default function Profile() {
     const [profile, setProfile] = useState(null);
     const [achievements, setAchievements] = useState([]);
     const [activities, setActivities] = useState([]);
+    const [userActivities, setUserActivities] = useState([]);
+    const [selectedActivity, setSelectedActivity] = useState(null);
     const [followersCount, setFollowersCount] = useState(0);
     const [followingCount, setFollowingCount] = useState(0);
     const [isFollowing, setIsFollowing] = useState(false);
@@ -361,6 +367,14 @@ export default function Profile() {
                     setFollowersCount(userData.followers ?? 0);
                     setFollowingCount(userData.following ?? 0);
                     setIsFollowing(relationship?.isFollowing ?? false);
+
+                    // Fetch public activities separately so a 404 doesn't break the profile
+                    try {
+                        const activitiesRes = await getUserActivities(userId);
+                        setUserActivities(activitiesRes.data.activities || []);
+                    } catch {
+                        // No activities or endpoint unavailable — show empty state
+                    }
                 }
             } catch (err) {
                 console.error('Profile load error:', err);
@@ -509,9 +523,15 @@ export default function Profile() {
                         </div>
                         <div className="text-center">
                             <div className="text-xl font-black text-emerald-400">
+                                {profile.tilesOwned ?? 0}
+                            </div>
+                            <div className="text-gray-400 text-xs font-bold mt-0.5">Tiles Owned</div>
+                        </div>
+                        <div className="text-center">
+                            <div className="text-xl font-black text-emerald-300">
                                 {stats.totalHexagonsCaptured ?? 0}
                             </div>
-                            <div className="text-gray-400 text-xs font-bold mt-0.5">Hexagons</div>
+                            <div className="text-gray-400 text-xs font-bold mt-0.5">Lifetime Cap.</div>
                         </div>
                         <div className="text-center">
                             <div className="text-xl font-black text-blue-400">
@@ -599,7 +619,11 @@ export default function Profile() {
                                     </div>
                                 ) : (
                                     activities.map(activity => (
-                                        <ActivityRow key={activity._id} activity={activity} />
+                                        <ActivityRow
+                                            key={activity._id}
+                                            activity={activity}
+                                            onClick={() => setSelectedActivity(activity)}
+                                        />
                                     ))
                                 )}
                             </div>
@@ -641,13 +665,56 @@ export default function Profile() {
                         )}
                     </>
                 )}
+
+                {/* ========== ACTIVITIES — other users' profiles ========== */}
+                {!isOwnProfile && (
+                    <div className="space-y-3">
+                        <h3 className="text-white font-black text-sm px-1">Recent Activities</h3>
+                        {userActivities.length === 0 ? (
+                            <div className="text-center py-12 bg-gray-900 border border-gray-800 rounded-xl">
+                                <svg width="48" height="48" viewBox="0 0 28 28" fill="none" className="mx-auto mb-3">
+                                    <polygon points="2,14 8,3 20,3 26,14 20,25 8,25" stroke="#374151" strokeWidth="2" fill="#0e0d0d"/>
+                                    <polyline
+                                        points="5,14 8,14 11,9 15,19 18,12 21,14 24,14"
+                                        stroke="#374151"
+                                        strokeWidth="1.5"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        fill="none"
+                                    />
+                                </svg>
+                                <p className="text-white font-bold">No activities yet</p>
+                                <p className="text-gray-400 text-sm font-bold mt-1">
+                                    This user hasn't logged any activities.
+                                </p>
+                            </div>
+                        ) : (
+                            userActivities.map(activity => (
+                                <ActivityRow
+                                    key={activity._id}
+                                    activity={activity}
+                                    onClick={() => setSelectedActivity(activity)}
+                                />
+                            ))
+                        )}
+                    </div>
+                )}
+
             </div>
+
+            {/* ========== ACTIVITY DETAIL MODAL ========== */}
+            {selectedActivity && (
+                <ActivityDetailModal
+                    activity={selectedActivity}
+                    onClose={() => setSelectedActivity(null)}
+                />
+            )}
         </div>
     );
 }
 
 // ========== ACTIVITY ROW ==========
-function ActivityRow({ activity }) {
+function ActivityRow({ activity, onClick }) {
     const isWalk = activity.activityType === 'walk' || activity.activityType === 'WALK';
     const distanceMiles = (activity.distance ?? 0).toFixed(2);
 
@@ -665,7 +732,13 @@ function ActivityRow({ activity }) {
         : (activity.capturedHexagons ?? 0);
 
     return (
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 flex items-center gap-3">
+        <div
+            className={`bg-gray-900 border border-gray-800 rounded-xl p-4 flex items-center gap-3 ${
+                onClick ? 'cursor-pointer hover:border-gray-600 transition-colors' : ''
+            }`}
+            onClick={onClick}
+            role={onClick ? 'button' : undefined}
+        >
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg flex-shrink-0 ${
                 isWalk ? 'bg-blue-500/20' : 'bg-emerald-500/20'
             }`}>
@@ -679,8 +752,197 @@ function ActivityRow({ activity }) {
                     {distanceMiles}mi · {formatDuration(activity.duration)} · {hexCount} hexagons
                 </p>
             </div>
-            <div className="text-gray-500 text-xs font-bold flex-shrink-0">
-                {timeAgo(activity.createdAt)}
+            <div className="flex items-center gap-2 flex-shrink-0">
+                <div className="text-gray-500 text-xs font-bold">
+                    {timeAgo(activity.createdAt)}
+                </div>
+                {onClick && (
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="text-gray-600">
+                        <path d="M5 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                )}
+            </div>
+        </div>
+    );
+}
+
+// ========== ACTIVITY DETAIL MODAL ==========
+// Full-detail view of a single activity: route map + all stats.
+// Uses maplibre-gl directly (same as Map.jsx) to draw the GPS polyline.
+function ActivityDetailModal({ activity, onClose }) {
+    const mapContainerRef = useRef(null);
+    const mapRef = useRef(null);
+
+    const isWalk = activity.activityType === 'walk' || activity.activityType === 'WALK';
+    const distanceMiles = (activity.distance ?? 0).toFixed(2);
+    const hexCount = Array.isArray(activity.capturedHexagons)
+        ? activity.capturedHexagons.length
+        : (activity.capturedHexagons ?? 0);
+
+    const formatDuration = (seconds) => {
+        if (!seconds) return '0m';
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        if (h > 0) return `${h}h ${m}m`;
+        return `${m}m`;
+    };
+
+    const formatPace = () => {
+        if (!activity.duration || !activity.distance || activity.distance === 0) return '—';
+        const minPerMile = activity.duration / 60 / activity.distance;
+        const mins = Math.floor(minPerMile);
+        const secs = Math.round((minPerMile - mins) * 60);
+        return `${mins}:${String(secs).padStart(2, '0')}/mi`;
+    };
+
+    const elevationFt = Math.round((activity.elevationGain ?? 0) * 3.28084);
+
+    const hasRoute = Array.isArray(activity.coordinates) && activity.coordinates.length > 1;
+
+    // Build the map once the container is in the DOM
+    useEffect(() => {
+        if (!mapContainerRef.current || !hasRoute) return;
+
+        let cancelled = false;
+
+        getCustomLightStyle().then(style => {
+            if (cancelled || !mapContainerRef.current) return;
+
+            const coords = activity.coordinates;
+
+            // Compute bounding box to fit all points
+            const lngs = coords.map(c => c.longitude);
+            const lats = coords.map(c => c.latitude);
+            const bounds = [
+                [Math.min(...lngs), Math.min(...lats)],
+                [Math.max(...lngs), Math.max(...lats)],
+            ];
+
+            const map = new maplibregl.Map({
+                container: mapContainerRef.current,
+                style,
+                interactive: false,
+                attributionControl: false,
+            });
+
+            map.on('load', () => {
+                if (cancelled) { map.remove(); return; }
+
+                map.fitBounds(bounds, { padding: 32, animate: false });
+
+                map.addSource('route', {
+                    type: 'geojson',
+                    data: {
+                        type: 'Feature',
+                        geometry: {
+                            type: 'LineString',
+                            coordinates: coords.map(c => [c.longitude, c.latitude]),
+                        },
+                    },
+                });
+
+                map.addLayer({
+                    id: 'route-line',
+                    type: 'line',
+                    source: 'route',
+                    paint: {
+                        'line-color': isWalk ? '#3b82f6' : '#10b981',
+                        'line-width': 3,
+                        'line-opacity': 0.9,
+                    },
+                    layout: {
+                        'line-cap': 'round',
+                        'line-join': 'round',
+                    },
+                });
+
+                mapRef.current = map;
+            });
+        });
+
+        return () => {
+            cancelled = true;
+            if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
+        };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    return (
+        <div
+            className="fixed inset-0 z-50 flex items-end justify-center bg-black/70"
+            onClick={onClose}
+        >
+            <div
+                className="bg-gray-900 border border-gray-800 rounded-t-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
+                onClick={e => e.stopPropagation()}
+            >
+                {/* Header */}
+                <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-gray-800">
+                    <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg ${
+                            isWalk ? 'bg-blue-500/20' : 'bg-emerald-500/20'
+                        }`}>
+                            {isWalk ? '🚶' : '🏃'}
+                        </div>
+                        <div>
+                            <p className="text-white font-black capitalize">{activity.activityType?.toLowerCase()}</p>
+                            <p className="text-gray-400 text-xs font-bold">{timeAgo(activity.createdAt)}</p>
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center text-gray-400 hover:text-white transition-colors"
+                    >
+                        ✕
+                    </button>
+                </div>
+
+                {/* Route Map */}
+                {hasRoute ? (
+                    <div
+                        ref={mapContainerRef}
+                        className="w-full h-48 bg-gray-800"
+                    />
+                ) : (
+                    <div className="w-full h-24 bg-gray-800 flex items-center justify-center">
+                        <p className="text-gray-500 text-sm font-bold">No route data</p>
+                    </div>
+                )}
+
+                {/* Stats Grid */}
+                <div className="p-5 grid grid-cols-2 gap-3">
+                    <div className="bg-gray-800 rounded-xl p-4">
+                        <p className="text-gray-400 text-xs font-bold mb-1">Distance</p>
+                        <p className="text-white text-xl font-black">{distanceMiles}<span className="text-gray-400 text-sm ml-1">mi</span></p>
+                    </div>
+                    <div className="bg-gray-800 rounded-xl p-4">
+                        <p className="text-gray-400 text-xs font-bold mb-1">Duration</p>
+                        <p className="text-white text-xl font-black">{formatDuration(activity.duration)}</p>
+                    </div>
+                    <div className="bg-gray-800 rounded-xl p-4">
+                        <p className="text-gray-400 text-xs font-bold mb-1">Pace</p>
+                        <p className="text-white text-xl font-black">{formatPace()}</p>
+                    </div>
+                    <div className="bg-gray-800 rounded-xl p-4">
+                        <p className="text-gray-400 text-xs font-bold mb-1">Calories</p>
+                        <p className="text-white text-xl font-black">{activity.estimatedCalories ?? '—'}<span className="text-gray-400 text-sm ml-1">kcal</span></p>
+                    </div>
+                    <div className="bg-gray-800 rounded-xl p-4">
+                        <p className="text-gray-400 text-xs font-bold mb-1">Elevation Gain</p>
+                        <p className="text-white text-xl font-black">{elevationFt}<span className="text-gray-400 text-sm ml-1">ft</span></p>
+                    </div>
+                    <div className="bg-gray-800 rounded-xl p-4">
+                        <p className="text-gray-400 text-xs font-bold mb-1">Hexagons</p>
+                        <p className="text-emerald-400 text-xl font-black">{hexCount}<span className="text-gray-400 text-sm ml-1">captured</span></p>
+                    </div>
+                    {(activity.stolenHexagons ?? 0) > 0 && (
+                        <div className="bg-gray-800 rounded-xl p-4 col-span-2">
+                            <p className="text-gray-400 text-xs font-bold mb-1">Stolen</p>
+                            <p className="text-red-400 text-xl font-black">{activity.stolenHexagons}<span className="text-gray-400 text-sm ml-1">hexagons taken from others</span></p>
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );

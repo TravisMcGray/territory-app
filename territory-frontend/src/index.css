@@ -120,6 +120,15 @@ body {
     border-bottom-color: #111827 !important;
 }
 
+/* ---------- Player card slide-up ---------- */
+@keyframes fadeSlideUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ---------- MapLibre Attribution (hide built-in, we render our own below map) ---------- */
+.maplibregl-ctrl-attrib { display: none !important; }
+
 /* ---------- GPS Location Dot ---------- */
 /* Blue dot with white ring and glow — matches the original Leaflet
    version but now rendered as a MapLibre Marker with a custom element. */

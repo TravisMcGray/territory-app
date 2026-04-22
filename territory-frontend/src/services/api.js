@@ -45,6 +45,7 @@ export const confirmAccountDeletion = (data) => api.delete('/api/user/account/co
 
 // ========== USERS (public profiles) ==========
 export const getUserById = (id) => api.get(`/api/users/${id}`);
+export const getUserActivities = (id) => api.get(`/api/users/${id}/activities`);
 export const updateBodyStats = (data) => api.put('/api/user/body-stats', data);
 export const updateProfile = (data) => api.put('/api/user/profile', data);
 
@@ -64,6 +65,7 @@ export const getUserAchievements = () => api.get('/api/achievements/user');
 export const getHexagonLeaderboard = () => api.get('/api/leaderboard/hexagons');
 export const getDistanceLeaderboard = () => api.get('/api/leaderboard/distance');
 export const getActivityLeaderboard = () => api.get('/api/leaderboard/activity');
+export const getTerritoryLeaderboard = () => api.get('/api/leaderboard/territory');
 
 // ========== NOTIFICATIONS ==========
 export const getNotifications = () => api.get('/api/notifications');

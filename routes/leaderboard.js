@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const User = require('../models/user');
+const Territory = require('../models/territory');
 const { authenticateToken } = require('../middleware/auth');
 
 // ========== CONSTANTS ==========
@@ -375,6 +376,33 @@ router.get('/:metric/rank', authenticateToken, async (req, res) => {
             status: 'error',
             code: 'INTERNAL_SERVER_ERROR',
             message: 'Error retrieving user rank'
+        });
+    }
+});
+
+// ========== GET /api/leaderboard/territory - Currently owned tiles ==========
+router.get('/territory', authenticateToken, async (req, res) => {
+    try {
+        const limit = Math.min(100, parseInt(req.query.limit) || 50);
+
+        const results = await Territory.aggregate([
+            { $group: { _id: '$ownerId', tilesOwned: { $sum: 1 } } },
+            { $sort: { tilesOwned: -1 } },
+            { $limit: limit },
+            { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'user' } },
+            { $unwind: '$user' },
+            { $match: { 'user.isActive': true } },
+            { $project: { id: '$_id', username: '$user.username', tilesOwned: 1, _id: 0 } },
+        ]);
+
+        const leaderboard = results.map((entry, i) => ({ rank: i + 1, ...entry }));
+
+        res.json({ message: 'Territory leaderboard retrieved successfully', leaderboard });
+    } catch (error) {
+        res.status(500).json({
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error retrieving territory leaderboard',
         });
     }
 });

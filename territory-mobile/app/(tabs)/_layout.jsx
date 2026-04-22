@@ -3,8 +3,10 @@
 // Map is positioned in the center as the primary action — the heart of the app.
 // Uses custom dark styling to match the HexCapture design system.
 
+import { View } from 'react-native';
 import { Tabs } from 'expo-router';
 import Svg, { Polygon, Polyline, Circle, Line } from 'react-native-svg';
+import HexBackground from '../../components/HexBackground';
 
 // ========== TAB ICONS ==========
 
