@@ -626,6 +626,7 @@ export default function Map() {
 
                 setSelectedPlayer({
                     username: ownerUsername,
+                    ownerId,
                     totalTiles: playerTiles.length,
                     tier: tierInfo,
                     preferredActivity: runCount > playerTiles.length / 2 ? 'RUN' : 'WALK',
@@ -1153,7 +1154,10 @@ export default function Map() {
                                     fill="none" stroke={selectedPlayer.tier.color} strokeWidth="1.5" strokeOpacity="0.5"/>
                             </svg>
                             <div>
-                                <div style={{ fontSize: 16, fontWeight: 800, color: '#fff', lineHeight: 1.2 }}>
+                                <div
+                                    onClick={() => navigate(`/profile/${selectedPlayer.ownerId}`)}
+                                    style={{ fontSize: 16, fontWeight: 800, color: '#fff', lineHeight: 1.2, cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 3 }}
+                                >
                                     {selectedPlayer.username}
                                 </div>
                                 <div style={{ fontSize: 11, fontWeight: 700, color: selectedPlayer.tier.color, marginTop: 2 }}>
