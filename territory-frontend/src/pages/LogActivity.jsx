@@ -144,6 +144,7 @@ export default function LogActivity() {
 
     // Submission state
     const [submitting, setSubmitting] = useState(false);
+    const [retryAttempt, setRetryAttempt] = useState(0);
     const [error, setError] = useState('');
     const [result, setResult] = useState(null);
 
@@ -290,6 +291,8 @@ export default function LogActivity() {
     };
 
     // ========== SUBMIT TO BACKEND ==========
+    // Retries up to 3 times on network/server errors with exponential backoff.
+    // Validation errors (4xx) fail immediately — retrying won't fix them.
     const handleSubmit = async () => {
         if (coordinates.length < 2) {
             setError('Not enough GPS points collected. Try moving around more before stopping.');
@@ -297,24 +300,57 @@ export default function LogActivity() {
         }
 
         setSubmitting(true);
+        setRetryAttempt(0);
         setError('');
 
-        try {
-            const payload = {
-                activityType,
-                coordinates,
-                duration: elapsedSeconds,
-                elevationGain: Math.round(elevationGain),
-            };
+        const payload = {
+            activityType,
+            coordinates,
+            duration: elapsedSeconds,
+            elevationGain: Math.round(elevationGain),
+        };
 
-            const res = await createActivity(payload);
-            setResult(res.data);
-            setPhase('result');
-        } catch (err) {
-            const message = err.response?.data?.message || 'Failed to save activity.';            setError(message);
-        } finally {
-            setSubmitting(false);
+        const MAX_RETRIES = 3;
+        let lastError;
+
+        for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+            try {
+                const res = await createActivity(payload);
+                setResult(res.data);
+                setPhase('result');
+                setSubmitting(false);
+                return;
+            } catch (err) {
+                lastError = err;
+                const status = err.response?.status;
+
+                // 4xx = validation/auth error — retrying won't help
+                if (status && status >= 400 && status < 500) break;
+
+                // Still have retries left — wait then try again
+                if (attempt < MAX_RETRIES) {
+                    setRetryAttempt(attempt);
+                    await new Promise(r => setTimeout(r, 1000 * attempt));
+                }
+            }
         }
+
+        // All attempts failed — show a specific, useful message
+        const status = lastError?.response?.status;
+        const serverMessage = lastError?.response?.data?.message;
+
+        let message;
+        if (!lastError?.response) {
+            message = 'No internet connection. Your run data is safe — check your signal and try again.';
+        } else if (status >= 500) {
+            message = serverMessage || 'Our server hit an issue saving your run. Please try again in a moment.';
+        } else {
+            message = serverMessage || 'Could not save your activity. Please try again.';
+        }
+
+        setError(message);
+        setRetryAttempt(0);
+        setSubmitting(false);
     };
 
     // ========== RENDER PHASES ==========
@@ -372,6 +408,7 @@ export default function LogActivity() {
                         elevationGainMeters={elevationGain}
                         elevationLossMeters={elevationLoss}
                         submitting={submitting}
+                        retryAttempt={retryAttempt}
                         error={error}
                         onSubmit={handleSubmit}
                         onDiscard={() => navigate('/dashboard')}
@@ -934,10 +971,12 @@ function SummaryPhase({
     elevationGainMeters,
     elevationLossMeters,
     submitting,
+    retryAttempt,
     error,
     onSubmit,
     onDiscard,
 }) {
+    const [confirmingDiscard, setConfirmingDiscard] = useState(false);
     const isWalk = activityType === 'walk';
     const hasEnoughPoints = coordinateCount >= 2;
     const elevGainFt = Math.round(elevationGainMeters * 3.28084);
@@ -1009,6 +1048,19 @@ function SummaryPhase({
                 </p>
             )}
 
+            {/* Don't close warning — shown while saving or retrying */}
+            {submitting && (
+                <div className="flex items-start gap-2 bg-yellow-500/10 border border-yellow-500/30 rounded-xl px-3 py-2.5">
+                    <span className="text-yellow-400 text-base mt-0.5">⚠️</span>
+                    <p className="text-yellow-300 text-xs font-semibold leading-snug">
+                        {retryAttempt > 0
+                            ? `Connection issue — retrying to save your run (attempt ${retryAttempt} of 3). Please keep the app open.`
+                            : 'Saving your run — please keep the app open until this completes.'
+                        }
+                    </p>
+                </div>
+            )}
+
             {/* Actions */}
             <div className="space-y-3">
                 <button
@@ -1017,16 +1069,46 @@ function SummaryPhase({
                     disabled={submitting || !hasEnoughPoints}
                     className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:bg-gray-800 disabled:text-gray-600 disabled:cursor-not-allowed text-white font-black text-lg py-4 rounded-2xl transition-colors"
                 >
-                    {submitting ? 'Saving...' : 'Save Activity'}
+                    {submitting
+                        ? retryAttempt > 0
+                            ? `Retrying... (${retryAttempt} of 3)`
+                            : 'Saving...'
+                        : 'Save Activity'
+                    }
                 </button>
 
-                <button
-                    type="button"
-                    onClick={onDiscard}
-                    className="w-full bg-transparent border border-gray-800 hover:border-gray-600 text-gray-300 hover:text-white font-semibold py-3 rounded-2xl transition-colors"
-                >
-                    Discard
-                </button>
+                {!confirmingDiscard ? (
+                    <button
+                        type="button"
+                        onClick={() => setConfirmingDiscard(true)}
+                        disabled={submitting}
+                        className="w-full bg-transparent border border-gray-800 hover:border-red-500/50 disabled:opacity-40 disabled:cursor-not-allowed text-gray-400 hover:text-red-400 font-semibold py-3 rounded-2xl transition-colors"
+                    >
+                        Discard
+                    </button>
+                ) : (
+                    <div className="space-y-2">
+                        <p className="text-center text-sm text-red-400 font-semibold">
+                            This will permanently delete your run. Are you sure?
+                        </p>
+                        <div className="flex gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setConfirmingDiscard(false)}
+                                className="flex-1 bg-gray-800 hover:bg-gray-700 text-white font-bold py-3 rounded-2xl transition-colors"
+                            >
+                                Keep it
+                            </button>
+                            <button
+                                type="button"
+                                onClick={onDiscard}
+                                className="flex-1 bg-red-500/20 hover:bg-red-500/40 border border-red-500/40 text-red-400 font-bold py-3 rounded-2xl transition-colors"
+                            >
+                                Yes, discard
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

@@ -34,6 +34,26 @@ const FALLBACK_LNG = -82.4572;
 const H3_RESOLUTION = 10;
 const HEX_GRID_RING_SIZE = 5;
 
+// Deterministic color from ownerId — same player always gets the same color
+const playerColor = (ownerId) => {
+    const hash = ownerId.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
+    const hue = (hash * 137) % 360; // golden angle keeps colors visually distinct
+    return `hsl(${hue}, 100%, 62%)`;
+};
+
+// Returns a Promise that resolves to an HTMLImageElement of a colored shield
+const makeShieldImage = (color) => new Promise((resolve) => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+        <path d="M32,4 L56,12 L56,34 Q56,54 32,62 Q8,54 8,34 L8,12 Z"
+            fill="#111111" stroke="${color}" stroke-width="3.5"/>
+        <path d="M32,11 L50,17 L50,34 Q50,49 32,56 Q14,49 14,34 L14,17 Z"
+            fill="none" stroke="${color}" stroke-width="1.5" stroke-opacity="0.5"/>
+    </svg>`;
+    const img = new Image(64, 64);
+    img.onload = () => resolve(img);
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+});
+
 function hslToHex(h, s, l) {
     s /= 100; l /= 100;
     const k = n => (n + h / 30) % 12;
@@ -510,34 +530,40 @@ export default function Map() {
                 paint: { 'line-color': '#ffffff', 'line-width': 1.5, 'line-opacity': 1, 'line-blur': 0 },
             });
 
-            // ---- Others: shield icon ----
-            const shieldSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
-                <path d="M32,4 L56,12 L56,34 Q56,54 32,62 Q8,54 8,34 L8,12 Z"
-                    fill="#111111" stroke="#FFD700" stroke-width="3.5"/>
-                <path d="M32,11 L50,17 L50,34 Q50,49 32,56 Q14,49 14,34 L14,17 Z"
-                    fill="none" stroke="#FFD700" stroke-width="1.5" stroke-opacity="0.5"/>
-            </svg>`;
-            const shieldImg = new Image(64, 64);
-            shieldImg.onload = () => {
-                if (!map.hasImage('shield-icon')) map.addImage('shield-icon', shieldImg);
+            // ---- Others: per-player colored shield icons ----
+            // Load a uniquely colored shield for each player, then add the layer
+            // with a data-driven icon-image so each hex shows its owner's color.
+            const uniqueOwnerIds = [...new Set(
+                territories
+                    .filter(t => t.owner?.id?.toString() !== currentUserId)
+                    .map(t => t.owner?.id?.toString())
+                    .filter(Boolean)
+            )];
+
+            Promise.all(
+                uniqueOwnerIds.map(async (ownerId) => {
+                    const key = `shield-${ownerId}`;
+                    if (!map.hasImage(key)) {
+                        const img = await makeShieldImage(playerColor(ownerId));
+                        if (!map.hasImage(key)) map.addImage(key, img);
+                    }
+                })
+            ).then(() => {
                 if (map.getLayer('hex-others-icon')) return;
                 map.addLayer({
                     id: 'hex-others-icon',
                     type: 'symbol',
                     source: 'shield-points',
                     layout: {
-                        'icon-image': 'shield-icon',
+                        'icon-image': ['concat', 'shield-', ['get', 'ownerId']],
                         'icon-size': 0.22,
                         'icon-allow-overlap': true,
                         'icon-ignore-placement': true,
                         'icon-anchor': 'center',
                     },
-                    paint: {
-                        'icon-opacity': 0.92,
-                    },
+                    paint: { 'icon-opacity': 0.92 },
                 });
-            };
-            shieldImg.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(shieldSvg);
+            });
 
             // ---- Click → popup showing owner info ----
             map.on('click', 'hex-fill', (e) => {
