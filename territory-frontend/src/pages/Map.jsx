@@ -170,7 +170,7 @@ export default function Map() {
                 });
             } else if (state === 'spinning' && atGlobeZoom) {
                 const { lng, lat } = map.getCenter();
-                map.setCenter([(lng + 0.08 + 180) % 360 - 180, lat]);
+                map.setCenter([(lng - 0.08 + 180) % 360 - 180, lat]);
             }
 
             spinFrameRef.current = requestAnimationFrame(spin);
