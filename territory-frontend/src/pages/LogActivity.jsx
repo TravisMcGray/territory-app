@@ -572,11 +572,35 @@ function SetupPhase({ activityType, setActivityType, onStart, lastActivity }) {
                     60%  { opacity: 0.4; transform: scale(1) rotate(90deg); }
                     100% { opacity: 0; transform: scale(1) rotate(90deg); }
                 }
-                @keyframes boltAppear {
-                    0%   { opacity: 0; transform: scale(0.5); }
-                    15%  { opacity: 0.7; transform: scale(1); }
-                    60%  { opacity: 0.4; transform: scale(1); }
-                    100% { opacity: 0; transform: scale(1); }
+                @keyframes samusRun {
+                    0%         { transform: translateX(-80px); opacity: 0; }
+                    5%         { opacity: 1; }
+                    70%        { transform: translateX(480px); opacity: 1; }
+                    75%        { transform: translateX(480px); opacity: 0; }
+                    100%       { transform: translateX(480px); opacity: 0; }
+                }
+                @keyframes samusGhost1 {
+                    0%         { transform: translateX(-100px); opacity: 0; }
+                    5%         { opacity: 0; }
+                    8%         { opacity: 0.45; }
+                    70%        { transform: translateX(460px); opacity: 0.3; }
+                    75%        { opacity: 0; }
+                    100%       { opacity: 0; }
+                }
+                @keyframes samusGhost2 {
+                    0%         { transform: translateX(-120px); opacity: 0; }
+                    5%         { opacity: 0; }
+                    10%        { opacity: 0.25; }
+                    70%        { transform: translateX(440px); opacity: 0.15; }
+                    75%        { opacity: 0; }
+                    100%       { opacity: 0; }
+                }
+                @keyframes samusFlash {
+                    0%         { opacity: 0; }
+                    6%         { opacity: 0.12; }
+                    70%        { opacity: 0.04; }
+                    75%        { opacity: 0; }
+                    100%       { opacity: 0; }
                 }
             `}</style>
             <button
@@ -603,19 +627,45 @@ function SetupPhase({ activityType, setActivityType, onStart, lastActivity }) {
                                 <ellipse cx="20" cy="30" rx="13" ry="22" fill="rgba(255,255,255,0.6)"/>
                             </svg>
                         ))
-                        : [0,1,2,3,4].map(i => (
-                            <svg key={i} width="14" height="22" viewBox="0 0 40 60"
-                                style={{
-                                    position: 'absolute',
-                                    left: `${8 + i * 18}%`,
-                                    top: '15%',
-                                    animation: `boltAppear 2.5s ease-in-out ${i * 0.5}s infinite`,
-                                    opacity: 0,
-                                }}
-                            >
-                                <polygon points="28,2 12,32 22,32 12,58 32,22 22,22" fill="rgba(255,255,255,0.6)"/>
-                            </svg>
-                        ))
+                        : <>
+                            {/* Ambient speed glow */}
+                            <div style={{
+                                position: 'absolute', inset: 0,
+                                background: 'rgba(255,255,255,0.08)',
+                                animation: 'samusFlash 2.5s ease-out infinite',
+                            }}/>
+                            {/* Ghost 2 — furthest behind, most faded */}
+                            <div style={{
+                                position: 'absolute', left: 0, top: '15%',
+                                width: 80, height: '70%',
+                                background: 'linear-gradient(90deg, transparent, rgba(167,243,208,0.3), rgba(255,255,255,0.2))',
+                                borderRadius: 4,
+                                filter: 'blur(4px)',
+                                animation: 'samusGhost2 2.5s cubic-bezier(0.4,0,0.2,1) infinite',
+                                opacity: 0,
+                            }}/>
+                            {/* Ghost 1 — close behind */}
+                            <div style={{
+                                position: 'absolute', left: 0, top: '10%',
+                                width: 55, height: '80%',
+                                background: 'linear-gradient(90deg, transparent, rgba(167,243,208,0.5), rgba(255,255,255,0.4))',
+                                borderRadius: 4,
+                                filter: 'blur(2px)',
+                                animation: 'samusGhost1 2.5s cubic-bezier(0.4,0,0.2,1) infinite',
+                                opacity: 0,
+                            }}/>
+                            {/* Core — bright leading edge */}
+                            <div style={{
+                                position: 'absolute', left: 0, top: '5%',
+                                width: 28, height: '90%',
+                                background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.95))',
+                                borderRadius: 4,
+                                filter: 'blur(1px)',
+                                boxShadow: '0 0 12px 4px rgba(255,255,255,0.6)',
+                                animation: 'samusRun 2.5s cubic-bezier(0.4,0,0.2,1) infinite',
+                                opacity: 0,
+                            }}/>
+                          </>
                     }
                 </div>
                 <span style={{ position: 'relative', zIndex: 1 }}>
