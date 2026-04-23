@@ -1,126 +1,68 @@
-// ========== DASHBOARD PAGE ==========
-// Main hub after login. Shows stats, quick actions, and recent activity.
-// Leaderboard rows and feed usernames are clickable → navigate to profile.
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getProfile, getFeed, getHexagonLeaderboard } from '../services/api';
+import { getProfile, getFeed, getTerritoryLeaderboard } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import HexBackground from '../components/HexBackground';
 import Navbar from '../components/Navbar';
 
-// ========== STAT CARD ICONS ==========
-const HexIcon = ({ stroke, children }) => (
-    <svg width="36" height="36" viewBox="0 0 28 28" fill="none">
-        <polygon
-            points="2,14 8,3 20,3 26,14 20,25 8,25"
-            fill="#0e0d0d"
-            stroke={stroke}
-            strokeWidth="2"
-        />
-        {children}
+const getTier = (tilesOwned) => {
+    if (tilesOwned >= 500) return { level: 4, name: 'Overlord',  color: '#ff00aa' };
+    if (tilesOwned >= 200) return { level: 3, name: 'Commander', color: '#f5a623' };
+    if (tilesOwned >= 50)  return { level: 2, name: 'Scout',     color: '#00ccff' };
+    return                        { level: 1, name: 'Recruit',   color: '#10b981' };
+};
+
+const timeAgo = (dateString) => {
+    const seconds = Math.floor((new Date() - new Date(dateString)) / 1000);
+    if (seconds < 60) return 'just now';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    if (days < 7) return `${days}d ago`;
+    return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+};
+
+const WalkIcon = ({ size = 14, color = 'currentColor' }) => (
+    <svg width={size} height={size} viewBox="0 0 40 40" fill={color}>
+        <ellipse cx="28" cy="28" rx="2.2" ry="3.5" transform="rotate(-35 28 28)"/>
+        <ellipse cx="20" cy="24" rx="2.2" ry="3.5" opacity="0.7" transform="rotate(-35 20 24)"/>
+        <ellipse cx="22" cy="17" rx="2.2" ry="3.5" opacity="0.45" transform="rotate(-35 22 17)"/>
+        <ellipse cx="14" cy="14" rx="2.2" ry="3.5" opacity="0.2" transform="rotate(-35 14 14)"/>
     </svg>
 );
 
-const HexOwnedIcon = () => (
-    <HexIcon stroke="#10b981">
-        <text x="14" y="17" textAnchor="middle" fontSize="8" fill="#10b981" fontWeight="800">HEX</text>
-    </HexIcon>
+const RunIcon = ({ size = 14, color = 'currentColor' }) => (
+    <svg width={size} height={size} viewBox="0 0 40 40" fill={color}>
+        <polygon points="23,4 13,22 20,22 17,36 27,18 20,18"/>
+    </svg>
 );
 
-const HexDistanceIcon = () => (
-    <HexIcon stroke="#3b82f6">
-        <line x1="8" y1="14" x2="20" y2="14" stroke="#3b82f6" strokeWidth="1.5" strokeLinecap="round"/>
-        <line x1="8" y1="11" x2="8" y2="17" stroke="#3b82f6" strokeWidth="1.5" strokeLinecap="round"/>
-        <line x1="20" y1="11" x2="20" y2="17" stroke="#3b82f6" strokeWidth="1.5" strokeLinecap="round"/>
-    </HexIcon>
-);
-
-const HexActivitiesIcon = () => (
-    <HexIcon stroke="#a855f7">
-        <polyline
-            points="5,14 8,14 11,9 15,19 18,12 21,14 24,14"
-            stroke="#a855f7"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            fill="none"
-        />
-    </HexIcon>
-);
-
-const HexStolenIcon = () => (
-    <HexIcon stroke="#ef4444">
-        <line x1="14" y1="7" x2="14" y2="21" stroke="#ef4444" strokeWidth="1.5" strokeLinecap="round"/>
-        <line x1="9" y1="12" x2="19" y2="12" stroke="#ef4444" strokeWidth="1.5" strokeLinecap="round"/>
-    </HexIcon>
-);
-
-// ========== MEDAL HEXAGONS ==========
 function MedalHex({ rank }) {
     const configs = {
-        1: { fill: '#0e0d0d', stroke: '#ffb004', textColor: '#ffffff', label: '1' },
-        2: { fill: '#000000', stroke: '#9daec5', textColor: '#ffffff', label: '2' },
-        3: { fill: '#000000', stroke: '#ad4d11', textColor: '#ffffff', label: '3' },
+        1: { stroke: '#ffb004', label: '1' },
+        2: { stroke: '#9daec5', label: '2' },
+        3: { stroke: '#ad4d11', label: '3' },
     };
-
     const config = configs[rank];
-
-    if (config) {
-        return (
-            <svg width="36" height="36" viewBox="0 0 28 28" fill="none">
-                <polygon
-                    points="2,14 8,3 20,3 26,14 20,25 8,25"
-                    fill={config.fill}
-                    stroke={config.stroke}
-                    strokeWidth="2"
-                />
-                <text
-                    x="14"
-                    y="15"
-                    textAnchor="middle"
-                    dominantBaseline="middle"
-                    fontSize="12"
-                    fill={config.textColor}
-                    fontWeight="700"
-                    fontFamily="Oxanium, sans-serif"
-                >
-                    {config.label}
-                </text>
-            </svg>
-        );
-    }
-
+    if (config) return (
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+            <polygon points="2,14 8,3 20,3 26,14 20,25 8,25" fill="#1e293b" stroke={config.stroke} strokeWidth="2"/>
+            <text x="14" y="15" textAnchor="middle" dominantBaseline="middle" fontSize="10" fill="#fff" fontWeight="700">{config.label}</text>
+        </svg>
+    );
     return (
-        <svg width="32" height="32" viewBox="0 0 28 28" fill="none">
-            <polygon
-                points="2,14 8,3 20,3 26,14 20,25 8,25"
-                fill="none"
-                stroke="#4b5563"
-                strokeWidth="1.5"
-            />
-            <text
-                x="14"
-                y="15"
-                textAnchor="middle"
-                dominantBaseline="middle"
-                fontSize={rank > 99 ? "7" : "10"}
-                fill="#6b7280"
-                fontWeight="700"
-                fontFamily="Oxanium, sans-serif"
-            >
-                {rank > 99 ? `#${rank}` : rank}
-            </text>
+        <svg width="24" height="24" viewBox="0 0 28 28" fill="none">
+            <polygon points="2,14 8,3 20,3 26,14 20,25 8,25" fill="none" stroke="#cbd5e1" strokeWidth="1.5"/>
+            <text x="14" y="15" textAnchor="middle" dominantBaseline="middle" fontSize="9" fill="#94a3b8" fontWeight="700">{rank}</text>
         </svg>
     );
 }
 
-// ========== MAIN COMPONENT ==========
 export default function Dashboard() {
     const navigate = useNavigate();
     const { user: currentUser } = useAuth();
-
-    // Normalize ID — getProfile() returns 'id', context may store 'id' or '_id'
     const currentUserId = currentUser?.id ?? currentUser?._id;
 
     const [profile, setProfile] = useState(null);
@@ -128,14 +70,13 @@ export default function Dashboard() {
     const [leaderboard, setLeaderboard] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    // ========== LOAD DATA ==========
     useEffect(() => {
         const loadDashboard = async () => {
             try {
                 const [profileRes, feedRes, leaderRes] = await Promise.all([
                     getProfile(),
                     getFeed(),
-                    getHexagonLeaderboard(),
+                    getTerritoryLeaderboard(),
                 ]);
                 setProfile(profileRes.data.profile);
                 setFeed(feedRes.data.activities || []);
@@ -146,243 +87,296 @@ export default function Dashboard() {
                 setLoading(false);
             }
         };
-
         loadDashboard();
     }, []);
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-                <div className="text-emerald-400 text-lg font-semibold animate-pulse">
-                    Loading dashboard data...
-                </div>
+            <div className="min-h-screen bg-slate-100 flex items-center justify-center">
+                <div className="text-emerald-500 text-lg font-semibold animate-pulse">Loading...</div>
             </div>
         );
     }
 
     const stats = profile?.stats || {};
+    const tier = getTier(profile?.tilesOwned ?? 0);
+    const totalActivities = (stats.totalWalks ?? 0) + (stats.totalRuns ?? 0);
+    const myRankEntry = leaderboard.findIndex(e => String(e.id) === String(currentUserId));
+    const myRank = myRankEntry >= 0 ? myRankEntry + 1 : null;
 
-    const handleLeaderboardClick = (entry) => {
-        if (String(entry.id) === String(currentUserId)) {
-            navigate('/profile');
-        } else {
-            navigate(`/profile/${entry.id}`);
-        }
-    };
-
-    const handleActivityUserClick = (userId) => {
-        if (!userId) return;
-        if (String(userId) === String(currentUserId)) {
-            navigate('/profile');
-        } else {
-            navigate(`/profile/${userId}`);
-        }
-    };
-
-    // ========== RENDER ==========
     return (
-        <div className="min-h-screen bg-gray-950 text-white relative">
+        <div className="min-h-screen bg-slate-100 text-slate-900 relative">
+            <style>{`
+                @keyframes fadeUp {
+                    from { opacity: 0; transform: translateY(10px); }
+                    to   { opacity: 1; transform: translateY(0); }
+                }
+                @keyframes globeSpin {
+                    from { transform: translateX(-50%); }
+                    to   { transform: translateX(0%); }
+                }
+                @keyframes hexGlow {
+                    0%, 100% { filter: drop-shadow(0 0 6px #10b981) drop-shadow(0 0 12px #10b981); }
+                    50%      { filter: drop-shadow(0 0 14px #10b981) drop-shadow(0 0 28px #10b981); }
+                }
+                @keyframes globeFloat {
+                    0%, 100% { transform: translateY(0px); }
+                    50%      { transform: translateY(-4px); }
+                }
+            `}</style>
             <HexBackground />
             <Navbar />
 
-            <div className="max-w-6xl mx-auto px-4 py-6 space-y-6 relative z-10">
+            <div className="max-w-3xl mx-auto px-4 py-8 relative z-10">
 
-                {/* ========== WELCOME ========== */}
-                <div>
-                    <h2 className="text-2xl font-bold">
-                        Welcome back, <span className="text-emerald-400">{profile?.username}</span>
-                    </h2>
-                    <p className="font-bold text-gray-300 text-sm mt-1">
-                        Ready to capture more territory?
+                {/* ========== HEADER ========== */}
+                <div style={{ marginBottom: 32, animation: 'fadeUp 0.4s ease both' }}>
+                    <h1 style={{ fontSize: 28, fontWeight: 900, color: '#0f172a', lineHeight: 1.2 }}>
+                        Welcome back, <span style={{ color: '#10b981' }}>{profile?.username}</span>
+                    </h1>
+                    <p style={{ fontSize: 14, color: '#64748b', marginTop: 6, fontWeight: 600 }}>
+                        {profile?.tilesOwned > 0
+                            ? `You control ${profile.tilesOwned} tiles. ${myRank ? `You're ranked #${myRank} globally.` : 'Keep capturing.'}`
+                            : 'Ready to capture more territory?'
+                        }
                     </p>
                 </div>
 
-                {/* ========== STATS GRID ========== */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <StatCard
-                        label="Hexagons Owned"
-                        value={stats.totalHexagonsCaptured ?? 0}
-                        accent="emerald"
-                        icon={<HexOwnedIcon />}
-                    />
-                    <StatCard
-                        label="Total Distance"
-                        value={`${(stats.totalDistance ?? 0).toFixed(1)}mi`}
-                        accent="blue"
-                        icon={<HexDistanceIcon />}
-                    />
-                    <StatCard
-                        label="Activities"
-                        value={(stats.totalWalks ?? 0) + (stats.totalRuns ?? 0)}
-                        accent="purple"
-                        icon={<HexActivitiesIcon />}
-                    />
-                    <StatCard
-                        label="Stolen"
-                        value={stats.totalStolenTerritories ?? 0}
-                        accent="red"
-                        icon={<HexStolenIcon />}
-                    />
+                {/* ========== SPINNING GLOBE ========== */}
+                <div style={{
+                    display: 'flex', justifyContent: 'center', alignItems: 'center',
+                    marginBottom: 32, animation: 'fadeUp 0.4s ease 0.05s both',
+                }}>
+                    <div style={{ position: 'relative', width: 260, height: 260, animation: 'globeFloat 4s ease-in-out infinite' }}>
+
+                        {/* Glowing hexagon ring */}
+                        <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', animation: 'hexGlow 3s ease-in-out infinite' }}
+                            viewBox="0 0 260 260">
+                            <polygon points="130,8 244,68 244,192 130,252 16,192 16,68"
+                                fill="none" stroke="#10b981" strokeWidth="2.5"/>
+                            <polygon points="130,24 228,80 228,180 130,236 32,180 32,80"
+                                fill="none" stroke="#10b981" strokeWidth="1" opacity="0.35"/>
+                        </svg>
+
+                        {/* Globe */}
+                        <div style={{
+                            position: 'absolute',
+                            top: '50%', left: '50%',
+                            transform: 'translate(-50%, -50%)',
+                            width: 180, height: 180,
+                            borderRadius: '50%',
+                            overflow: 'hidden',
+                            boxShadow: '0 0 30px rgba(16,185,129,0.35), inset -8px -8px 20px rgba(0,0,0,0.6)',
+                            background: '#1a6b9a',
+                        }}>
+                            <div style={{
+                                position: 'absolute', top: 0, left: 0,
+                                width: '200%', height: '100%',
+                                animation: 'globeSpin 30s linear infinite',
+                                backgroundImage: 'url(/earth.jpg)',
+                                backgroundSize: '50% 100%',
+                                backgroundRepeat: 'repeat-x',
+                            }}/>
+                            <div style={{
+                                position: 'absolute', top: 0, left: 0,
+                                width: '200%', height: '100%',
+                                animation: 'globeSpin 30s linear infinite',
+                            }}>
+                                <svg width="100%" height="100%" viewBox="0 0 240 120" preserveAspectRatio="none">
+                                    {[0,30,60,90,120,150,180,210,240].map(x => (
+                                        <path key={x} d={`M ${x} 0 Q ${x+15} 60 ${x} 120`}
+                                            fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="0.8"/>
+                                    ))}
+                                    {[20,45,60,75,100].map(y => (
+                                        <line key={y} x1="0" y1={y} x2="240" y2={y}
+                                            stroke="rgba(255,255,255,0.08)" strokeWidth="0.6"/>
+                                    ))}
+                                </svg>
+                            </div>
+                            <div style={{
+                                position: 'absolute', inset: 0,
+                                background: 'radial-gradient(circle at 30% 28%, rgba(255,255,255,0.15) 0%, transparent 55%)',
+                            }}/>
+                        </div>
+                    </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* ========== KEY NUMBERS ========== */}
+                <div style={{
+                    display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)',
+                    gap: 1, marginBottom: 32,
+                    background: '#e2e8f0', borderRadius: 16, overflow: 'hidden',
+                    animation: 'fadeUp 0.4s ease 0.1s both',
+                    boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+                }}>
+                    {[
+                        { label: 'Tiles Owned',  value: profile?.tilesOwned ?? 0,                       color: tier.color },
+                        { label: 'Miles',         value: (stats.totalDistance ?? 0).toFixed(1),           color: '#3b82f6' },
+                        { label: 'Activities',    value: totalActivities,                                  color: '#8b5cf6' },
+                        { label: 'Stolen',        value: stats.totalStolenTerritories ?? 0,               color: '#ef4444' },
+                    ].map((s, i) => (
+                        <div key={i} style={{
+                            background: '#ffffff',
+                            padding: '18px 12px', textAlign: 'center',
+                        }}>
+                            <div style={{ fontSize: 24, fontWeight: 900, color: s.color, lineHeight: 1 }}>
+                                {s.value}
+                            </div>
+                            <div style={{ fontSize: 9, color: '#94a3b8', fontWeight: 700,
+                                textTransform: 'uppercase', letterSpacing: '0.07em', marginTop: 5 }}>
+                                {s.label}
+                            </div>
+                        </div>
+                    ))}
+                </div>
 
-                    {/* ========== RECENT FEED ========== */}
-                    <div className="bg-gray-900 rounded-2xl border border-gray-800 p-5">
-                        <div className="flex items-center justify-between mb-4">
-                            <h3 className="font-bold text-lg">Recent Activity</h3>
-                            <button
-                                onClick={() => navigate('/feed')}
-                                className="font-bold text-emerald-400 text-sm hover:text-emerald-300 transition-colors"
-                            >
-                                View all
+                {/* ========== BOTTOM GRID ========== */}
+                <div style={{
+                    display: 'grid', gridTemplateColumns: '1fr 1fr',
+                    gap: 16, animation: 'fadeUp 0.4s ease 0.15s both',
+                }}>
+
+                    {/* ---- Recent Activity ---- */}
+                    <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 16, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                            <h3 style={{ fontSize: 13, fontWeight: 800, color: '#64748b',
+                                textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                                Activity Feed
+                            </h3>
+                            <button onClick={() => navigate('/feed')}
+                                style={{ fontSize: 11, fontWeight: 700, color: '#10b981',
+                                    background: 'none', border: 'none', cursor: 'pointer' }}>
+                                See all →
                             </button>
                         </div>
+
                         {feed.length === 0 ? (
-                            <div className="text-center py-8">
-                                <p className="font-bold text-gray-300 text-sm">No activity yet.</p>
-                                <p className="font-bold text-gray-400 text-xs mt-1">
-                                    Follow people or log your first activity!
-                                </p>
+                            <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                                <p style={{ color: '#94a3b8', fontSize: 13 }}>No activity yet.</p>
+                                <button onClick={() => navigate('/leaderboard')}
+                                    style={{ fontSize: 12, color: '#10b981', background: 'none',
+                                        border: 'none', cursor: 'pointer', marginTop: 8, fontWeight: 600 }}>
+                                    Find people to follow →
+                                </button>
                             </div>
                         ) : (
-                            <div className="space-y-3">
-                                {feed.slice(0, 4).map(activity => (
-                                    <ActivityItem
-                                        key={activity._id}
-                                        activity={activity}
-                                        onUserClick={handleActivityUserClick}
-                                    />
-                                ))}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                {feed.slice(0, 4).map(activity => {
+                                    const isWalk = activity.activityType === 'walk' || activity.activityType === 'WALK';
+                                    const accent = isWalk ? '#3b82f6' : '#10b981';
+                                    const hexCount = typeof activity.capturedHexagons === 'number'
+                                        ? activity.capturedHexagons
+                                        : (Array.isArray(activity.capturedHexagons) ? activity.capturedHexagons.length : 0);
+                                    return (
+                                        <div key={activity._id} style={{
+                                            display: 'flex', alignItems: 'center', gap: 10,
+                                            padding: '10px 0',
+                                            borderBottom: '1px solid #f1f5f9',
+                                        }}>
+                                            <div style={{
+                                                width: 30, height: 30, borderRadius: 8,
+                                                background: `${accent}15`,
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                flexShrink: 0,
+                                            }}>
+                                                {isWalk ? <WalkIcon size={14} color={accent}/> : <RunIcon size={14} color={accent}/>}
+                                            </div>
+                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                                <p style={{ fontSize: 12, fontWeight: 700, color: '#0f172a',
+                                                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                    {activity.username ?? 'Unknown'}
+                                                </p>
+                                                <p style={{ fontSize: 10, color: '#94a3b8', marginTop: 1 }}>
+                                                    {(activity.distance ?? 0).toFixed(1)}mi · {hexCount} hex
+                                                </p>
+                                            </div>
+                                            <span style={{ fontSize: 10, color: '#94a3b8', flexShrink: 0 }}>
+                                                {timeAgo(activity.createdAt)}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         )}
                     </div>
 
-                    {/* ========== LEADERBOARD PREVIEW ========== */}
-                    <div className="bg-gray-900 rounded-2xl border border-gray-800 p-5">
-                        <div className="flex items-center justify-between mb-4">
-                            <h3 className="font-bold text-lg">Hexagon Leaderboard</h3>
-                            <button
-                                onClick={() => navigate('/leaderboard')}
-                                className="font-bold text-emerald-400 text-sm hover:text-emerald-300 transition-colors"
-                            >
-                                View all
+                    {/* ---- Territory Rank ---- */}
+                    <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 16, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                            <h3 style={{ fontSize: 13, fontWeight: 800, color: '#64748b',
+                                textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                                Territory Rank
+                            </h3>
+                            <button onClick={() => navigate('/leaderboard')}
+                                style={{ fontSize: 11, fontWeight: 700, color: '#10b981',
+                                    background: 'none', border: 'none', cursor: 'pointer' }}>
+                                See all →
                             </button>
                         </div>
+
                         {leaderboard.length === 0 ? (
-                            <div className="text-center py-8">
-                                <p className="text-gray-400 font-bold text-sm">No data yet.</p>
-                                <p className="text-gray-500 font-bold text-xs mt-1">
-                                    Be the first to capture territory!
-                                </p>
+                            <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                                <p style={{ color: '#94a3b8', fontSize: 13 }}>No rankings yet.</p>
                             </div>
                         ) : (
-                            <div className="space-y-2">
-                                {leaderboard.slice(0, 5).map((entry, index) => (
-                                    <LeaderboardItem
-                                        key={entry.id}
-                                        entry={entry}
-                                        rank={index + 1}
-                                        currentUserId={currentUserId}
-                                        onClick={() => handleLeaderboardClick(entry)}
-                                    />
-                                ))}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                {leaderboard.slice(0, 4).map((entry, index) => {
+                                    const isMe = String(entry.id) === String(currentUserId);
+                                    return (
+                                        <button key={entry.id} type="button"
+                                            onClick={() => isMe ? navigate('/profile') : navigate(`/profile/${entry.id}`)}
+                                            style={{
+                                                display: 'flex', alignItems: 'center', gap: 8,
+                                                background: isMe ? 'rgba(16,185,129,0.08)' : 'transparent',
+                                                border: `1px solid ${isMe ? 'rgba(16,185,129,0.25)' : 'transparent'}`,
+                                                borderRadius: 10, padding: '7px 8px',
+                                                cursor: 'pointer', width: '100%', textAlign: 'left',
+                                                transition: 'background 0.15s',
+                                            }}
+                                        >
+                                            <MedalHex rank={index + 1}/>
+                                            <span style={{ flex: 1, fontSize: 12, fontWeight: 700,
+                                                color: isMe ? '#10b981' : '#0f172a',
+                                                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                {entry.username}
+                                                {isMe && <span style={{ fontSize: 9, color: '#f59e0b', marginLeft: 5 }}>you</span>}
+                                            </span>
+                                            <span style={{ fontSize: 11, fontWeight: 800,
+                                                color: isMe ? '#10b981' : '#64748b', flexShrink: 0 }}>
+                                                {entry.tilesOwned}
+                                            </span>
+                                        </button>
+                                    );
+                                })}
+
+                                {myRank && myRank > 4 && (
+                                    <>
+                                        <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: 11 }}>· · ·</div>
+                                        <button type="button" onClick={() => navigate('/profile')}
+                                            style={{
+                                                display: 'flex', alignItems: 'center', gap: 8,
+                                                background: 'rgba(16,185,129,0.08)',
+                                                border: '1px solid rgba(16,185,129,0.25)',
+                                                borderRadius: 10, padding: '7px 8px',
+                                                cursor: 'pointer', width: '100%', textAlign: 'left',
+                                            }}
+                                        >
+                                            <MedalHex rank={myRank}/>
+                                            <span style={{ flex: 1, fontSize: 12, fontWeight: 700, color: '#10b981' }}>
+                                                {profile?.username}
+                                                <span style={{ fontSize: 9, color: '#f59e0b', marginLeft: 5 }}>you</span>
+                                            </span>
+                                            <span style={{ fontSize: 11, fontWeight: 800, color: '#10b981', flexShrink: 0 }}>
+                                                {profile?.tilesOwned ?? 0}
+                                            </span>
+                                        </button>
+                                    </>
+                                )}
                             </div>
                         )}
                     </div>
                 </div>
             </div>
         </div>
-    );
-}
-
-// ========== STAT CARD ==========
-function StatCard({ label, value, accent, icon }) {
-    const accentColors = {
-        emerald: 'text-emerald-400',
-        blue: 'text-blue-400',
-        purple: 'text-purple-400',
-        red: 'text-red-400',
-    };
-
-    return (
-        <div className="bg-gray-900 rounded-2xl border border-gray-800 p-4 flex items-center gap-3">
-            <div className="flex-shrink-0">{icon}</div>
-            <div className="flex-1 text-center">
-                <div className={`text-2xl font-black ${accentColors[accent]}`}>{value}</div>
-                <div className="text-gray-400 text-xs mt-0.5 font-bold">{label}</div>
-            </div>
-        </div>
-    );
-}
-
-// ========== ACTIVITY ITEM ==========
-// capturedHexagons from feed is a Number (projected via $size), not an array.
-// activity.userId is flat on the feed response — use it for navigation.
-function ActivityItem({ activity, onUserClick }) {
-    const isWalk = activity.activityType === 'walk' || activity.activityType === 'WALK';
-    const distance = (activity.distance ?? 0).toFixed(2);
-
-    // Feed endpoint projects capturedHexagons as $size (Number), not array
-    const hexCount = typeof activity.capturedHexagons === 'number'
-        ? activity.capturedHexagons
-        : (Array.isArray(activity.capturedHexagons) ? activity.capturedHexagons.length : 0);
-
-    return (
-        <div className="flex items-center gap-3 py-2 border-b border-gray-800 last:border-0">
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold flex-shrink-0 ${
-                isWalk ? 'bg-blue-500/20 text-blue-400' : 'bg-emerald-500/20 text-emerald-400'
-            }`}>
-                {isWalk ? '🚶' : '🏃'}
-            </div>
-            <div className="flex-1 min-w-0">
-                {/* Clickable username → profile */}
-                <button
-                    type="button"
-                    onClick={() => onUserClick(activity.userId)}
-                    className="text-sm font-semibold text-white hover:text-emerald-400 transition-colors truncate block text-left w-full"
-                >
-                    {activity.username ?? 'Unknown'}
-                </button>
-                <p className="text-gray-500 text-xs">
-                    {distance}mi · {hexCount} hexagons
-                </p>
-            </div>
-            <div className="text-gray-600 text-xs flex-shrink-0">
-                {isWalk ? 'Walk' : 'Run'}
-            </div>
-        </div>
-    );
-}
-
-// ========== LEADERBOARD ITEM ==========
-function LeaderboardItem({ entry, rank, currentUserId, onClick }) {
-    const isCurrentUser = String(entry.id) === String(currentUserId);
-
-    return (
-        <button
-            type="button"
-            onClick={onClick}
-            className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl transition-colors text-left ${
-                isCurrentUser
-                    ? 'bg-emerald-500/10 border border-emerald-500/30 hover:border-emerald-500/60'
-                    : 'hover:bg-gray-800 border border-transparent'
-            }`}
-        >
-            <div className="flex items-center justify-center flex-shrink-0">
-                <MedalHex rank={rank} />
-            </div>
-            <span className={`flex-1 text-sm font-semibold truncate ${
-                isCurrentUser ? 'text-emerald-400' : 'text-white'
-            }`}>
-                {entry.username}
-                {isCurrentUser && (
-                    <span className="font-bold text-yellow-400 text-xs ml-2">you</span>
-                )}
-            </span>
-            <span className="text-emerald-400 text-sm font-bold flex-shrink-0">
-                {entry.hexagons} hex
-            </span>
-        </button>
     );
 }

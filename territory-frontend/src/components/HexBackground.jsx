@@ -37,10 +37,6 @@ export default function HexBackground() {
             style={{ zIndex: 0 }}
             aria-hidden="true"
         >
-            {/* ========== SVG HEXAGON GRID ==========
-                Fills the full screen but we clip it to left 60% using
-                the CSS mask below. Color gradient uses absolute pixels
-                so color zones stay consistent regardless of screen width. */}
             <svg
                 width="100%"
                 height="100%"
@@ -54,19 +50,19 @@ export default function HexBackground() {
                         x1="0" y1="0"
                         x2="900" y2="0"
                     >
-                        <stop offset="0%"   stopColor="#34d399" />
-                        <stop offset="10%"  stopColor="#34d399" />
-                        <stop offset="40%"  stopColor="#60a5fa" />
-                        <stop offset="60%"  stopColor="#60a5fa" />
-                        <stop offset="75%"  stopColor="#a78bfa" />
-                        <stop offset="100%" stopColor="#a78bfa" />
+                        <stop offset="0%"   stopColor="#10b981" />
+                        <stop offset="10%"  stopColor="#10b981" />
+                        <stop offset="40%"  stopColor="#3b82f6" />
+                        <stop offset="60%"  stopColor="#3b82f6" />
+                        <stop offset="75%"  stopColor="#8b5cf6" />
+                        <stop offset="100%" stopColor="#8b5cf6" />
                     </linearGradient>
                 </defs>
 
                 <g
                     stroke="url(#hexColor)"
                     fill="none"
-                    opacity="0.55"
+                    opacity="0.12"
                 >
                     {hexagons.map(({ cx, cy, key }) => (
                         <polygon
@@ -78,12 +74,6 @@ export default function HexBackground() {
                 </g>
             </svg>
 
-            {/* ========== CSS FADE OVERLAY ==========
-                A div positioned on top of the SVG that fades
-                from transparent on the left to the background color on the right.
-                Uses percentage widths so it ALWAYS scales with screen size.
-                This is the key to making it responsive — CSS gradients
-                are inherently percentage-based and screen-aware. */}
             <div
                 style={{
                     position: 'absolute',
@@ -91,10 +81,9 @@ export default function HexBackground() {
                     left: 0,
                     width: '100%',
                     height: '100%',
-                    background: 'linear-gradient(to right, transparent 0%, transparent 35%, #030712 55%, #030712 100%)',
+                    background: 'linear-gradient(to right, transparent 0%, transparent 35%, #f1f5f9 55%, #f1f5f9 100%)',
                 }}
             />
-            {/* Bottom fade so hex grid blends into page background */}
             <div
                 style={{
                     position: 'absolute',
@@ -102,7 +91,7 @@ export default function HexBackground() {
                     left: 0,
                     width: '100%',
                     height: '30%',
-                    background: 'linear-gradient(to bottom, transparent, #030712)',
+                    background: 'linear-gradient(to bottom, transparent, #f1f5f9)',
                 }}
             />
         </div>

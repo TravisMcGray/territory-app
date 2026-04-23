@@ -1,8 +1,3 @@
-// ========== FEED PAGE ==========
-// Shows activities from users you follow.
-// Supports kudos toggling with optimistic UI and inline comments.
-// Usernames are clickable and navigate to /profile/:userId.
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getFeed, addKudos, removeKudos, addComment } from '../services/api';
@@ -10,7 +5,6 @@ import { useAuth } from '../context/AuthContext';
 import HexBackground from '../components/HexBackground';
 import Navbar from '../components/Navbar';
 
-// ========== TIME HELPER ==========
 const timeAgo = (dateString) => {
     const seconds = Math.floor((new Date() - new Date(dateString)) / 1000);
     if (seconds < 60) return 'just now';
@@ -20,13 +14,44 @@ const timeAgo = (dateString) => {
     if (hours < 24) return `${hours}h ago`;
     const days = Math.floor(hours / 24);
     if (days < 7) return `${days}d ago`;
-    return new Date(dateString).toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-    });
+    return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 };
 
-// ========== MAIN COMPONENT ==========
+const WalkIcon = ({ size = 14, color = 'currentColor' }) => (
+    <svg width={size} height={size} viewBox="0 0 40 40" fill={color}>
+        <ellipse cx="28" cy="28" rx="2.2" ry="3.5" transform="rotate(-35 28 28)"/>
+        <ellipse cx="20" cy="24" rx="2.2" ry="3.5" opacity="0.7" transform="rotate(-35 20 24)"/>
+        <ellipse cx="22" cy="17" rx="2.2" ry="3.5" opacity="0.45" transform="rotate(-35 22 17)"/>
+        <ellipse cx="14" cy="14" rx="2.2" ry="3.5" opacity="0.2" transform="rotate(-35 14 14)"/>
+    </svg>
+);
+
+const RunIcon = ({ size = 14, color = 'currentColor' }) => (
+    <svg width={size} height={size} viewBox="0 0 40 40" fill={color}>
+        <polygon points="23,4 13,22 20,22 17,36 27,18 20,18"/>
+    </svg>
+);
+
+const BoltIcon = ({ size = 16, color = 'currentColor' }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
+        <polygon points="13,2 6,14 11,14 11,22 18,10 13,10"/>
+    </svg>
+);
+
+const ChatIcon = ({ size = 16, color = 'currentColor' }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+    </svg>
+);
+
+const HexIcon = () => (
+    <svg width="48" height="48" viewBox="0 0 100 100">
+        <polygon points="50,5 95,27.5 95,72.5 50,95 5,72.5 5,27.5"
+            fill="none" stroke="#cbd5e1" strokeWidth="4"/>
+        <text x="50" y="57" textAnchor="middle" fontSize="28" fill="#cbd5e1" fontWeight="800">?</text>
+    </svg>
+);
+
 export default function Feed() {
     const { user } = useAuth();
     const navigate = useNavigate();
@@ -35,7 +60,6 @@ export default function Feed() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
-    // ========== LOAD FEED ==========
     useEffect(() => {
         const loadFeed = async () => {
             try {
@@ -47,98 +71,79 @@ export default function Feed() {
                 setLoading(false);
             }
         };
-
         loadFeed();
     }, []);
 
-    // ========== KUDOS HANDLER ==========
-    // Optimistic update: change UI immediately, then sync with server.
-    // If server fails, revert to previous state so nothing looks broken.
     const handleKudos = async (activityId, hasGivenKudos) => {
         const previous = activities;
-
         setActivities(prev =>
             prev.map(a => {
                 if (a._id !== activityId) return a;
-                return {
-                    ...a,
-                    hasGivenKudos: !hasGivenKudos,
-                    kudosCount: hasGivenKudos ? a.kudosCount - 1 : a.kudosCount + 1,
-                };
+                return { ...a, hasGivenKudos: !hasGivenKudos, kudosCount: hasGivenKudos ? a.kudosCount - 1 : a.kudosCount + 1 };
             })
         );
-
         try {
-            if (hasGivenKudos) {
-                await removeKudos(activityId);
-            } else {
-                await addKudos(activityId);
-            }
-        } catch (err) {
-            setActivities(previous);
-        }
+            if (hasGivenKudos) await removeKudos(activityId);
+            else await addKudos(activityId);
+        } catch { setActivities(previous); }
     };
 
-    // ========== COMMENT HANDLER ==========
     const handleCommentAdded = (activityId) => {
         setActivities(prev =>
-            prev.map(a => {
-                if (a._id !== activityId) return a;
-                return { ...a, commentCount: a.commentCount + 1 };
-            })
+            prev.map(a => a._id !== activityId ? a : { ...a, commentCount: a.commentCount + 1 })
         );
     };
 
-    // ========== RENDER ==========
     if (loading) {
         return (
-            <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-                <div className="text-emerald-400 text-lg font-semibold animate-pulse">
-                    Loading feed data...
-                </div>
+            <div className="min-h-screen bg-slate-100 flex items-center justify-center">
+                <div className="text-emerald-500 text-lg font-semibold animate-pulse">Loading feed...</div>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-gray-950 text-white relative">
+        <div className="min-h-screen bg-slate-100 text-slate-900 relative">
+            <style>{`
+                @keyframes cardIn {
+                    from { opacity: 0; transform: translateY(16px) scale(0.97); }
+                    to   { opacity: 1; transform: translateY(0) scale(1); }
+                }
+                @keyframes kudosPulse {
+                    0%   { box-shadow: 0 0 0 0 rgba(16,185,129,0.7); }
+                    70%  { box-shadow: 0 0 0 10px rgba(16,185,129,0); }
+                    100% { box-shadow: 0 0 0 0 rgba(16,185,129,0); }
+                }
+            `}</style>
             <HexBackground />
             <Navbar />
 
             <div className="max-w-lg mx-auto px-4 py-6 relative z-10">
+                <h2 className="text-2xl font-black mb-6 text-slate-900">Activity Feed</h2>
 
-                <h2 className="text-2xl font-black mb-6">Activity Feed</h2>
-
-                {/* Error state */}
                 {error && (
-                    <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-400 text-sm mb-4">
+                    <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-600 text-sm mb-4">
                         {error}
                     </div>
                 )}
 
-                {/* Empty state */}
                 {!error && activities.length === 0 && (
                     <div className="text-center py-16">
-                        <div className="text-5xl mb-4">🗺️</div>
-                        <h3 className="text-xl font-bold text-white mb-2">
-                            Your feed is empty
-                        </h3>
-                        <p className="text-gray-300 text-sm max-w-sm mx-auto font-bold">
-                            Your feed shows activities from people you follow.
-                        </p>
-                        <p className="text-gray-300 text-sm max-w-sm mx-auto mt-1 font-bold">
-                            Head to the Leaderboard to find people to follow!
+                        <div className="flex justify-center mb-4"><HexIcon /></div>
+                        <h3 className="text-xl font-bold text-slate-900 mb-2">Your feed is empty</h3>
+                        <p className="text-slate-500 text-sm max-w-sm mx-auto">
+                            Follow people on the Leaderboard to see their activities here.
                         </p>
                     </div>
                 )}
 
-                {/* Activity list */}
                 {activities.length > 0 && (
                     <div className="space-y-4">
-                        {activities.map(activity => (
+                        {activities.map((activity, index) => (
                             <ActivityCard
                                 key={activity._id}
                                 activity={activity}
+                                index={index}
                                 currentUserId={user?._id}
                                 onKudos={handleKudos}
                                 onCommentAdded={handleCommentAdded}
@@ -152,24 +157,19 @@ export default function Feed() {
     );
 }
 
-// ========== ACTIVITY CARD ==========
-function ActivityCard({ activity, currentUserId, onKudos, onCommentAdded, onNavigateToProfile }) {
+function ActivityCard({ activity, index, currentUserId, onKudos, onCommentAdded, onNavigateToProfile }) {
     const [commentsOpen, setCommentsOpen] = useState(false);
     const [comments, setComments] = useState([]);
     const [commentsLoading, setCommentsLoading] = useState(false);
     const [commentText, setCommentText] = useState('');
     const [submittingComment, setSubmittingComment] = useState(false);
+    const [kudosBurst, setKudosBurst] = useState(false);
 
     const isWalk = activity.activityType === 'walk' || activity.activityType === 'WALK';
-
-    // From the feed endpoint, userId is flat on the activity object (not nested)
+    const accentColor = isWalk ? '#3b82f6' : '#10b981';
     const isOwnActivity = activity.userId?.toString() === currentUserId?.toString();
 
-    const distanceMiles = typeof activity.distance === 'number'
-        ? activity.distance.toFixed(2)
-        : '0.00';
-
-    // capturedHexagons from the feed is a Number (projected via $size), not an array
+    const distanceMiles = typeof activity.distance === 'number' ? activity.distance.toFixed(2) : '0.00';
     const hexCount = typeof activity.capturedHexagons === 'number'
         ? activity.capturedHexagons
         : (Array.isArray(activity.capturedHexagons) ? activity.capturedHexagons.length : 0);
@@ -182,7 +182,15 @@ function ActivityCard({ activity, currentUserId, onKudos, onCommentAdded, onNavi
         return `${m}m`;
     };
 
-    // ========== LOAD COMMENTS ==========
+    const handleKudosClick = () => {
+        if (isOwnActivity) return;
+        onKudos(activity._id, activity.hasGivenKudos);
+        if (!activity.hasGivenKudos) {
+            setKudosBurst(true);
+            setTimeout(() => setKudosBurst(false), 600);
+        }
+    };
+
     const handleToggleComments = async () => {
         if (!commentsOpen && comments.length === 0) {
             setCommentsLoading(true);
@@ -190,20 +198,15 @@ function ActivityCard({ activity, currentUserId, onKudos, onCommentAdded, onNavi
                 const { getActivity } = await import('../services/api');
                 const res = await getActivity(activity._id);
                 setComments(res.data.social.comments || []);
-            } catch (err) {
-                console.error('Failed to load comments:', err);
-            } finally {
-                setCommentsLoading(false);
-            }
+            } catch {}
+            finally { setCommentsLoading(false); }
         }
         setCommentsOpen(prev => !prev);
     };
 
-    // ========== SUBMIT COMMENT ==========
     const handleSubmitComment = async (e) => {
         e.preventDefault();
         if (!commentText.trim()) return;
-
         setSubmittingComment(true);
         try {
             const { addComment } = await import('../services/api');
@@ -211,156 +214,207 @@ function ActivityCard({ activity, currentUserId, onKudos, onCommentAdded, onNavi
             setComments(prev => [res.data.comment, ...prev]);
             setCommentText('');
             onCommentAdded(activity._id);
-        } catch (err) {
-            console.error('Failed to submit comment:', err);
-        } finally {
-            setSubmittingComment(false);
-        }
+        } catch {}
+        finally { setSubmittingComment(false); }
     };
 
     return (
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
-
-            {/* Card header */}
+        <div style={{
+            background: '#ffffff',
+            border: `1px solid ${accentColor}33`,
+            borderLeft: `4px solid ${accentColor}`,
+            borderRadius: 16,
+            overflow: 'hidden',
+            boxShadow: `0 2px 12px rgba(0,0,0,0.06)`,
+            animation: `cardIn 0.4s ease both`,
+            animationDelay: `${index * 0.06}s`,
+            transition: 'border-color 0.2s, box-shadow 0.2s',
+        }}
+            onMouseEnter={e => {
+                e.currentTarget.style.boxShadow = `0 4px 20px ${accentColor}22`;
+            }}
+            onMouseLeave={e => {
+                e.currentTarget.style.boxShadow = `0 2px 12px rgba(0,0,0,0.06)`;
+            }}
+        >
             <div className="p-5">
+                {/* Header */}
                 <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-3">
-                        {/* Clickable avatar → profile */}
                         <button
                             type="button"
                             onClick={() => activity.userId && onNavigateToProfile(activity.userId)}
-                            className="w-10 h-10 rounded-full bg-gray-800 border border-gray-700 flex items-center justify-center text-sm font-bold text-emerald-400 flex-shrink-0 hover:border-emerald-500 transition-colors"
+                            style={{
+                                width: 40, height: 40, borderRadius: '50%',
+                                background: `${accentColor}15`,
+                                border: `2px solid ${accentColor}`,
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                fontSize: 14, fontWeight: 700, color: accentColor,
+                                cursor: 'pointer', flexShrink: 0,
+                                transition: 'box-shadow 0.2s',
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.boxShadow = `0 0 12px ${accentColor}66`}
+                            onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}
                         >
                             {activity.username?.[0]?.toUpperCase() ?? '?'}
                         </button>
                         <div>
-                            {/* Clickable username → profile */}
                             <button
                                 type="button"
                                 onClick={() => activity.userId && onNavigateToProfile(activity.userId)}
-                                className="font-bold text-white text-sm hover:text-emerald-400 transition-colors"
+                                style={{ fontWeight: 700, color: '#0f172a', fontSize: 14, background: 'none', border: 'none', cursor: 'pointer', padding: 0, transition: 'color 0.2s' }}
+                                onMouseEnter={e => e.currentTarget.style.color = accentColor}
+                                onMouseLeave={e => e.currentTarget.style.color = '#0f172a'}
                             >
                                 {activity.username ?? 'Unknown'}
                             </button>
-                            <p className="text-gray-500 text-xs">
-                                {timeAgo(activity.createdAt)}
-                            </p>
+                            <p style={{ color: '#94a3b8', fontSize: 11, marginTop: 1 }}>{timeAgo(activity.createdAt)}</p>
                         </div>
                     </div>
 
-                    {/* Activity type badge */}
-                    <span className={`text-xs font-bold px-2 py-1 rounded-full ${
-                        isWalk
-                            ? 'bg-blue-500/20 text-blue-400'
-                            : 'bg-emerald-500/20 text-emerald-400'
-                    }`}>
-                        {isWalk ? '🚶 Walk' : '🏃 Run'}
-                    </span>
+                    <div style={{
+                        display: 'flex', alignItems: 'center', gap: 6,
+                        background: `${accentColor}12`,
+                        border: `1px solid ${accentColor}33`,
+                        borderRadius: 20, padding: '5px 12px',
+                    }}>
+                        {isWalk ? <WalkIcon size={18} color={accentColor}/> : <RunIcon size={18} color={accentColor}/>}
+                        <span style={{ fontSize: 12, fontWeight: 700, color: accentColor }}>
+                            {isWalk ? 'Walk' : 'Run'}
+                        </span>
+                    </div>
                 </div>
 
-                {/* Stats row */}
-                <div className="grid grid-cols-2 gap-2 mb-4">
-                    <StatPill label="Distance" value={`${distanceMiles}mi`} />
-                    <StatPill label="Duration" value={formatDuration(activity.duration)} />
-                    <StatPill label="Hexagons" value={hexCount} accent="emerald" />
-                    <StatPill label="Calories" value={`${activity.estimatedCalories ?? 0} kcal`} />
+                {/* Hero distance */}
+                <div style={{ marginBottom: 12 }}>
+                    <span style={{ fontSize: 32, fontWeight: 900, color: accentColor, textShadow: `0 0 20px ${accentColor}44`, lineHeight: 1 }}>
+                        {distanceMiles}
+                    </span>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: '#94a3b8', marginLeft: 4 }}>mi</span>
+                </div>
+
+                {/* Stats grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 14 }}>
+                    {[
+                        { label: 'Duration', value: formatDuration(activity.duration), color: '#64748b' },
+                        { label: 'Hexagons', value: hexCount, color: accentColor },
+                        { label: 'Calories', value: `${activity.estimatedCalories ?? 0} kcal`, color: '#64748b' },
+                    ].map((s, i) => (
+                        <div key={i} style={{
+                            background: i === 1 ? `${accentColor}10` : '#f8fafc',
+                            border: `1px solid ${i === 1 ? accentColor + '33' : '#e2e8f0'}`,
+                            borderRadius: 10, padding: '8px 6px', textAlign: 'center',
+                        }}>
+                            <div style={{ fontSize: 13, fontWeight: 800, color: s.color }}>{s.value}</div>
+                            <div style={{ fontSize: 9, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 2 }}>{s.label}</div>
+                        </div>
+                    ))}
                 </div>
 
                 {/* Stolen hexagons */}
                 {activity.stolenHexagons > 0 && (
-                    <p className="text-red-400 text-xs mb-3">
-                        ⚔️ Stole {activity.stolenHexagons} hexagon{activity.stolenHexagons !== 1 ? 's' : ''}
-                    </p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10,
+                        background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)',
+                        borderRadius: 8, padding: '4px 10px', width: 'fit-content' }}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="#ef4444">
+                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                        </svg>
+                        <span style={{ color: '#ef4444', fontSize: 11, fontWeight: 700 }}>
+                            Stole {activity.stolenHexagons} hex{activity.stolenHexagons !== 1 ? 'es' : ''}
+                        </span>
+                    </div>
                 )}
 
                 {/* Social actions */}
-                <div className="flex items-center gap-4 pt-1">
-
-                    {/* Kudos button */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16, paddingTop: 4 }}>
                     <button
                         type="button"
-                        onClick={() => !isOwnActivity && onKudos(activity._id, activity.hasGivenKudos)}
+                        onClick={handleKudosClick}
                         disabled={isOwnActivity}
-                        className={`flex items-center gap-1.5 text-sm transition-colors ${
-                            isOwnActivity
-                                ? 'text-gray-700 cursor-default'
-                                : activity.hasGivenKudos
-                                ? 'text-emerald-400'
-                                : 'text-gray-500 hover:text-emerald-400'
-                        }`}
+                        style={{
+                            display: 'flex', alignItems: 'center', gap: 6,
+                            background: activity.hasGivenKudos ? `${accentColor}15` : 'transparent',
+                            border: activity.hasGivenKudos ? `1px solid ${accentColor}44` : '1px solid transparent',
+                            borderRadius: 20, padding: '5px 10px',
+                            color: isOwnActivity ? '#cbd5e1' : activity.hasGivenKudos ? accentColor : '#94a3b8',
+                            cursor: isOwnActivity ? 'default' : 'pointer',
+                            fontSize: 13, fontWeight: 600,
+                            transition: 'all 0.2s',
+                            animation: kudosBurst ? 'kudosPulse 0.6s ease' : 'none',
+                        }}
                     >
-                        <span className="text-base">⚡</span>
-                        <span>{activity.kudosCount ?? 0}</span>
+                        <BoltIcon size={18} color={isOwnActivity ? '#cbd5e1' : activity.hasGivenKudos ? accentColor : '#94a3b8'}/>
+                        {activity.kudosCount ?? 0}
                     </button>
 
-                    {/* Comments button */}
                     <button
                         type="button"
                         onClick={handleToggleComments}
-                        className={`flex items-center gap-1.5 text-sm transition-colors ${
-                            commentsOpen
-                                ? 'text-white'
-                                : 'text-gray-500 hover:text-white'
-                        }`}
+                        style={{
+                            display: 'flex', alignItems: 'center', gap: 6,
+                            background: commentsOpen ? '#f1f5f9' : 'transparent',
+                            border: '1px solid transparent',
+                            borderRadius: 20, padding: '5px 10px',
+                            color: commentsOpen ? '#0f172a' : '#94a3b8',
+                            cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                            transition: 'all 0.2s',
+                        }}
                     >
-                        <span className="text-base">💬</span>
-                        <span>{activity.commentCount ?? 0}</span>
+                        <ChatIcon size={18} color={commentsOpen ? '#475569' : '#94a3b8'}/>
+                        {activity.commentCount ?? 0}
                     </button>
                 </div>
             </div>
 
-            {/* ========== COMMENTS SECTION ========== */}
+            {/* Comments section */}
             {commentsOpen && (
-                <div className="border-t border-gray-800 px-5 py-4 space-y-4">
-
-                    {/* Comment input */}
-                    <form onSubmit={handleSubmitComment} className="flex gap-2">
+                <div style={{ borderTop: '1px solid #e2e8f0', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 14, background: '#fafafa' }}>
+                    <form onSubmit={handleSubmitComment} style={{ display: 'flex', gap: 8 }}>
                         <input
                             value={commentText}
                             onChange={e => setCommentText(e.target.value)}
                             placeholder="Add a comment..."
                             maxLength={500}
-                            className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-emerald-500 transition-colors"
+                            style={{
+                                flex: 1, background: '#ffffff', border: '1px solid #e2e8f0',
+                                borderRadius: 12, padding: '8px 12px', color: '#0f172a',
+                                fontSize: 13, outline: 'none', transition: 'border-color 0.2s',
+                            }}
+                            onFocus={e => e.target.style.borderColor = accentColor}
+                            onBlur={e => e.target.style.borderColor = '#e2e8f0'}
                         />
                         <button
                             type="submit"
                             disabled={submittingComment || !commentText.trim()}
-                            className="bg-emerald-500 hover:bg-emerald-400 disabled:bg-gray-800 disabled:text-gray-600 text-white text-sm font-bold px-4 py-2 rounded-xl transition-colors"
+                            style={{
+                                background: accentColor, color: '#fff', fontWeight: 700,
+                                fontSize: 13, padding: '8px 16px', borderRadius: 12,
+                                border: 'none', cursor: 'pointer', opacity: (!commentText.trim() || submittingComment) ? 0.4 : 1,
+                                transition: 'opacity 0.2s',
+                            }}
                         >
                             {submittingComment ? '...' : 'Post'}
                         </button>
                     </form>
 
-                    {/* Comments list */}
-                    {commentsLoading && (
-                        <div className="text-gray-600 text-sm text-center py-2">
-                            Loading comments...
-                        </div>
-                    )}
-
-                    {!commentsLoading && comments.length === 0 && (
-                        <p className="text-gray-600 text-sm text-center py-2">
-                            No comments yet. Be the first!
-                        </p>
-                    )}
-
+                    {commentsLoading && <p style={{ color: '#94a3b8', fontSize: 13, textAlign: 'center' }}>Loading comments...</p>}
+                    {!commentsLoading && comments.length === 0 && <p style={{ color: '#94a3b8', fontSize: 13, textAlign: 'center' }}>No comments yet. Be the first!</p>}
                     {!commentsLoading && comments.length > 0 && (
-                        <div className="space-y-3">
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                             {comments.map(comment => (
-                                <div key={comment.id} className="flex gap-2">
-                                    <div className="w-7 h-7 rounded-full bg-gray-800 flex items-center justify-center text-xs font-bold text-emerald-400 flex-shrink-0">
+                                <div key={comment.id} style={{ display: 'flex', gap: 10 }}>
+                                    <div style={{
+                                        width: 28, height: 28, borderRadius: '50%',
+                                        background: `${accentColor}15`, border: `1px solid ${accentColor}33`,
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        fontSize: 11, fontWeight: 700, color: accentColor, flexShrink: 0,
+                                    }}>
                                         {comment.user?.username?.[0]?.toUpperCase() ?? '?'}
                                     </div>
-                                    <div className="flex-1">
-                                        <span className="text-white text-sm font-semibold">
-                                            {comment.user?.username ?? 'Unknown'}
-                                        </span>
-                                        <span className="text-gray-400 text-sm ml-2">
-                                            {comment.text}
-                                        </span>
-                                        <p className="text-gray-600 text-xs mt-0.5">
-                                            {timeAgo(comment.createdAt)}
-                                        </p>
+                                    <div>
+                                        <span style={{ color: '#0f172a', fontSize: 13, fontWeight: 600 }}>{comment.user?.username ?? 'Unknown'}</span>
+                                        <span style={{ color: '#475569', fontSize: 13, marginLeft: 8 }}>{comment.text}</span>
+                                        <p style={{ color: '#94a3b8', fontSize: 11, marginTop: 2 }}>{timeAgo(comment.createdAt)}</p>
                                     </div>
                                 </div>
                             ))}
@@ -368,21 +422,6 @@ function ActivityCard({ activity, currentUserId, onKudos, onCommentAdded, onNavi
                     )}
                 </div>
             )}
-        </div>
-    );
-}
-
-// ========== STAT PILL ==========
-function StatPill({ label, value, accent = 'white' }) {
-    const colors = {
-        white: 'text-white',
-        emerald: 'text-emerald-400',
-    };
-
-    return (
-        <div className="bg-gray-800 rounded-xl px-3 py-2 text-center">
-            <div className={`text-sm font-bold ${colors[accent]}`}>{value}</div>
-            <div className="text-gray-600 text-xs mt-0.5">{label}</div>
         </div>
     );
 }

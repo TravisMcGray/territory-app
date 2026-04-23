@@ -1,7 +1,3 @@
-// ========== NAVBAR COMPONENT ==========
-// Shared navigation bar used on every page.
-// Single source of truth for navigation — update here, updates everywhere.
-
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -16,30 +12,27 @@ export default function Navbar() {
         navigate('/login');
     };
 
-    // ========== ACTIVE ROUTE DETECTION ==========
-    // Highlights the current page's nav link so users know where they are.
     const isActive = (path) => location.pathname === path;
 
     const navLinkClass = (path) =>
         `font-bold text-md px-3 py-2 rounded-lg transition-colors ${
             isActive(path)
-                ? 'text-emerald-400 bg-emerald-400/10'
-                : 'text-gray-300 hover:text-white hover:bg-gray-800'
+                ? 'text-emerald-600 bg-emerald-500/10'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-gray-100'
         }`;
 
-const [menuOpen, setMenuOpen] = useState(false);
+    const [menuOpen, setMenuOpen] = useState(false);
 
-    // ========== RENDER ==========
     return (
-        <nav className="border-b border-gray-800 bg-gray-900 px-4 py-3 sticky top-0 z-20">
+        <nav className="border-b border-gray-200 bg-white px-4 py-3 sticky top-0 z-20 shadow-sm">
             <div className="w-full max-w-6xl mx-auto flex items-center justify-between">
 
                 {/* ========== LOGO ========== */}
                 <button
                     onClick={() => navigate('/dashboard')}
-                    className="text-xl font-black tracking-tight"
+                    className="text-xl font-black tracking-tight text-slate-900"
                 >
-                    Hex<span className="text-emerald-400">Capture</span>
+                    Hex<span className="text-emerald-500">Capture</span>
                 </button>
 
                 {/* ========== DESKTOP NAV LINKS ========== */}
@@ -54,7 +47,7 @@ const [menuOpen, setMenuOpen] = useState(false);
                 <div className="hidden md:flex items-center gap-4">
                     <button
                         onClick={() => navigate('/profile')}
-                        className="text-white font-bold hover:text-emerald-400 text-md transition-colors"
+                        className="text-slate-900 font-bold hover:text-emerald-600 text-md transition-colors"
                     >
                         {user?.username}
                     </button>
@@ -66,7 +59,7 @@ const [menuOpen, setMenuOpen] = useState(false);
                     </button>
                     <button
                         onClick={handleLogout}
-                        className="text-gray-500 hover:text-white text-md font-bold transition-colors"
+                        className="text-gray-400 hover:text-gray-700 text-md font-bold transition-colors"
                     >
                         Logout
                     </button>
@@ -77,15 +70,15 @@ const [menuOpen, setMenuOpen] = useState(false);
                     onClick={() => setMenuOpen(prev => !prev)}
                     className="md:hidden flex flex-col justify-center items-center w-8 h-8 gap-1.5"
                 >
-                    <span className={`block w-6 h-0.5 bg-gray-300 transition-all ${menuOpen ? 'rotate-45 translate-y-2' : ''}`} />
-                    <span className={`block w-6 h-0.5 bg-gray-300 transition-all ${menuOpen ? 'opacity-0' : ''}`} />
-                    <span className={`block w-6 h-0.5 bg-gray-300 transition-all ${menuOpen ? '-rotate-45 -translate-y-2' : ''}`} />
+                    <span className={`block w-6 h-0.5 bg-gray-600 transition-all ${menuOpen ? 'rotate-45 translate-y-2' : ''}`} />
+                    <span className={`block w-6 h-0.5 bg-gray-600 transition-all ${menuOpen ? 'opacity-0' : ''}`} />
+                    <span className={`block w-6 h-0.5 bg-gray-600 transition-all ${menuOpen ? '-rotate-45 -translate-y-2' : ''}`} />
                 </button>
             </div>
 
             {/* ========== MOBILE DROPDOWN MENU ========== */}
             {menuOpen && (
-                <div className="md:hidden border-t border-gray-800 mt-3 pt-3 pb-2 space-y-1">
+                <div className="md:hidden border-t border-gray-200 mt-3 pt-3 pb-2 space-y-1">
                     {[
                         { label: 'Dashboard', path: '/dashboard' },
                         { label: 'Map', path: '/map' },
@@ -98,8 +91,8 @@ const [menuOpen, setMenuOpen] = useState(false);
                             onClick={() => { navigate(path); setMenuOpen(false); }}
                             className={`w-full text-left px-3 py-2.5 rounded-lg text-md font-bold transition-colors ${
                                 isActive(path)
-                                    ? 'text-emerald-400 bg-emerald-400/10'
-                                    : 'text-gray-300 hover:text-white hover:bg-gray-800'
+                                    ? 'text-emerald-600 bg-emerald-500/10'
+                                    : 'text-slate-600 hover:text-slate-900 hover:bg-gray-100'
                             }`}
                         >
                             {label}
@@ -107,13 +100,13 @@ const [menuOpen, setMenuOpen] = useState(false);
                     ))}
                     <button
                         onClick={() => { navigate('/log-activity'); setMenuOpen(false); }}
-                        className="w-full text-left px-3 py-2.5 rounded-lg text-md font-bold bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-colors"
+                        className="w-full text-left px-3 py-2.5 rounded-lg text-md font-bold bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 transition-colors"
                     >
                         + Log Activity
                     </button>
                     <button
                         onClick={() => { handleLogout(); setMenuOpen(false); }}
-                        className="w-full text-left px-3 py-2.5 rounded-lg text-md font-bold text-gray-500 hover:text-white hover:bg-gray-800 transition-colors"
+                        className="w-full text-left px-3 py-2.5 rounded-lg text-md font-bold text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
                     >
                         Logout
                     </button>
