@@ -565,16 +565,62 @@ function SetupPhase({ activityType, setActivityType, onStart, lastActivity }) {
             </div>
 
             {/* ========== START BUTTON ========== */}
+            <style>{`
+                @keyframes stepAppear {
+                    0%   { opacity: 0; transform: scale(0.5) rotate(90deg); }
+                    15%  { opacity: 0.7; transform: scale(1) rotate(90deg); }
+                    60%  { opacity: 0.4; transform: scale(1) rotate(90deg); }
+                    100% { opacity: 0; transform: scale(1) rotate(90deg); }
+                }
+                @keyframes boltAppear {
+                    0%   { opacity: 0; transform: scale(0.5); }
+                    15%  { opacity: 0.7; transform: scale(1); }
+                    60%  { opacity: 0.4; transform: scale(1); }
+                    100% { opacity: 0; transform: scale(1); }
+                }
+            `}</style>
             <button
                 type="button"
                 onClick={onStart}
-                className={`w-full font-black text-xl py-5 rounded-2xl transition-all transform active:scale-95 ${
-                    isWalk
-                        ? 'bg-blue-500 hover:bg-blue-400 text-white'
-                        : 'bg-emerald-500 hover:bg-emerald-400 text-white'
-                }`}
+                className="w-full font-black text-xl py-5 rounded-2xl transition-all transform active:scale-95 text-white relative overflow-hidden"
+                style={{
+                    backgroundImage: `linear-gradient(135deg, ${isWalk ? '#1d4ed8, #06b6d4' : '#059669, #10b981'})`,
+                }}
             >
-                {isWalk ? '🚶 Start Walk' : '🏃 Start Run'}
+                {/* Animated footprints for walk, lightning bolts for run */}
+                <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+                    {isWalk
+                        ? [0,1,2,3,4,5,6].map(i => (
+                            <svg key={i} width="14" height="22" viewBox="0 0 40 60"
+                                style={{
+                                    position: 'absolute',
+                                    left: `${6 + i * 13}%`,
+                                    top: i % 2 === 0 ? '20%' : '52%',
+                                    animation: `stepAppear 2.8s ease-in-out ${i * 0.4}s infinite`,
+                                    opacity: 0,
+                                }}
+                            >
+                                <ellipse cx="20" cy="30" rx="13" ry="22" fill="rgba(255,255,255,0.6)"/>
+                            </svg>
+                        ))
+                        : [0,1,2,3,4].map(i => (
+                            <svg key={i} width="14" height="22" viewBox="0 0 40 60"
+                                style={{
+                                    position: 'absolute',
+                                    left: `${8 + i * 18}%`,
+                                    top: '15%',
+                                    animation: `boltAppear 2.5s ease-in-out ${i * 0.5}s infinite`,
+                                    opacity: 0,
+                                }}
+                            >
+                                <polygon points="28,2 12,32 22,32 12,58 32,22 22,22" fill="rgba(255,255,255,0.6)"/>
+                            </svg>
+                        ))
+                    }
+                </div>
+                <span style={{ position: 'relative', zIndex: 1 }}>
+                    {isWalk ? 'Start Walk' : 'Start Run'}
+                </span>
             </button>
         </div>
     );
@@ -857,7 +903,24 @@ function TrackingPhase({
                         ? 'bg-blue-500/20 text-blue-400'
                         : 'bg-emerald-500/20 text-emerald-400'
                 }`}>
-                    {isWalk ? '🚶 Walking' : '🏃 Running'}
+                    {isWalk ? (
+                        <span className="flex items-center gap-1.5">
+                            <svg width="13" height="13" viewBox="0 0 40 40" fill="currentColor">
+                                <ellipse cx="28" cy="28" rx="2.2" ry="3.5" transform="rotate(-35 28 28)"/>
+                                <ellipse cx="20" cy="24" rx="2.2" ry="3.5" opacity="0.7" transform="rotate(-35 20 24)"/>
+                                <ellipse cx="22" cy="17" rx="2.2" ry="3.5" opacity="0.45" transform="rotate(-35 22 17)"/>
+                                <ellipse cx="14" cy="14" rx="2.2" ry="3.5" opacity="0.2" transform="rotate(-35 14 14)"/>
+                            </svg>
+                            Walking
+                        </span>
+                    ) : (
+                        <span className="flex items-center gap-1.5">
+                            <svg width="13" height="13" viewBox="0 0 40 40" fill="currentColor">
+                                <polygon points="23,4 13,22 20,22 17,36 27,18 20,18"/>
+                            </svg>
+                            Running
+                        </span>
+                    )}
                 </span>
             </div>
 
@@ -994,7 +1057,17 @@ function SummaryPhase({
             {/* Summary card */}
             <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 space-y-4">
                 <div className="flex items-center gap-3">
-                    <span className="text-2xl">{isWalk ? '🚶' : '🏃'}</span>
+                    <svg width="28" height="28" viewBox="0 0 40 40" fill={isWalk ? '#3b82f6' : '#10b981'}>
+                        {isWalk
+                            ? <>
+                                <ellipse cx="28" cy="28" rx="2.2" ry="3.5" transform="rotate(-35 28 28)"/>
+                                <ellipse cx="20" cy="24" rx="2.2" ry="3.5" opacity="0.7" transform="rotate(-35 20 24)"/>
+                                <ellipse cx="22" cy="17" rx="2.2" ry="3.5" opacity="0.45" transform="rotate(-35 22 17)"/>
+                                <ellipse cx="14" cy="14" rx="2.2" ry="3.5" opacity="0.2" transform="rotate(-35 14 14)"/>
+                              </>
+                            : <polygon points="23,4 13,22 20,22 17,36 27,18 20,18"/>
+                        }
+                    </svg>
                     <div>
                         <div className="font-bold text-lg capitalize">{activityType}</div>
                         <div className="font-bold text-gray-400 text-sm">
