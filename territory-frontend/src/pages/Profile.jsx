@@ -449,7 +449,7 @@ export default function Profile() {
         if (tilesOwned >= 500) return { level: 4, name: 'Overlord',   color: '#ff00aa', next: null,  progress: 100, from: 500 };
         if (tilesOwned >= 200) return { level: 3, name: 'Commander',  color: '#f5a623', next: 500,  progress: ((tilesOwned - 200) / 300) * 100, from: 200 };
         if (tilesOwned >= 50)  return { level: 2, name: 'Scout',      color: '#00ccff', next: 200,  progress: ((tilesOwned - 50)  / 150) * 100, from: 50  };
-        return                        { level: 1, name: 'Recruit',    color: '#39ff14', next: 50,   progress: (tilesOwned / 50) * 100,          from: 0   };
+        return                        { level: 1, name: 'Recruit',    color: '#10b981', next: 50,   progress: (tilesOwned / 50) * 100,          from: 0   };
     };
 
     // ========== WEEKLY ACTIVITY RINGS ==========
@@ -504,12 +504,8 @@ export default function Profile() {
                         borderBottom: `1px solid ${tier.color}33`,
                         padding: '24px 20px 16px',
                         position: 'relative',
+                        overflow: 'hidden',
                     }}>
-                        {/* Hex watermark */}
-                        <svg style={{ position: 'absolute', right: 16, top: 12, opacity: 0.06 }} width="120" height="120" viewBox="0 0 100 100">
-                            <polygon points="50,5 95,27.5 95,72.5 50,95 5,72.5 5,27.5" fill={tier.color}/>
-                        </svg>
-
                         <div className="flex items-center justify-between relative z-10">
                             <div className="flex items-center gap-4">
                                 {/* Avatar */}
@@ -653,43 +649,40 @@ export default function Profile() {
                 {/* ========== TABS — own profile only ========== */}
                 {isOwnProfile && (
                     <>
-                        <div className="flex bg-gray-900 border border-gray-800 rounded-xl p-1 gap-1">
-                            <button
-                                type="button"
-                                onClick={() => setActiveTab('activities')}
-                                className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${
-                                    activeTab === 'activities'
-                                        ? 'bg-emerald-500 text-white'
-                                        : 'text-gray-500 hover:text-white'
-                                }`}
-                            >
-                                <ActivityTabIcon color={activeTab === 'activities' ? '#ffffff' : '#6b7280'} />
-                                Activities
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setActiveTab('achievements')}
-                                className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${
-                                    activeTab === 'achievements'
-                                        ? 'bg-emerald-500 text-white'
-                                        : 'text-gray-500 hover:text-white'
-                                }`}
-                            >
-                                <AchievementTabIcon color={activeTab === 'achievements' ? '#ffffff' : '#6b7280'} />
-                                Achievements
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setActiveTab('settings')}
-                                className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${
-                                    activeTab === 'settings'
-                                        ? 'bg-emerald-500 text-white'
-                                        : 'text-gray-500 hover:text-white'
-                                }`}
-                            >
-                                <SettingsTabIcon color={activeTab === 'settings' ? '#ffffff' : '#6b7280'} />
-                                Settings
-                            </button>
+                        {/* Tab switcher — styled to match hero card */}
+                        <div style={{
+                            display: 'flex', gap: 0,
+                            background: '#0d0d1a',
+                            border: '1px solid #1f2937',
+                            borderRadius: 16, overflow: 'hidden',
+                        }}>
+                            {[
+                                { key: 'activities',   label: 'Activities',    Icon: ActivityTabIcon },
+                                { key: 'achievements', label: 'Achievements',  Icon: AchievementTabIcon },
+                                { key: 'settings',     label: 'Settings',      Icon: SettingsTabIcon },
+                            ].map(({ key, label, Icon }, i) => {
+                                const active = activeTab === key;
+                                return (
+                                    <button
+                                        key={key}
+                                        type="button"
+                                        onClick={() => setActiveTab(key)}
+                                        style={{
+                                            flex: 1, padding: '12px 8px',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                                            fontSize: 13, fontWeight: 700,
+                                            background: active ? `${tier.color}18` : 'transparent',
+                                            color: active ? tier.color : '#4b5563',
+                                            borderRight: i < 2 ? '1px solid #1f2937' : 'none',
+                                            borderBottom: active ? `2px solid ${tier.color}` : '2px solid transparent',
+                                            cursor: 'pointer', transition: 'all 0.2s',
+                                        }}
+                                    >
+                                        <Icon color={active ? tier.color : '#4b5563'} />
+                                        {label}
+                                    </button>
+                                );
+                            })}
                         </div>
 
                         {/* ========== ACTIVITIES TAB ========== */}
@@ -809,6 +802,29 @@ export default function Profile() {
     );
 }
 
+// ========== ACTIVITY HEX ICONS ==========
+const WalkHexIcon = () => (
+    <svg width="40" height="40" viewBox="0 0 40 40">
+        <polygon points="20,2 37,11 37,29 20,38 3,29 3,11"
+            fill="rgba(59,130,246,0.15)" stroke="#3b82f6" strokeWidth="1.5"/>
+        {/* 4 clean oval footprints — alternating left/right, fading upward */}
+        <ellipse cx="28" cy="28" rx="2.2" ry="3.5" fill="#3b82f6" transform="rotate(-35 28 28)"/>
+        <ellipse cx="20" cy="24" rx="2.2" ry="3.5" fill="#3b82f6" opacity="0.7" transform="rotate(-35 20 24)"/>
+        <ellipse cx="22" cy="17" rx="2.2" ry="3.5" fill="#3b82f6" opacity="0.45" transform="rotate(-35 22 17)"/>
+        <ellipse cx="14" cy="14" rx="2.2" ry="3.5" fill="#3b82f6" opacity="0.2" transform="rotate(-35 14 14)"/>
+    </svg>
+);
+
+const RunHexIcon = () => (
+    <svg width="40" height="40" viewBox="0 0 40 40">
+        <polygon points="20,2 37,11 37,29 20,38 3,29 3,11"
+            fill="rgba(16,185,129,0.15)" stroke="#10b981" strokeWidth="1.5"/>
+        {/* Lightning bolt */}
+        <polygon points="23,8 15,22 20,22 17,32 25,18 20,18"
+            fill="#10b981"/>
+    </svg>
+);
+
 // ========== ACTIVITY ROW ==========
 function ActivityRow({ activity, onClick }) {
     const isWalk = activity.activityType === 'walk' || activity.activityType === 'WALK';
@@ -835,10 +851,8 @@ function ActivityRow({ activity, onClick }) {
             onClick={onClick}
             role={onClick ? 'button' : undefined}
         >
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg flex-shrink-0 ${
-                isWalk ? 'bg-blue-500/20' : 'bg-emerald-500/20'
-            }`}>
-                {isWalk ? '🚶' : '🏃'}
+            <div className="flex-shrink-0">
+                {isWalk ? <WalkHexIcon /> : <RunHexIcon />}
             </div>
             <div className="flex-1 min-w-0">
                 <p className="text-white font-bold text-sm capitalize">
@@ -975,11 +989,7 @@ function ActivityDetailModal({ activity, onClose }) {
                 {/* Header */}
                 <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-gray-800">
                     <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg ${
-                            isWalk ? 'bg-blue-500/20' : 'bg-emerald-500/20'
-                        }`}>
-                            {isWalk ? '🚶' : '🏃'}
-                        </div>
+                        {isWalk ? <WalkHexIcon /> : <RunHexIcon />}
                         <div>
                             <p className="text-white font-black capitalize">{activity.activityType?.toLowerCase()}</p>
                             <p className="text-gray-400 text-xs font-bold">{timeAgo(activity.createdAt)}</p>
