@@ -444,26 +444,47 @@ export default function Profile() {
 
     const stats = profile.stats || {};
 
+    // ========== TIER CALCULATION ==========
+    const getTier = (tilesOwned) => {
+        if (tilesOwned >= 500) return { level: 4, name: 'Overlord',   color: '#ff00aa', next: null,  progress: 100, from: 500 };
+        if (tilesOwned >= 200) return { level: 3, name: 'Commander',  color: '#f5a623', next: 500,  progress: ((tilesOwned - 200) / 300) * 100, from: 200 };
+        if (tilesOwned >= 50)  return { level: 2, name: 'Scout',      color: '#00ccff', next: 200,  progress: ((tilesOwned - 50)  / 150) * 100, from: 50  };
+        return                        { level: 1, name: 'Recruit',    color: '#39ff14', next: 50,   progress: (tilesOwned / 50) * 100,          from: 0   };
+    };
+
+    // ========== WEEKLY ACTIVITY RINGS ==========
+    const getWeekRings = (activityList) => {
+        const days = Array.from({ length: 7 }, (_, i) => {
+            const d = new Date();
+            d.setDate(d.getDate() - (6 - i));
+            return d.toDateString();
+        });
+        const activeDays = new Set(
+            activityList.map(a => new Date(a.createdAt || a.date).toDateString())
+        );
+        return days.map(d => ({ label: new Date(d).toLocaleDateString('en-US', { weekday: 'short' })[0], active: activeDays.has(d) }));
+    };
+
     // ========== RENDER ==========
+    const tier = getTier(profile.tilesOwned ?? 0);
+    const weekRings = getWeekRings(isOwnProfile ? activities : userActivities);
+    const totalActivities = (stats.totalWalks ?? 0) + (stats.totalRuns ?? 0);
+
     return (
         <div className="min-h-screen bg-gray-950 text-white relative">
-            {/* Cascading achievement animation */}
             <style>{`
                 @keyframes achievementSlideIn {
-                    from {
-                        opacity: 0;
-                        transform: translateY(12px);
-                    }
-                    to {
-                        opacity: 1;
-                        transform: translateY(0);
-                    }
+                    from { opacity: 0; transform: translateY(12px); }
+                    to   { opacity: 1; transform: translateY(0); }
+                }
+                @keyframes glowPulse {
+                    0%, 100% { opacity: 1; }
+                    50%       { opacity: 0.6; }
                 }
             `}</style>
             <HexBackground />
             <Navbar />
 
-            {/* Delete account modal */}
             {showDeleteModal && (
                 <DeleteAccountModal
                     profile={profile}
@@ -472,85 +493,160 @@ export default function Profile() {
                 />
             )}
 
-            <div className="max-w-lg mx-auto px-4 py-6 relative z-10 space-y-6">
+            <div className="max-w-lg mx-auto px-4 py-6 relative z-10 space-y-4">
 
-                {/* ========== PROFILE HEADER ========== */}
-                <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-                    <div className="flex items-start justify-between">
-                        <div className="flex items-center gap-4">
-                            <div className="w-16 h-16 rounded-2xl bg-gray-800 border border-gray-700 flex items-center justify-center text-2xl font-black text-emerald-400">
-                                {profile.username?.[0]?.toUpperCase() ?? '?'}
+                {/* ========== HERO CARD ========== */}
+                <div className="rounded-2xl overflow-hidden border border-gray-800 shadow-2xl">
+
+                    {/* Banner */}
+                    <div style={{
+                        background: `linear-gradient(135deg, ${tier.color}22 0%, #0a0a14 60%)`,
+                        borderBottom: `1px solid ${tier.color}33`,
+                        padding: '24px 20px 16px',
+                        position: 'relative',
+                    }}>
+                        {/* Hex watermark */}
+                        <svg style={{ position: 'absolute', right: 16, top: 12, opacity: 0.06 }} width="120" height="120" viewBox="0 0 100 100">
+                            <polygon points="50,5 95,27.5 95,72.5 50,95 5,72.5 5,27.5" fill={tier.color}/>
+                        </svg>
+
+                        <div className="flex items-center justify-between relative z-10">
+                            <div className="flex items-center gap-4">
+                                {/* Avatar */}
+                                <div style={{
+                                    width: 72, height: 72, borderRadius: 20,
+                                    background: '#111827',
+                                    border: `2.5px solid ${tier.color}`,
+                                    boxShadow: `0 0 20px ${tier.color}55`,
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    fontSize: 28, fontWeight: 900, color: tier.color,
+                                    flexShrink: 0,
+                                }}>
+                                    {profile.username?.[0]?.toUpperCase() ?? '?'}
+                                </div>
+
+                                <div>
+                                    <h2 className="text-2xl font-black text-white leading-tight">
+                                        {profile.username}
+                                    </h2>
+                                    {/* Tier badge */}
+                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 4,
+                                        background: `${tier.color}22`, border: `1px solid ${tier.color}55`,
+                                        borderRadius: 20, padding: '2px 10px' }}>
+                                        <svg width="10" height="10" viewBox="0 0 100 100">
+                                            <polygon points="50,5 95,27.5 95,72.5 50,95 5,72.5 5,27.5" fill={tier.color}/>
+                                        </svg>
+                                        <span style={{ fontSize: 11, fontWeight: 800, color: tier.color, letterSpacing: '0.05em' }}>
+                                            TIER {tier.level} · {tier.name.toUpperCase()}
+                                        </span>
+                                    </div>
+                                    <p className="text-gray-500 text-xs mt-1.5">
+                                        Member since {new Date(profile.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                                    </p>
+                                </div>
                             </div>
-                            <div>
-                                <h2 className="text-xl font-black text-white">
-                                    {profile.username}
-                                </h2>
-                                <p className="font-bold text-gray-400 text-sm mt-0.5">
-                                    Member since {new Date(profile.createdAt).toLocaleDateString('en-US', {
-                                        month: 'long',
-                                        year: 'numeric',
-                                    })}
-                                </p>
-                            </div>
+
+                            {!isOwnProfile && (
+                                <button
+                                    type="button"
+                                    onClick={handleFollowToggle}
+                                    disabled={followLoading}
+                                    style={{
+                                        padding: '8px 16px', borderRadius: 12, fontSize: 13, fontWeight: 700,
+                                        border: isFollowing ? '1px solid #374151' : `1px solid ${tier.color}`,
+                                        background: isFollowing ? '#1f2937' : `${tier.color}22`,
+                                        color: isFollowing ? '#9ca3af' : tier.color,
+                                        cursor: 'pointer', transition: 'all 0.2s', flexShrink: 0,
+                                    }}
+                                >
+                                    {followLoading ? '...' : isFollowing ? 'Following' : 'Follow'}
+                                </button>
+                            )}
                         </div>
-
-                        {/* Follow / Unfollow — only on other users' profiles */}
-                        {!isOwnProfile && (
-                            <button
-                                type="button"
-                                onClick={handleFollowToggle}
-                                disabled={followLoading}
-                                className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
-                                    isFollowing
-                                        ? 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-                                        : 'bg-emerald-500 hover:bg-emerald-400 text-white'
-                                }`}
-                            >
-                                {followLoading ? '...' : isFollowing ? 'Following' : 'Follow'}
-                            </button>
-                        )}
                     </div>
 
-                    {/* ========== STATS GRID ========== */}
-                    <div className="grid grid-cols-3 gap-4 mt-5 pt-5 border-t border-gray-800">
-                        <div className="text-center">
-                            <div className="text-xl font-black text-white">{followersCount}</div>
-                            <div className="text-gray-400 text-xs font-bold mt-0.5">Followers</div>
-                        </div>
-                        <div className="text-center">
-                            <div className="text-xl font-black text-white">{followingCount}</div>
-                            <div className="text-gray-400 text-xs font-bold mt-0.5">Following</div>
-                        </div>
-                        <div className="text-center">
-                            <div className="text-xl font-black text-emerald-400">
-                                {profile.tilesOwned ?? 0}
+                    {/* Big three stats */}
+                    <div style={{ background: '#0d0d1a', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', borderBottom: '1px solid #1f2937' }}>
+                        {[
+                            { value: profile.tilesOwned ?? 0, label: 'Tiles Owned', color: tier.color },
+                            { value: (stats.totalDistance ?? 0).toFixed(1), label: 'Miles', color: '#60a5fa' },
+                            { value: totalActivities, label: 'Activities', color: '#a78bfa' },
+                        ].map((s, i) => (
+                            <div key={i} style={{ padding: '16px 8px', textAlign: 'center', borderRight: i < 2 ? '1px solid #1f2937' : 'none' }}>
+                                <div style={{ fontSize: 28, fontWeight: 900, color: s.color, lineHeight: 1,
+                                    textShadow: `0 0 20px ${s.color}88` }}>
+                                    {s.value}
+                                </div>
+                                <div style={{ fontSize: 10, color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: 4 }}>
+                                    {s.label}
+                                </div>
                             </div>
-                            <div className="text-gray-400 text-xs font-bold mt-0.5">Tiles Owned</div>
+                        ))}
+                    </div>
+
+                    {/* Tier progress bar */}
+                    <div style={{ background: '#0a0a14', padding: '12px 16px', borderBottom: '1px solid #1f2937' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: tier.color }}>Tier {tier.level} · {tier.name}</span>
+                            {tier.next
+                                ? <span style={{ fontSize: 11, color: '#6b7280' }}>{tier.next - (profile.tilesOwned ?? 0)} tiles to Tier {tier.level + 1}</span>
+                                : <span style={{ fontSize: 11, color: tier.color }}>Max Tier Reached</span>
+                            }
                         </div>
-                        <div className="text-center">
-                            <div className="text-xl font-black text-emerald-300">
-                                {stats.totalHexagonsCaptured ?? 0}
+                        <div style={{ height: 6, background: '#1f2937', borderRadius: 99, overflow: 'hidden' }}>
+                            <div style={{
+                                height: '100%', borderRadius: 99,
+                                width: `${Math.min(100, tier.progress)}%`,
+                                background: `linear-gradient(90deg, ${tier.color}88, ${tier.color})`,
+                                boxShadow: `0 0 8px ${tier.color}`,
+                                transition: 'width 1s ease',
+                            }}/>
+                        </div>
+                    </div>
+
+                    {/* Weekly activity rings */}
+                    <div style={{ background: '#0d0d1a', padding: '12px 16px', borderBottom: '1px solid #1f2937' }}>
+                        <p style={{ fontSize: 10, fontWeight: 700, color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
+                            This Week
+                        </p>
+                        <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between' }}>
+                            {weekRings.map((day, i) => (
+                                <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                                    <div style={{
+                                        width: 32, height: 32, borderRadius: '50%',
+                                        background: day.active ? `${tier.color}22` : '#111827',
+                                        border: `2px solid ${day.active ? tier.color : '#1f2937'}`,
+                                        boxShadow: day.active ? `0 0 10px ${tier.color}66` : 'none',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    }}>
+                                        {day.active && (
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                                                <polyline points="4,12 8,12 10,6 14,18 16,10 18,12 20,12"
+                                                    stroke={tier.color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                            </svg>
+                                        )}
+                                    </div>
+                                    <span style={{ fontSize: 9, fontWeight: 700, color: day.active ? tier.color : '#374151' }}>
+                                        {day.label}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Secondary stats */}
+                    <div style={{ background: '#0a0a14', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', padding: '12px 0' }}>
+                        {[
+                            { value: followersCount,                        label: 'Followers' },
+                            { value: followingCount,                        label: 'Following' },
+                            { value: stats.totalHexagonsCaptured ?? 0,     label: 'Lifetime' },
+                            { value: stats.totalStolenTerritories ?? 0,    label: 'Stolen' },
+                        ].map((s, i) => (
+                            <div key={i} style={{ textAlign: 'center', borderRight: i < 3 ? '1px solid #1f2937' : 'none' }}>
+                                <div style={{ fontSize: 16, fontWeight: 800, color: '#e5e7eb' }}>{s.value}</div>
+                                <div style={{ fontSize: 9, color: '#4b5563', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 2 }}>{s.label}</div>
                             </div>
-                            <div className="text-gray-400 text-xs font-bold mt-0.5">Lifetime Cap.</div>
-                        </div>
-                        <div className="text-center">
-                            <div className="text-xl font-black text-blue-400">
-                                {(stats.totalDistance ?? 0).toFixed(1)}
-                            </div>
-                            <div className="text-gray-400 text-xs font-bold mt-0.5">Miles</div>
-                        </div>
-                        <div className="text-center">
-                            <div className="text-xl font-black text-purple-400">
-                                {(stats.totalWalks ?? 0) + (stats.totalRuns ?? 0)}
-                            </div>
-                            <div className="text-gray-400 text-xs font-bold mt-0.5">Activities</div>
-                        </div>
-                        <div className="text-center">
-                            <div className="text-xl font-black text-red-400">
-                                {stats.totalStolenTerritories ?? 0}
-                            </div>
-                            <div className="text-gray-400 text-xs font-bold mt-0.5">Stolen</div>
-                        </div>
+                        ))}
                     </div>
                 </div>
 
