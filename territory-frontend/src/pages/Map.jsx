@@ -1031,35 +1031,54 @@ export default function Map() {
                             </div>
                         </div>
                         <div className="w-px h-8 bg-gray-700"/>
+                        {/* Others — shield icon */}
                         <div className="flex items-center gap-2">
-                            <svg width="52" height="52" viewBox="-15 -15 130 130">
+                            <svg width="42" height="42" viewBox="0 0 64 64">
                                 <defs>
-                                    <filter id="hex-others-glow-legend" x="-60%" y="-60%" width="220%" height="220%">
-                                        <feGaussianBlur stdDeviation="6" result="blur"/>
+                                    <filter id="shield-legend-glow" x="-40%" y="-40%" width="180%" height="180%">
+                                        <feGaussianBlur stdDeviation="2.5" result="blur"/>
                                         <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
                                     </filter>
                                 </defs>
-                                {/* semi-transparent fill */}
-                                <polygon points="50,5 95,27.5 95,72.5 50,95 5,72.5 5,27.5"
-                                    fill="rgba(100,255,30,0.5)" stroke="none"
-                                />
-                                {/* green outer border with glow */}
-                                <polygon points="50,5 95,27.5 95,72.5 50,95 5,72.5 5,27.5"
-                                    fill="none" stroke="#39ff14" strokeWidth="14"
-                                    filter="url(#hex-others-glow-legend)" opacity="0.4"
-                                />
-                                {/* green outer border */}
-                                <polygon points="50,5 95,27.5 95,72.5 50,95 5,72.5 5,27.5"
-                                    fill="none" stroke="#39ff14" strokeWidth="7"
-                                />
-                                {/* white core */}
-                                <polygon points="50,5 95,27.5 95,72.5 50,95 5,72.5 5,27.5"
-                                    fill="none" stroke="#ffffff" strokeWidth="2.5"
-                                />
+                                <path d="M32,4 L56,12 L56,34 Q56,54 32,62 Q8,54 8,34 L8,12 Z"
+                                    fill="#111827" stroke="#FFD700" strokeWidth="3.5"
+                                    filter="url(#shield-legend-glow)"/>
+                                <path d="M32,11 L50,17 L50,34 Q50,49 32,56 Q14,49 14,34 L14,17 Z"
+                                    fill="none" stroke="#FFD700" strokeWidth="1.5" strokeOpacity="0.5"/>
                             </svg>
                             <div className="flex flex-col leading-tight">
                                 <span className="text-xs text-gray-500 font-semibold uppercase tracking-wider">Others</span>
                                 <span className="text-base font-bold text-white">{tileCount.total - tileCount.mine}</span>
+                            </div>
+                        </div>
+                        <div className="w-px h-8 bg-gray-700"/>
+                        {/* Uncaptured — rainbow hex */}
+                        <div className="flex items-center gap-2">
+                            <svg width="52" height="52" viewBox="-15 -15 130 130">
+                                <defs>
+                                    <linearGradient id="rainbow-legend" x1="0%" y1="0%" x2="100%" y2="100%">
+                                        <stop offset="0%"   stopColor="#ff0080"/>
+                                        <stop offset="25%"  stopColor="#ff6600"/>
+                                        <stop offset="50%"  stopColor="#39ff14"/>
+                                        <stop offset="75%"  stopColor="#00ccff"/>
+                                        <stop offset="100%" stopColor="#a855f7"/>
+                                    </linearGradient>
+                                </defs>
+                                {/* faint fill */}
+                                <polygon points="50,5 95,27.5 95,72.5 50,95 5,72.5 5,27.5"
+                                    fill="rgba(168,85,247,0.08)" stroke="none"
+                                />
+                                {/* rainbow border */}
+                                <polygon points="50,5 95,27.5 95,72.5 50,95 5,72.5 5,27.5"
+                                    fill="none" stroke="url(#rainbow-legend)" strokeWidth="7"
+                                />
+                                {/* white core */}
+                                <polygon points="50,5 95,27.5 95,72.5 50,95 5,72.5 5,27.5"
+                                    fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="2.5"
+                                />
+                            </svg>
+                            <div className="flex flex-col leading-tight">
+                                <span className="text-xs text-gray-500 font-semibold uppercase tracking-wider">Uncaptured</span>
                             </div>
                         </div>
                     </div>
