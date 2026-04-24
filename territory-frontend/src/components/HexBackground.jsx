@@ -62,7 +62,7 @@ export default function HexBackground() {
                 <g
                     stroke="url(#hexColor)"
                     fill="none"
-                    opacity="0.12"
+                    opacity="0.45"
                 >
                     {hexagons.map(({ cx, cy, key }) => (
                         <polygon
@@ -81,7 +81,7 @@ export default function HexBackground() {
                     left: 0,
                     width: '100%',
                     height: '100%',
-                    background: 'linear-gradient(to right, transparent 0%, transparent 35%, #f1f5f9 55%, #f1f5f9 100%)',
+                    background: 'linear-gradient(to right, transparent 0%, transparent 50%, #f1f5f9 75%, #f1f5f9 100%)',
                 }}
             />
             <div

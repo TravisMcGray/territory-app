@@ -127,254 +127,221 @@ export default function Dashboard() {
             <HexBackground />
             <Navbar />
 
-            <div className="max-w-3xl mx-auto px-4 py-8 relative z-10">
+            <div className="max-w-6xl mx-auto px-6 py-8 relative z-10">
 
-                {/* ========== HEADER ========== */}
-                <div style={{ marginBottom: 32, animation: 'fadeUp 0.4s ease both' }}>
-                    <h1 style={{ fontSize: 28, fontWeight: 900, color: '#0f172a', lineHeight: 1.2 }}>
-                        Welcome back, <span style={{ color: '#10b981' }}>{profile?.username}</span>
-                    </h1>
-                    <p style={{ fontSize: 14, color: '#64748b', marginTop: 6, fontWeight: 600 }}>
-                        {profile?.tilesOwned > 0
-                            ? `You control ${profile.tilesOwned} tiles. ${myRank ? `You're ranked #${myRank} globally.` : 'Keep capturing.'}`
-                            : 'Ready to capture more territory?'
-                        }
-                    </p>
-                </div>
-
-                {/* ========== SPINNING GLOBE ========== */}
+                {/* ========== HERO ROW: Globe left, Stats + Rank right ========== */}
                 <div style={{
-                    display: 'flex', justifyContent: 'center', alignItems: 'center',
-                    marginBottom: 32, animation: 'fadeUp 0.4s ease 0.05s both',
+                    display: 'grid', gridTemplateColumns: '300px 1fr',
+                    gap: 40, marginBottom: 24,
+                    animation: 'fadeUp 0.4s ease both',
                 }}>
-                    <div style={{ position: 'relative', width: 260, height: 260, animation: 'globeFloat 4s ease-in-out infinite' }}>
 
-                        {/* Glowing hexagon ring */}
-                        <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', animation: 'hexGlow 3s ease-in-out infinite' }}
-                            viewBox="0 0 260 260">
-                            <polygon points="130,8 244,68 244,192 130,252 16,192 16,68"
-                                fill="none" stroke="#10b981" strokeWidth="2.5"/>
-                            <polygon points="130,24 228,80 228,180 130,236 32,180 32,80"
-                                fill="none" stroke="#10b981" strokeWidth="1" opacity="0.35"/>
-                        </svg>
-
-                        {/* Globe */}
-                        <div style={{
-                            position: 'absolute',
-                            top: '50%', left: '50%',
-                            transform: 'translate(-50%, -50%)',
-                            width: 180, height: 180,
-                            borderRadius: '50%',
-                            overflow: 'hidden',
-                            boxShadow: '0 0 30px rgba(16,185,129,0.35), inset -8px -8px 20px rgba(0,0,0,0.6)',
-                            background: '#1a6b9a',
-                        }}>
+                    {/* ---- LEFT: Globe ---- */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div style={{ position: 'relative', width: 280, height: 280, animation: 'globeFloat 4s ease-in-out infinite' }}>
+                            <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', animation: 'hexGlow 3s ease-in-out infinite' }}
+                                viewBox="0 0 280 280">
+                                <polygon points="140,8 264,74 264,206 140,272 16,206 16,74"
+                                    fill="none" stroke="#10b981" strokeWidth="2.5"/>
+                                <polygon points="140,26 246,86 246,194 140,254 34,194 34,86"
+                                    fill="none" stroke="#10b981" strokeWidth="1" opacity="0.35"/>
+                            </svg>
                             <div style={{
-                                position: 'absolute', top: 0, left: 0,
-                                width: '200%', height: '100%',
-                                animation: 'globeSpin 30s linear infinite',
-                                backgroundImage: 'url(/earth.jpg)',
-                                backgroundSize: '50% 100%',
-                                backgroundRepeat: 'repeat-x',
-                            }}/>
-                            <div style={{
-                                position: 'absolute', top: 0, left: 0,
-                                width: '200%', height: '100%',
-                                animation: 'globeSpin 30s linear infinite',
+                                position: 'absolute', top: '50%', left: '50%',
+                                transform: 'translate(-50%, -50%)',
+                                width: 200, height: 200,
+                                borderRadius: '50%', overflow: 'hidden',
+                                boxShadow: '0 0 40px rgba(16,185,129,0.3), inset -8px -8px 20px rgba(0,0,0,0.5)',
+                                background: '#1a6b9a',
                             }}>
-                                <svg width="100%" height="100%" viewBox="0 0 240 120" preserveAspectRatio="none">
-                                    {[0,30,60,90,120,150,180,210,240].map(x => (
-                                        <path key={x} d={`M ${x} 0 Q ${x+15} 60 ${x} 120`}
-                                            fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="0.8"/>
-                                    ))}
-                                    {[20,45,60,75,100].map(y => (
-                                        <line key={y} x1="0" y1={y} x2="240" y2={y}
-                                            stroke="rgba(255,255,255,0.08)" strokeWidth="0.6"/>
-                                    ))}
-                                </svg>
+                                <div style={{
+                                    position: 'absolute', top: 0, left: 0,
+                                    width: '200%', height: '100%',
+                                    animation: 'globeSpin 30s linear infinite',
+                                    backgroundImage: 'url(/world2.jpg)',
+                                    backgroundSize: '50% 100%',
+                                    backgroundRepeat: 'repeat-x',
+                                }}/>
+                                <div style={{
+                                    position: 'absolute', inset: 0,
+                                    background: 'radial-gradient(circle at 30% 28%, rgba(255,255,255,0.15) 0%, transparent 55%)',
+                                }}/>
                             </div>
-                            <div style={{
-                                position: 'absolute', inset: 0,
-                                background: 'radial-gradient(circle at 30% 28%, rgba(255,255,255,0.15) 0%, transparent 55%)',
-                            }}/>
                         </div>
                     </div>
-                </div>
 
-                {/* ========== KEY NUMBERS ========== */}
-                <div style={{
-                    display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)',
-                    gap: 1, marginBottom: 32,
-                    background: '#e2e8f0', borderRadius: 16, overflow: 'hidden',
-                    animation: 'fadeUp 0.4s ease 0.1s both',
-                    boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
-                }}>
-                    {[
-                        { label: 'Tiles Owned',  value: profile?.tilesOwned ?? 0,                       color: tier.color },
-                        { label: 'Miles',         value: (stats.totalDistance ?? 0).toFixed(1),           color: '#3b82f6' },
-                        { label: 'Activities',    value: totalActivities,                                  color: '#8b5cf6' },
-                        { label: 'Stolen',        value: stats.totalStolenTerritories ?? 0,               color: '#ef4444' },
-                    ].map((s, i) => (
-                        <div key={i} style={{
-                            background: '#ffffff',
-                            padding: '18px 12px', textAlign: 'center',
+                    {/* ---- RIGHT: Welcome + Stats + Territory Rank ---- */}
+                    <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 20 }}>
+
+                        {/* Welcome */}
+                        <div>
+                            <h1 style={{ fontSize: 32, fontWeight: 900, color: '#0f172a', lineHeight: 1.2 }}>
+                                Welcome back, <span style={{ color: '#10b981' }}>{profile?.username}</span>
+                            </h1>
+                            <p style={{ fontSize: 14, color: '#64748b', marginTop: 6, fontWeight: 600 }}>
+                                {profile?.tilesOwned > 0
+                                    ? `You control ${profile.tilesOwned} tiles. ${myRank ? `You're ranked #${myRank} globally.` : 'Keep capturing.'}`
+                                    : 'Ready to capture more territory?'
+                                }
+                            </p>
+                        </div>
+
+                        {/* Stats strip */}
+                        <div style={{
+                            display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)',
+                            gap: 1, background: '#e2e8f0', borderRadius: 16,
+                            overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
                         }}>
-                            <div style={{ fontSize: 24, fontWeight: 900, color: s.color, lineHeight: 1 }}>
-                                {s.value}
-                            </div>
-                            <div style={{ fontSize: 9, color: '#94a3b8', fontWeight: 700,
-                                textTransform: 'uppercase', letterSpacing: '0.07em', marginTop: 5 }}>
-                                {s.label}
-                            </div>
-                        </div>
-                    ))}
-                </div>
-
-                {/* ========== BOTTOM GRID ========== */}
-                <div style={{
-                    display: 'grid', gridTemplateColumns: '1fr 1fr',
-                    gap: 16, animation: 'fadeUp 0.4s ease 0.15s both',
-                }}>
-
-                    {/* ---- Recent Activity ---- */}
-                    <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 16, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-                            <h3 style={{ fontSize: 13, fontWeight: 800, color: '#64748b',
-                                textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-                                Activity Feed
-                            </h3>
-                            <button onClick={() => navigate('/feed')}
-                                style={{ fontSize: 11, fontWeight: 700, color: '#10b981',
-                                    background: 'none', border: 'none', cursor: 'pointer' }}>
-                                See all →
-                            </button>
+                            {[
+                                { label: 'Tiles Owned', value: profile?.tilesOwned ?? 0,                    color: tier.color },
+                                { label: 'Miles',        value: (stats.totalDistance ?? 0).toFixed(1),       color: '#3b82f6' },
+                                { label: 'Activities',   value: totalActivities,                              color: '#8b5cf6' },
+                                { label: 'Stolen',       value: stats.totalStolenTerritories ?? 0,           color: '#ef4444' },
+                            ].map((s, i) => (
+                                <div key={i} style={{ background: '#ffffff', padding: '16px 12px', textAlign: 'center' }}>
+                                    <div style={{ fontSize: 26, fontWeight: 900, color: s.color, lineHeight: 1 }}>{s.value}</div>
+                                    <div style={{ fontSize: 9, color: '#94a3b8', fontWeight: 700,
+                                        textTransform: 'uppercase', letterSpacing: '0.07em', marginTop: 4 }}>
+                                        {s.label}
+                                    </div>
+                                </div>
+                            ))}
                         </div>
 
-                        {feed.length === 0 ? (
-                            <div style={{ textAlign: 'center', padding: '20px 0' }}>
-                                <p style={{ color: '#94a3b8', fontSize: 13 }}>No activity yet.</p>
+                        {/* Territory Rank */}
+                        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 16, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                                <h3 style={{ fontSize: 13, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                                    Territory Rank
+                                </h3>
                                 <button onClick={() => navigate('/leaderboard')}
-                                    style={{ fontSize: 12, color: '#10b981', background: 'none',
-                                        border: 'none', cursor: 'pointer', marginTop: 8, fontWeight: 600 }}>
-                                    Find people to follow →
+                                    style={{ fontSize: 11, fontWeight: 700, color: '#10b981', background: 'none', border: 'none', cursor: 'pointer' }}>
+                                    See all →
                                 </button>
                             </div>
-                        ) : (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                {feed.slice(0, 4).map(activity => {
-                                    const isWalk = activity.activityType === 'walk' || activity.activityType === 'WALK';
-                                    const accent = isWalk ? '#3b82f6' : '#10b981';
-                                    const hexCount = typeof activity.capturedHexagons === 'number'
-                                        ? activity.capturedHexagons
-                                        : (Array.isArray(activity.capturedHexagons) ? activity.capturedHexagons.length : 0);
-                                    return (
-                                        <div key={activity._id} style={{
-                                            display: 'flex', alignItems: 'center', gap: 10,
-                                            padding: '10px 0',
-                                            borderBottom: '1px solid #f1f5f9',
-                                        }}>
-                                            <div style={{
-                                                width: 30, height: 30, borderRadius: 8,
-                                                background: `${accent}15`,
-                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                flexShrink: 0,
-                                            }}>
-                                                {isWalk ? <WalkIcon size={14} color={accent}/> : <RunIcon size={14} color={accent}/>}
-                                            </div>
-                                            <div style={{ flex: 1, minWidth: 0 }}>
-                                                <p style={{ fontSize: 12, fontWeight: 700, color: '#0f172a',
+                            {leaderboard.length === 0 ? (
+                                <p style={{ color: '#94a3b8', fontSize: 13, textAlign: 'center', padding: '8px 0' }}>No rankings yet.</p>
+                            ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                    {leaderboard.slice(0, 5).map((entry, index) => {
+                                        const isMe = String(entry.id) === String(currentUserId);
+                                        return (
+                                            <button key={entry.id} type="button"
+                                                onClick={() => isMe ? navigate('/profile') : navigate(`/profile/${entry.id}`)}
+                                                style={{
+                                                    display: 'flex', alignItems: 'center', gap: 8,
+                                                    background: isMe ? 'rgba(16,185,129,0.08)' : 'transparent',
+                                                    border: `1px solid ${isMe ? 'rgba(16,185,129,0.25)' : 'transparent'}`,
+                                                    borderRadius: 10, padding: '6px 8px',
+                                                    cursor: 'pointer', width: '100%', textAlign: 'left',
+                                                    transition: 'background 0.15s',
+                                                }}
+                                            >
+                                                <MedalHex rank={index + 1}/>
+                                                <span style={{ flex: 1, fontSize: 13, fontWeight: 700,
+                                                    color: isMe ? '#10b981' : '#0f172a',
                                                     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                    {activity.username ?? 'Unknown'}
-                                                </p>
-                                                <p style={{ fontSize: 10, color: '#94a3b8', marginTop: 1 }}>
-                                                    {(activity.distance ?? 0).toFixed(1)}mi · {hexCount} hex
-                                                </p>
-                                            </div>
-                                            <span style={{ fontSize: 10, color: '#94a3b8', flexShrink: 0 }}>
-                                                {timeAgo(activity.createdAt)}
-                                            </span>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
+                                                    {entry.username}
+                                                    {isMe && <span style={{ fontSize: 9, color: '#f59e0b', marginLeft: 5 }}>you</span>}
+                                                </span>
+                                                <span style={{ fontSize: 12, fontWeight: 800, color: isMe ? '#10b981' : '#64748b', flexShrink: 0 }}>
+                                                    {entry.tilesOwned}
+                                                </span>
+                                            </button>
+                                        );
+                                    })}
+                                    {myRank && myRank > 5 && (
+                                        <>
+                                            <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: 11 }}>· · ·</div>
+                                            <button type="button" onClick={() => navigate('/profile')}
+                                                style={{
+                                                    display: 'flex', alignItems: 'center', gap: 8,
+                                                    background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)',
+                                                    borderRadius: 10, padding: '6px 8px',
+                                                    cursor: 'pointer', width: '100%', textAlign: 'left',
+                                                }}
+                                            >
+                                                <MedalHex rank={myRank}/>
+                                                <span style={{ flex: 1, fontSize: 13, fontWeight: 700, color: '#10b981' }}>
+                                                    {profile?.username}
+                                                    <span style={{ fontSize: 9, color: '#f59e0b', marginLeft: 5 }}>you</span>
+                                                </span>
+                                                <span style={{ fontSize: 12, fontWeight: 800, color: '#10b981', flexShrink: 0 }}>
+                                                    {profile?.tilesOwned ?? 0}
+                                                </span>
+                                            </button>
+                                        </>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                {/* ========== ACTIVITY FEED — full width below ========== */}
+                <div style={{
+                    background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 16,
+                    padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
+                    animation: 'fadeUp 0.4s ease 0.15s both',
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                        <h3 style={{ fontSize: 13, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                            Activity Feed
+                        </h3>
+                        <button onClick={() => navigate('/feed')}
+                            style={{ fontSize: 11, fontWeight: 700, color: '#10b981', background: 'none', border: 'none', cursor: 'pointer' }}>
+                            See all →
+                        </button>
                     </div>
 
-                    {/* ---- Territory Rank ---- */}
-                    <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 16, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-                            <h3 style={{ fontSize: 13, fontWeight: 800, color: '#64748b',
-                                textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-                                Territory Rank
-                            </h3>
+                    {feed.length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: '24px 0' }}>
+                            <p style={{ color: '#94a3b8', fontSize: 13 }}>No activity yet.</p>
                             <button onClick={() => navigate('/leaderboard')}
-                                style={{ fontSize: 11, fontWeight: 700, color: '#10b981',
-                                    background: 'none', border: 'none', cursor: 'pointer' }}>
-                                See all →
+                                style={{ fontSize: 12, color: '#10b981', background: 'none', border: 'none', cursor: 'pointer', marginTop: 8, fontWeight: 600 }}>
+                                Find people to follow →
                             </button>
                         </div>
-
-                        {leaderboard.length === 0 ? (
-                            <div style={{ textAlign: 'center', padding: '20px 0' }}>
-                                <p style={{ color: '#94a3b8', fontSize: 13 }}>No rankings yet.</p>
-                            </div>
-                        ) : (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                {leaderboard.slice(0, 4).map((entry, index) => {
-                                    const isMe = String(entry.id) === String(currentUserId);
-                                    return (
-                                        <button key={entry.id} type="button"
-                                            onClick={() => isMe ? navigate('/profile') : navigate(`/profile/${entry.id}`)}
-                                            style={{
-                                                display: 'flex', alignItems: 'center', gap: 8,
-                                                background: isMe ? 'rgba(16,185,129,0.08)' : 'transparent',
-                                                border: `1px solid ${isMe ? 'rgba(16,185,129,0.25)' : 'transparent'}`,
-                                                borderRadius: 10, padding: '7px 8px',
-                                                cursor: 'pointer', width: '100%', textAlign: 'left',
-                                                transition: 'background 0.15s',
-                                            }}
-                                        >
-                                            <MedalHex rank={index + 1}/>
-                                            <span style={{ flex: 1, fontSize: 12, fontWeight: 700,
-                                                color: isMe ? '#10b981' : '#0f172a',
+                    ) : (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
+                            {feed.slice(0, 6).map(activity => {
+                                const isWalk = activity.activityType === 'walk' || activity.activityType === 'WALK';
+                                const accent = isWalk ? '#3b82f6' : '#10b981';
+                                const hexCount = typeof activity.capturedHexagons === 'number'
+                                    ? activity.capturedHexagons
+                                    : (Array.isArray(activity.capturedHexagons) ? activity.capturedHexagons.length : 0);
+                                return (
+                                    <div key={activity._id} style={{
+                                        display: 'flex', alignItems: 'center', gap: 12,
+                                        padding: '12px 14px',
+                                        background: '#f8fafc', borderRadius: 12,
+                                        border: `1px solid ${accent}22`,
+                                        borderLeft: `3px solid ${accent}`,
+                                    }}>
+                                        <div style={{
+                                            width: 34, height: 34, borderRadius: 10,
+                                            background: `${accent}15`,
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                                        }}>
+                                            {isWalk ? <WalkIcon size={15} color={accent}/> : <RunIcon size={15} color={accent}/>}
+                                        </div>
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <p style={{ fontSize: 13, fontWeight: 700, color: '#0f172a',
                                                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                {entry.username}
-                                                {isMe && <span style={{ fontSize: 9, color: '#f59e0b', marginLeft: 5 }}>you</span>}
-                                            </span>
-                                            <span style={{ fontSize: 11, fontWeight: 800,
-                                                color: isMe ? '#10b981' : '#64748b', flexShrink: 0 }}>
-                                                {entry.tilesOwned}
-                                            </span>
-                                        </button>
-                                    );
-                                })}
-
-                                {myRank && myRank > 4 && (
-                                    <>
-                                        <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: 11 }}>· · ·</div>
-                                        <button type="button" onClick={() => navigate('/profile')}
-                                            style={{
-                                                display: 'flex', alignItems: 'center', gap: 8,
-                                                background: 'rgba(16,185,129,0.08)',
-                                                border: '1px solid rgba(16,185,129,0.25)',
-                                                borderRadius: 10, padding: '7px 8px',
-                                                cursor: 'pointer', width: '100%', textAlign: 'left',
-                                            }}
-                                        >
-                                            <MedalHex rank={myRank}/>
-                                            <span style={{ flex: 1, fontSize: 12, fontWeight: 700, color: '#10b981' }}>
-                                                {profile?.username}
-                                                <span style={{ fontSize: 9, color: '#f59e0b', marginLeft: 5 }}>you</span>
-                                            </span>
-                                            <span style={{ fontSize: 11, fontWeight: 800, color: '#10b981', flexShrink: 0 }}>
-                                                {profile?.tilesOwned ?? 0}
-                                            </span>
-                                        </button>
-                                    </>
-                                )}
-                            </div>
-                        )}
-                    </div>
+                                                {activity.username ?? 'Unknown'}
+                                            </p>
+                                            <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }}>
+                                                {(activity.distance ?? 0).toFixed(1)}mi · {hexCount} hex
+                                            </p>
+                                        </div>
+                                        <span style={{ fontSize: 11, color: '#94a3b8', flexShrink: 0 }}>
+                                            {timeAgo(activity.createdAt)}
+                                        </span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
