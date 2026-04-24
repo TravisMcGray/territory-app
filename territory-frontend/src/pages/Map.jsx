@@ -987,53 +987,45 @@ export default function Map() {
             <div className="max-w-6xl w-full mx-auto px-4 pt-3 pb-4 relative z-10 flex flex-col flex-1 min-h-0">
 
                 {/* ========== HEADER + LEGEND ========== */}
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-                    <div>
-                        <h2 className="text-2xl font-bold">Territory Map</h2>
-                        <p className="text-gray-300 font-bold text-sm mt-1">
-                            Every captured hex tile in the world
-                        </p>
+                <div className="flex flex-col gap-2 mb-4">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h2 className="text-xl sm:text-2xl font-bold">Territory Map</h2>
+                            <p className="text-gray-300 font-bold text-xs sm:text-sm mt-0.5">
+                                Every captured hex tile in the world
+                            </p>
+                        </div>
                     </div>
-                    <div className="flex items-center gap-3 bg-gray-900/80 backdrop-blur border border-gray-700/60 rounded-2xl px-4 py-3 shadow-lg">
-                        <div className="flex items-center gap-2">
-                            <svg width="52" height="52" viewBox="-15 -15 130 130">
+                    {/* Legend — full width, items spread evenly */}
+                    <div className="w-full flex items-center bg-gray-900/80 backdrop-blur border border-gray-700/60 rounded-2xl px-3 py-2 shadow-lg">
+                        {/* Yours */}
+                        <div className="flex flex-1 items-center justify-center gap-1.5">
+                            <svg width="32" height="32" viewBox="-15 -15 130 130">
                                 <defs>
                                     <filter id="hex-outer-glow" x="-60%" y="-60%" width="220%" height="220%">
                                         <feGaussianBlur stdDeviation="6" result="blur"/>
                                         <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
                                     </filter>
-                                    <filter id="hex-hull-glow" x="-80%" y="-80%" width="260%" height="260%">
-                                        <feGaussianBlur stdDeviation="2.5" result="blur"/>
-                                        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-                                    </filter>
                                 </defs>
-                                {/* outer glow halo */}
                                 <polygon points="50,5 95,27.5 95,72.5 50,95 5,72.5 5,27.5"
                                     fill="none" stroke="#39ff14" strokeWidth="14"
-                                    filter="url(#hex-outer-glow)" opacity="0.5"
-                                />
-                                {/* semi-transparent fill */}
+                                    filter="url(#hex-outer-glow)" opacity="0.5"/>
                                 <polygon points="50,5 95,27.5 95,72.5 50,95 5,72.5 5,27.5"
-                                    fill="rgba(57,255,20,0.18)" stroke="none"
-                                />
-                                {/* green outer border */}
+                                    fill="rgba(57,255,20,0.18)" stroke="none"/>
                                 <polygon points="50,5 95,27.5 95,72.5 50,95 5,72.5 5,27.5"
-                                    fill="none" stroke="#39ff14" strokeWidth="7"
-                                />
-                                {/* white core — sits right on top of green border */}
+                                    fill="none" stroke="#39ff14" strokeWidth="7"/>
                                 <polygon points="50,5 95,27.5 95,72.5 50,95 5,72.5 5,27.5"
-                                    fill="none" stroke="#ffffff" strokeWidth="2.5"
-                                />
+                                    fill="none" stroke="#ffffff" strokeWidth="2.5"/>
                             </svg>
                             <div className="flex flex-col leading-tight">
                                 <span className="text-xs text-gray-500 font-semibold uppercase tracking-wider">Yours</span>
-                                <span className="text-base font-bold text-white">{tileCount.mine}</span>
+                                <span className="text-sm font-bold text-white">{tileCount.mine}</span>
                             </div>
                         </div>
-                        <div className="w-px h-8 bg-gray-700"/>
-                        {/* Others — shield icon */}
-                        <div className="flex items-center gap-2">
-                            <svg width="42" height="42" viewBox="0 0 64 64">
+                        <div className="w-px h-7 bg-gray-700 shrink-0"/>
+                        {/* Others */}
+                        <div className="flex flex-1 items-center justify-center gap-1.5">
+                            <svg width="26" height="26" viewBox="0 0 64 64">
                                 <defs>
                                     <filter id="shield-legend-glow" x="-40%" y="-40%" width="180%" height="180%">
                                         <feGaussianBlur stdDeviation="2.5" result="blur"/>
@@ -1048,13 +1040,13 @@ export default function Map() {
                             </svg>
                             <div className="flex flex-col leading-tight">
                                 <span className="text-xs text-gray-500 font-semibold uppercase tracking-wider">Others</span>
-                                <span className="text-base font-bold text-white">{tileCount.total - tileCount.mine}</span>
+                                <span className="text-sm font-bold text-white">{tileCount.total - tileCount.mine}</span>
                             </div>
                         </div>
-                        <div className="w-px h-8 bg-gray-700"/>
-                        {/* Uncaptured — rainbow hex */}
-                        <div className="flex items-center gap-2">
-                            <svg width="52" height="52" viewBox="-15 -15 130 130">
+                        <div className="w-px h-7 bg-gray-700 shrink-0"/>
+                        {/* Uncaptured */}
+                        <div className="flex flex-1 items-center justify-center gap-1.5">
+                            <svg width="32" height="32" viewBox="-15 -15 130 130">
                                 <defs>
                                     <linearGradient id="rainbow-legend" x1="0%" y1="0%" x2="100%" y2="100%">
                                         <stop offset="0%"   stopColor="#ff0080"/>
@@ -1064,21 +1056,15 @@ export default function Map() {
                                         <stop offset="100%" stopColor="#a855f7"/>
                                     </linearGradient>
                                 </defs>
-                                {/* faint fill */}
                                 <polygon points="50,5 95,27.5 95,72.5 50,95 5,72.5 5,27.5"
-                                    fill="rgba(168,85,247,0.08)" stroke="none"
-                                />
-                                {/* rainbow border */}
+                                    fill="rgba(168,85,247,0.08)" stroke="none"/>
                                 <polygon points="50,5 95,27.5 95,72.5 50,95 5,72.5 5,27.5"
-                                    fill="none" stroke="url(#rainbow-legend)" strokeWidth="7"
-                                />
-                                {/* white core */}
+                                    fill="none" stroke="url(#rainbow-legend)" strokeWidth="7"/>
                                 <polygon points="50,5 95,27.5 95,72.5 50,95 5,72.5 5,27.5"
-                                    fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="2.5"
-                                />
+                                    fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="2.5"/>
                             </svg>
                             <div className="flex flex-col leading-tight">
-                                <span className="text-xs text-gray-500 font-semibold uppercase tracking-wider">Uncaptured</span>
+                                <span className="text-xs text-gray-500 font-semibold uppercase tracking-wider">Open</span>
                             </div>
                         </div>
                     </div>

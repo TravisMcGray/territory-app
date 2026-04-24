@@ -123,6 +123,27 @@ export default function Dashboard() {
                     0%, 100% { transform: translateY(0px); }
                     50%      { transform: translateY(-4px); }
                 }
+                .dashboard-hero {
+                    display: grid;
+                    grid-template-columns: 300px 1fr;
+                    gap: 40px;
+                }
+                @media (max-width: 768px) {
+                    .dashboard-hero {
+                        grid-template-columns: 1fr;
+                        gap: 24px;
+                    }
+                }
+                .feed-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+                    gap: 12px;
+                }
+                @media (max-width: 540px) {
+                    .feed-grid {
+                        grid-template-columns: 1fr;
+                    }
+                }
             `}</style>
             <HexBackground />
             <Navbar />
@@ -130,11 +151,7 @@ export default function Dashboard() {
             <div className="max-w-6xl mx-auto px-6 py-8 relative z-10">
 
                 {/* ========== HERO ROW: Globe left, Stats + Rank right ========== */}
-                <div style={{
-                    display: 'grid', gridTemplateColumns: '300px 1fr',
-                    gap: 40, marginBottom: 24,
-                    animation: 'fadeUp 0.4s ease both',
-                }}>
+                <div className="dashboard-hero" style={{ marginBottom: 24, animation: 'fadeUp 0.4s ease both' }}>
 
                     {/* ---- LEFT: Globe ---- */}
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -303,7 +320,7 @@ export default function Dashboard() {
                             </button>
                         </div>
                     ) : (
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
+                        <div className="feed-grid">
                             {feed.slice(0, 6).map(activity => {
                                 const isWalk = activity.activityType === 'walk' || activity.activityType === 'WALK';
                                 const accent = isWalk ? '#3b82f6' : '#10b981';
