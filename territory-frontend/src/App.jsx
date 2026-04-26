@@ -4,6 +4,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import Login from './pages/Login';
+import Landing from './pages/Landing';
 import Dashboard from './pages/Dashboard';
 import LogActivity from './pages/LogActivity';
 import Feed from './pages/Feed';
@@ -23,6 +24,12 @@ export default function App() {
 
     return (
         <Routes>
+            {/* ========== LANDING ========== */}
+            <Route
+                path="/"
+                element={user ? <Navigate to="/dashboard" /> : <Landing />}
+            />
+
             {/* ========== AUTH ROUTES ========== */}
             <Route
                 path="/login"

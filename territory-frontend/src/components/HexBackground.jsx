@@ -1,11 +1,11 @@
-export default function HexBackground() {
+export default function HexBackground({ fadeColor = '${fadeColor}', hexOpacity = 0.45, fixed = false }) {
     const hexSize = 24;
     const hexHeight = Math.sqrt(3) * hexSize;
     const colSpacing = hexSize * 2 * 0.75;
     const rowSpacing = hexHeight;
 
     const cols = 48;
-    const rows = 40;
+    const rows = 120;
     const gridWidth = cols * colSpacing + hexSize;
 
     const hexPoints = (cx, cy) => {
@@ -33,8 +33,8 @@ export default function HexBackground() {
 
     return (
         <div
-            className="fixed inset-0 pointer-events-none overflow-hidden"
-            style={{ zIndex: 0 }}
+            className={`${fixed ? 'fixed' : 'absolute'} inset-0 pointer-events-none overflow-hidden`}
+            style={{ zIndex: fixed ? -1 : 0 }}
             aria-hidden="true"
         >
             <svg
@@ -62,7 +62,7 @@ export default function HexBackground() {
                 <g
                     stroke="url(#hexColor)"
                     fill="none"
-                    opacity="0.45"
+                    opacity={hexOpacity}
                 >
                     {hexagons.map(({ cx, cy, key }) => (
                         <polygon
@@ -81,7 +81,7 @@ export default function HexBackground() {
                     left: 0,
                     width: '100%',
                     height: '100%',
-                    background: 'linear-gradient(to right, transparent 0%, transparent 50%, #f1f5f9 75%, #f1f5f9 100%)',
+                    background: `linear-gradient(to right, transparent 0%, transparent 50%, ${fadeColor} 75%, ${fadeColor} 100%)`,
                 }}
             />
             <div
@@ -91,7 +91,7 @@ export default function HexBackground() {
                     left: 0,
                     width: '100%',
                     height: '30%',
-                    background: 'linear-gradient(to bottom, transparent, #f1f5f9)',
+                    background: `linear-gradient(to bottom, transparent, ${fadeColor})`,
                 }}
             />
         </div>

@@ -34,8 +34,8 @@ export const removeKudos = (id) => api.delete(`/api/activities/${id}/kudos`);
 // ========== USER ==========
 export const getProfile = () => api.get('/api/user/profile');
 export const updateUsername = (data) => api.put('/api/user/username', data);
-export const getUserTerritories = () => api.get('/api/user/territories');
-export const getTerritories = () => api.get('/api/user/territories');
+export const getUserTerritories = (params) => api.get('/api/user/territories', { params });
+export const getTerritories = (params) => api.get('/api/user/territories', { params });
 
 // Account deletion — two step process:
 // 1. requestAccountDeletion() → sends 6-digit code to user's email

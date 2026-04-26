@@ -47,6 +47,37 @@ router.get('/profile', authenticateToken, async (req, res) => {
     }
 });
 
+// ========== PUT /api/user/privacy ==========
+router.put('/privacy', authenticateToken, async (req, res) => {
+    try {
+        const { activityPrivacy } = req.body;
+        if (!['public', 'followers', 'private'].includes(activityPrivacy)) {
+            return res.status(400).json({
+                status: 'error',
+                code: 'INVALID_PRIVACY',
+                message: 'activityPrivacy must be public, followers, or private'
+            });
+        }
+        const user = await User.findById(req.user.userId);
+        if (!user) {
+            return res.status(404).json({
+                status: 'error',
+                code: 'USER_NOT_FOUND',
+                message: 'User not found'
+            });
+        }
+        user.activityPrivacy = activityPrivacy;
+        await user.save();
+        res.json({ message: 'Privacy setting updated', activityPrivacy: user.activityPrivacy });
+    } catch (err) {
+        res.status(500).json({
+            status: 'error',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Error updating privacy setting'
+        });
+    }
+});
+
 // ========== PUT /api/user/profile ==========
 router.put('/profile', authenticateToken, async (req, res) => {
     try {
@@ -61,7 +92,16 @@ router.put('/profile', authenticateToken, async (req, res) => {
         }
         if (firstName !== undefined) user.firstName = firstName;
         if (lastName !== undefined) user.lastName = lastName;
-        if (avatar !== undefined) user.avatar = avatar;
+        if (avatar !== undefined) {
+            if (avatar !== null && !avatar.startsWith('https://')) {
+                return res.status(400).json({
+                    status: 'error',
+                    code: 'INVALID_AVATAR_URL',
+                    message: 'Avatar URL must start with https://'
+                });
+            }
+            user.avatar = avatar;
+        }
         await user.save();
         return res.json({
             message: 'Profile updated successfully',
@@ -323,18 +363,25 @@ router.put('/password', authenticateToken, validatePasswordStrength, async (req,
 router.post('/forgot-password', validateEmailFormat, async (req, res) => {
     try {
         const { email } = req.body;
-        const user = await User.findByEmail(email);
-        if (!user) {
-            return res.json({
-                message: 'If an account exists with this email, reset instructions have been sent'
-            });
-        }
-        const resetToken = jwt.sign(
-            { userId: user._id, type: 'password-reset' },
-            JWT_SECRET,
-            { expiresIn: '1h' }
-        );
-        const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
+
+        // Always return the same response — don't reveal whether email exists
+        const genericResponse = {
+            message: 'If an account exists with this email, reset instructions have been sent.'
+        };
+
+        const user = await User.findByEmail(email)
+            .select('+passwordResetToken +passwordResetExpires');
+        if (!user) return res.json(genericResponse);
+
+        // Generate raw token (for email) and hashed token (for DB)
+        const raw = crypto.randomBytes(32).toString('hex');
+        const hashed = crypto.createHash('sha256').update(raw).digest('hex');
+
+        user.passwordResetToken = hashed;
+        user.passwordResetExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+        await user.save();
+
+        const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${raw}`;
         await resend.emails.send({
             from: 'HexCapture <noreply@hexcapture.com>',
             to: user.email,
@@ -356,9 +403,8 @@ router.post('/forgot-password', validateEmailFormat, async (req, res) => {
                 </div>
             `
         });
-        return res.json({
-            message: 'If an account exists with this email, reset instructions have been sent'
-        });
+
+        return res.json(genericResponse);
     } catch (err) {
         return res.status(500).json({
             status: 'error',
@@ -379,33 +425,29 @@ router.post('/reset-password', validatePasswordStrength, async (req, res) => {
                 message: 'Reset token is required'
             });
         }
-        let decoded;
-        try {
-            decoded = jwt.verify(token, JWT_SECRET);
-        } catch (err) {
+
+        // Hash the raw token from the URL to compare against DB
+        const hashed = crypto.createHash('sha256').update(token).digest('hex');
+
+        const user = await User.findOne({
+            passwordResetToken: hashed,
+            passwordResetExpires: { $gt: new Date() }
+        }).select('+passwordResetToken +passwordResetExpires');
+
+        if (!user) {
             return res.status(403).json({
                 status: 'error',
                 code: 'INVALID_TOKEN',
-                message: 'Invalid or expired token'
+                message: 'Invalid or expired reset link. Please request a new one.'
             });
         }
-        if (decoded.type !== 'password-reset') {
-            return res.status(403).json({
-                status: 'error',
-                code: 'INVALID_TOKEN_TYPE',
-                message: 'Invalid token type'
-            });
-        }
-        const user = await User.findById(decoded.userId);
-        if (!user) {
-            return res.status(404).json({
-                status: 'error',
-                code: 'USER_NOT_FOUND',
-                message: 'User not found'
-            });
-        }
+
+        // Set new password and clear the token — single use, now invalidated
         user.password = password;
+        user.passwordResetToken = undefined;
+        user.passwordResetExpires = undefined;
         await user.save();
+
         res.json({ message: 'Password reset successful. You can now login with your new password.' });
     } catch (err) {
         res.status(500).json({
@@ -655,12 +697,44 @@ router.get('/nearby-hexagons', authenticateToken, async (req, res) => {
 });
 
 // ========== GET /api/user/territories ==========
-// Returns all captured territories with pre-computed polygon coordinates.
-// Mobile app uses the polygon field to render hexagons without needing h3-js.
-// Web app can use either hexagonId (with client-side h3-js) or polygon.
+// Returns captured territories near a given coordinate.
+// Requires ?lat=&lng= query params. Optional ?radius= (1-5, default 3 H3 rings).
+// Only returns hexes visible in the current map view — never the full database.
 router.get('/territories', authenticateToken, async (req, res) => {
     try {
-        const territories = await Territory.find({ ownerId: { $exists: true } })
+        const { latitude, longitude, radius } = req.query;
+
+        if (!latitude || !longitude) {
+            return res.status(400).json({
+                status: 'error',
+                code: 'MISSING_COORDINATES',
+                message: 'latitude and longitude query params are required'
+            });
+        }
+
+        const lat = parseFloat(latitude);
+        const lng = parseFloat(longitude);
+
+        if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+            return res.status(400).json({
+                status: 'error',
+                code: 'INVALID_COORDINATES',
+                message: 'Invalid latitude or longitude'
+            });
+        }
+
+        // Cap radius at 6 rings (~127 hexes) to prevent abuse
+        const k = Math.min(6, Math.max(1, parseInt(radius) || 3));
+
+        const { latLngToCell, gridDisk } = require('h3-js');
+        const centerHex = latLngToCell(lat, lng, 10);
+        const nearbyHexIds = new Set(gridDisk(centerHex, k));
+
+        // Only fetch territories whose hexagonId is in the nearby set
+        const territories = await Territory.find({
+            hexagonId: { $in: [...nearbyHexIds] },
+            ownerId: { $exists: true }
+        })
             .populate({ path: 'ownerId', match: { isActive: true }, select: 'username' })
             .select('hexagonId ownerId ownerActivityType capturedAt timesVisited')
             .lean();
@@ -668,18 +742,13 @@ router.get('/territories', authenticateToken, async (req, res) => {
         const formatted = territories
             .filter(t => t.ownerId !== null)
             .map(t => {
-                // Pre-compute polygon boundary for mobile rendering
                 let polygon = null;
                 try {
                     const boundary = cellToBoundary(t.hexagonId);
-                    // cellToBoundary returns [[lat, lng], ...]
-                    // Mobile needs [{ latitude, longitude }]
                     polygon = boundary.map(([lat, lng]) => ({ latitude: lat, longitude: lng }));
                 } catch (err) {
-                    // Skip malformed H3 indices
                     console.warn('Invalid H3 index:', t.hexagonId);
                 }
-
                 return {
                     hexagonId: t.hexagonId,
                     owner: { id: t.ownerId._id, username: t.ownerId.username },

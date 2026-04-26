@@ -20,17 +20,20 @@ const PORT = process.env.PORT || 3000;
 // ========== SECURITY MIDDLEWARE ==========
 
 // Request size limits (prevent DoS)
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ limit: '10mb', extended: true }));
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ limit: '1mb', extended: true }));
 
 // CORS
-app.use(cors({
-    origin: [
-        'http://localhost:5173', // npm run dev location
+const allowedOrigins = [process.env.FRONTEND_URL].filter(Boolean);
+if (process.env.NODE_ENV !== 'production') {
+    allowedOrigins.push(
+        'http://localhost:5173', // npm run dev
         'http://localhost:3000',
-        'http://localhost:8081', // expo go location
-        process.env.FRONTEND_URL,
-    ].filter(Boolean),
+        'http://localhost:8081', // expo go
+    );
+}
+app.use(cors({
+    origin: allowedOrigins,
     credentials: true,
 }));
 

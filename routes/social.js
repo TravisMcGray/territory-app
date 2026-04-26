@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const User = require('../models/user');
 const Activity = require('../models/activity');
 const { createNewFollowerNotification } = require('../utils/notifications');
@@ -7,12 +8,14 @@ const { authenticateToken } = require('../middleware/auth');
 
 // ========== POST /api/users/:userId/follow - Follow a user ==========
 router.post('/:userId/follow', authenticateToken, async (req, res) => {
+    const session = await mongoose.startSession();
+    session.startTransaction();
     try {
         const { userId: currentUserId } = req.user;
         const { userId: targetUserId } = req.params;
 
-        // Validate IDs
         if (!targetUserId || targetUserId.length !== 24) {
+            await session.abortTransaction();
             return res.status(400).json({
                 status: 'error',
                 code: 'INVALID_USER_ID',
@@ -20,8 +23,8 @@ router.post('/:userId/follow', authenticateToken, async (req, res) => {
             });
         }
 
-        // Can't follow yourself
         if (currentUserId === targetUserId) {
+            await session.abortTransaction();
             return res.status(400).json({
                 status: 'error',
                 code: 'CANNOT_FOLLOW_SELF',
@@ -29,9 +32,9 @@ router.post('/:userId/follow', authenticateToken, async (req, res) => {
             });
         }
 
-        // Get current user and target user
-        const currentUser = await User.findById(currentUserId);
+        const currentUser = await User.findById(currentUserId).session(session);
         if (!currentUser) {
+            await session.abortTransaction();
             return res.status(404).json({
                 status: 'error',
                 code: 'USER_NOT_FOUND',
@@ -39,8 +42,9 @@ router.post('/:userId/follow', authenticateToken, async (req, res) => {
             });
         }
 
-        const targetUser = await User.findById(targetUserId);
+        const targetUser = await User.findById(targetUserId).session(session);
         if (!targetUser) {
+            await session.abortTransaction();
             return res.status(404).json({
                 status: 'error',
                 code: 'USER_NOT_FOUND',
@@ -48,12 +52,11 @@ router.post('/:userId/follow', authenticateToken, async (req, res) => {
             });
         }
 
-        // Ensure arrays exist (for old documents without these fields)
         if (!currentUser.following) currentUser.following = [];
         if (!targetUser.followers) targetUser.followers = [];
 
-        // Check if already following
         if (currentUser.isFollowing(targetUserId)) {
+            await session.abortTransaction();
             return res.status(400).json({
                 status: 'error',
                 code: 'ALREADY_FOLLOWING',
@@ -61,15 +64,15 @@ router.post('/:userId/follow', authenticateToken, async (req, res) => {
             });
         }
 
-        // Add to current user's following list
         currentUser.following.push(targetUserId);
-        await currentUser.save();
+        await currentUser.save({ session });
 
-        // Add to target user's followers list
         targetUser.followers.push(currentUserId);
-        await targetUser.save();
+        await targetUser.save({ session });
 
-        // Notify the user being followed
+        await session.commitTransaction();
+
+        // Notification outside transaction — non-fatal if it fails
         await createNewFollowerNotification(targetUserId, currentUser);
 
         res.status(200).json({
@@ -82,22 +85,27 @@ router.post('/:userId/follow', authenticateToken, async (req, res) => {
         });
 
     } catch (error) {
+        await session.abortTransaction();
         res.status(500).json({
             status: 'error',
             code: 'INTERNAL_SERVER_ERROR',
             message: 'Error following user'
         });
+    } finally {
+        session.endSession();
     }
 });
 
 // ========== DELETE /api/users/:userId/follow - Unfollow a user ==========
 router.delete('/:userId/follow', authenticateToken, async (req, res) => {
+    const session = await mongoose.startSession();
+    session.startTransaction();
     try {
         const { userId: currentUserId } = req.user;
         const { userId: targetUserId } = req.params;
 
-        // Validate IDs
         if (!targetUserId || targetUserId.length !== 24) {
+            await session.abortTransaction();
             return res.status(400).json({
                 status: 'error',
                 code: 'INVALID_USER_ID',
@@ -105,9 +113,9 @@ router.delete('/:userId/follow', authenticateToken, async (req, res) => {
             });
         }
 
-        // Get current user and target user
-        const currentUser = await User.findById(currentUserId);
+        const currentUser = await User.findById(currentUserId).session(session);
         if (!currentUser) {
+            await session.abortTransaction();
             return res.status(404).json({
                 status: 'error',
                 code: 'USER_NOT_FOUND',
@@ -115,8 +123,9 @@ router.delete('/:userId/follow', authenticateToken, async (req, res) => {
             });
         }
 
-        const targetUser = await User.findById(targetUserId);
+        const targetUser = await User.findById(targetUserId).session(session);
         if (!targetUser) {
+            await session.abortTransaction();
             return res.status(404).json({
                 status: 'error',
                 code: 'USER_NOT_FOUND',
@@ -124,12 +133,11 @@ router.delete('/:userId/follow', authenticateToken, async (req, res) => {
             });
         }
 
-        // Ensure arrays exist (for old documents without these fields)
         if (!currentUser.following) currentUser.following = [];
         if (!targetUser.followers) targetUser.followers = [];
 
-        // Check if following
         if (!currentUser.isFollowing(targetUserId)) {
+            await session.abortTransaction();
             return res.status(400).json({
                 status: 'error',
                 code: 'NOT_FOLLOWING',
@@ -137,17 +145,17 @@ router.delete('/:userId/follow', authenticateToken, async (req, res) => {
             });
         }
 
-        // Remove from current user's following list
         currentUser.following = currentUser.following.filter(
             id => id.toString() !== targetUserId
         );
-        await currentUser.save();
+        await currentUser.save({ session });
 
-        // Remove from target user's followers list
         targetUser.followers = targetUser.followers.filter(
             id => id.toString() !== currentUserId
         );
-        await targetUser.save();
+        await targetUser.save({ session });
+
+        await session.commitTransaction();
 
         res.status(200).json({
             message: `You have unfollowed ${targetUser.username}`,
@@ -158,11 +166,14 @@ router.delete('/:userId/follow', authenticateToken, async (req, res) => {
         });
 
     } catch (error) {
+        await session.abortTransaction();
         res.status(500).json({
             status: 'error',
             code: 'INTERNAL_SERVER_ERROR',
             message: 'Error unfollowing user'
         });
+    } finally {
+        session.endSession();
     }
 });
 
@@ -347,12 +358,15 @@ router.get('/:userId/following', authenticateToken, async (req, res) => {
     }
 });
 
-// ========== GET /api/users/:userId/activities - Get a user's public activities ==========
-// Returns activities with coordinates so the mobile app can render route maps.
-// Excludes nothing — activities are public once posted.
+// ========== GET /api/users/:userId/activities - Get a user's activities ==========
+// Coordinates are stripped based on the target user's activityPrivacy setting:
+//   public    → coordinates visible to everyone
+//   followers → coordinates visible only to followers (default)
+//   private   → coordinates never returned to anyone except the owner
 router.get('/:userId/activities', authenticateToken, async (req, res) => {
     try {
         const { userId } = req.params;
+        const requesterId = req.user.userId;
 
         if (!userId || userId.length !== 24) {
             return res.status(400).json({
@@ -362,12 +376,32 @@ router.get('/:userId/activities', authenticateToken, async (req, res) => {
             });
         }
 
-        const user = await User.findById(userId).select('username');
+        const user = await User.findById(userId).select('username activityPrivacy followers');
         if (!user) {
             return res.status(404).json({
                 status: 'error',
                 code: 'USER_NOT_FOUND',
                 message: 'User not found'
+            });
+        }
+
+        const isOwner = userId === requesterId;
+        const isFollower = user.followers?.some(id => id.toString() === requesterId);
+        const privacy = user.activityPrivacy || 'followers';
+
+        // Determine whether requester can see coordinates
+        const canSeeCoordinates =
+            isOwner ||
+            privacy === 'public' ||
+            (privacy === 'followers' && isFollower);
+
+        // If private and not owner, return no activities at all
+        if (privacy === 'private' && !isOwner) {
+            return res.json({
+                message: 'Activities retrieved successfully',
+                count: 0,
+                activities: [],
+                privacy: 'private'
             });
         }
 
@@ -377,12 +411,13 @@ router.get('/:userId/activities', authenticateToken, async (req, res) => {
             .select('activityType distance duration elevationGain stolenHexagons capturedHexagons estimatedCalories coordinates kudosCount commentCount createdAt')
             .lean();
 
-        // Attach username and compute comment/kudos counts if not stored
         const formatted = activities.map(a => ({
             ...a,
             username: user.username,
             kudosCount: a.kudosCount ?? 0,
             commentCount: a.commentCount ?? 0,
+            // Strip coordinates if requester doesn't have permission
+            coordinates: canSeeCoordinates ? a.coordinates : undefined,
         }));
 
         res.json({

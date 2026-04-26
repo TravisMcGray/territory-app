@@ -27,6 +27,10 @@ npm-debug.log*
 
 # Testing
 coverage/
-.nyc_output/wipe-all-users.js
+.nyc_output/
+
+# Destructive dev scripts — never commit these
+wipe-all-users.js
 delete-user.js
+reset-user.js
 reset-username.js

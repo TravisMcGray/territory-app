@@ -273,7 +273,20 @@ export default function Map() {
     useEffect(() => {
         const loadTerritories = async () => {
             try {
-                const res = await getTerritories();
+                // Use user's current location if available, fall back to map center
+                const center = userLocation
+                    ? { latitude: userLocation.lat, longitude: userLocation.lng }
+                    : mapRef.current
+                        ? { latitude: mapRef.current.getCenter().lat, longitude: mapRef.current.getCenter().lng }
+                        : null;
+
+                if (!center) return;
+
+                const res = await getTerritories({
+                    latitude: center.latitude,
+                    longitude: center.longitude,
+                    radius: 5
+                });
                 setTerritories(res.data.territories || []);
             } catch (err) {
                 console.error('Failed to load territories:', err);
@@ -282,7 +295,7 @@ export default function Map() {
             }
         };
         loadTerritories();
-    }, []);
+    }, [userLocation]);
 
     // ========== DRAW HEX TILES ==========
     // Runs whenever territories load, user changes, or map finishes loading.

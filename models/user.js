@@ -32,6 +32,17 @@ const userSchema = new mongoose.Schema({
         select: false
     },
 
+    // ========== PASSWORD RESET ==========
+    // Hashed token stored here — raw token only travels in email, never stored
+    passwordResetToken: {
+        type: String,
+        select: false
+    },
+    passwordResetExpires: {
+        type: Date,
+        select: false
+    },
+
     // ========== ACCOUNT DELETION ==========
     // 6-digit code hashed before storage — expires in 15 minutes
     accountDeletionCode: {
@@ -83,6 +94,13 @@ const userSchema = new mongoose.Schema({
             unlockedAt:    { type: Date, default: Date.now }
         }
     ],
+
+    // ========== PRIVACY ==========
+    activityPrivacy: {
+        type: String,
+        enum: ['public', 'followers', 'private'],
+        default: 'followers'
+    },
 
     // ========== ACCOUNT METADATA ==========
     usernameChangedAt: Date,
@@ -136,6 +154,7 @@ userSchema.methods.toProfileJSON = function () {
         followers:         this.followers ? this.followers.length : 0,
         following:         this.following ? this.following.length : 0,
         canChangeUsername: this.canChangeUsername(),
+        activityPrivacy:   this.activityPrivacy,
         createdAt:         this.createdAt,
         lastLogin:         this.lastLogin
     };
@@ -150,9 +169,10 @@ userSchema.methods.toPublicJSON = function () {
         lastName:  this.lastName,
         avatar:    this.avatar,
         stats:     this.stats,
-        followers: this.followers ? this.followers.length : 0,
-        following: this.following ? this.following.length : 0,
-        createdAt: this.createdAt
+        followers:       this.followers ? this.followers.length : 0,
+        following:       this.following ? this.following.length : 0,
+        activityPrivacy: this.activityPrivacy,
+        createdAt:       this.createdAt
     };
 };
 
