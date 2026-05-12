@@ -420,6 +420,7 @@ export default function Landing() {
     const g1Ref      = useSlideIn('up', 0);
     const g2Ref      = useSlideIn('up', 0.1);
     const g3Ref      = useSlideIn('up', 0.2);
+    const privacyRef  = useSlideIn('up');
     const ctaRef     = useSlideIn('up');
 
     const scrollTo = (ref) => ref.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -826,6 +827,81 @@ export default function Landing() {
                             <div key={name} style={{ borderLeft: `4px solid ${color}`, paddingLeft: 14, textAlign: 'left' }}>
                                 <div style={{ fontSize: 16, fontWeight: 900, color: '#0f172a', marginBottom: 4 }}>{name}</div>
                                 <div style={{ fontSize: 13, color: '#64748b', fontWeight: 600 }}>{range}</div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+
+            {/* ========== PRIVACY ========== */}
+            <div style={{ background: '#fff', padding: '80px 24px', borderTop: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0', position: 'relative', zIndex: 10 }}>
+                <div ref={privacyRef} style={{ maxWidth: 720, margin: '0 auto' }}>
+                    <div style={{ textAlign: 'center', marginBottom: 48 }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 52, height: 52, background: 'rgba(16,185,129,0.1)', borderRadius: '50%', marginBottom: 16 }}>
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                            </svg>
+                        </div>
+                        <div style={{ fontSize: 11, fontWeight: 800, color: '#10b981', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 10 }}>Your privacy</div>
+                        <h2 style={{ fontSize: 'clamp(22px, 3vw, 32px)', fontWeight: 900, color: '#0f172a', marginBottom: 12, letterSpacing: '-0.5px' }}>
+                            We only keep what you give us.
+                        </h2>
+                        <p style={{ fontSize: 16, color: '#64748b', fontWeight: 500, lineHeight: 1.7, maxWidth: 520, margin: '0 auto' }}>
+                            HexCapture is a location-based app, so we want to be completely straight with you about what gets saved and what doesn't.
+                        </p>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                        {[
+                            {
+                                saved: false,
+                                title: 'My Location button',
+                                body: 'Reads your GPS to fly the map to your position. Never sent to our servers, never stored anywhere.',
+                            },
+                            {
+                                saved: false,
+                                title: 'Address search',
+                                body: 'Your search goes directly to OpenStreetMap\'s geocoding service and returns a map coordinate. We never see the address you typed.',
+                            },
+                            {
+                                saved: false,
+                                title: 'Loading the map',
+                                body: 'We fetch nearby hex tiles using your coordinates, but those coordinates are used only to query the database and are never saved.',
+                            },
+                            {
+                                saved: true,
+                                title: 'Logging an activity',
+                                body: 'The GPS path from an activity you explicitly start and finish is saved so your territory shows on the map. That\'s the only location data we ever store.',
+                            },
+                        ].map(({ saved, title, body }) => (
+                            <div key={title} style={{
+                                background: saved ? 'rgba(16,185,129,0.04)' : '#f8fafc',
+                                border: `1px solid ${saved ? 'rgba(16,185,129,0.2)' : '#e2e8f0'}`,
+                                borderRadius: 16,
+                                padding: '24px 28px',
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                                    <div style={{
+                                        width: 28, height: 28, borderRadius: '50%',
+                                        background: saved ? 'rgba(16,185,129,0.12)' : 'rgba(100,116,139,0.1)',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                                    }}>
+                                        {saved ? (
+                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                                <polyline points="20 6 9 17 4 12"/>
+                                            </svg>
+                                        ) : (
+                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                                            </svg>
+                                        )}
+                                    </div>
+                                    <div style={{ fontSize: 13, fontWeight: 800, color: saved ? '#10b981' : '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                                        {saved ? 'Saved' : 'Not saved'}
+                                    </div>
+                                </div>
+                                <div style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', marginBottom: 6 }}>{title}</div>
+                                <div style={{ fontSize: 14, color: '#64748b', lineHeight: 1.7, fontWeight: 500 }}>{body}</div>
                             </div>
                         ))}
                     </div>

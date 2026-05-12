@@ -78,6 +78,9 @@ export default function Map() {
     const [mapLoaded, setMapLoaded] = useState(false);
     const [mapZoom, setMapZoom] = useState(15);
     const [selectedPlayer, setSelectedPlayer] = useState(null);
+    const [showAddressInput, setShowAddressInput] = useState(false);
+    const [addressQuery, setAddressQuery] = useState('');
+    const [geocoding, setGeocoding] = useState(false);
 
     // ========== REFS ==========
     // Map ref lives outside React state because MapLibre manages its own
@@ -988,6 +991,30 @@ export default function Map() {
         );
     };
 
+    // ========== ADDRESS SEARCH HANDLER ==========
+    const handleAddressSearch = async (e) => {
+        e.preventDefault();
+        if (!addressQuery.trim()) return;
+        setGeocoding(true);
+        try {
+            const res = await fetch(
+                `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(addressQuery)}`,
+                { headers: { 'Accept-Language': 'en' } }
+            );
+            const results = await res.json();
+            if (results.length > 0) {
+                const { lat, lon } = results[0];
+                mapRef.current?.flyTo({ center: [parseFloat(lon), parseFloat(lat)], zoom: DEFAULT_ZOOM });
+                setShowAddressInput(false);
+                setAddressQuery('');
+            }
+        } catch (err) {
+            console.error('Geocoding failed:', err);
+        } finally {
+            setGeocoding(false);
+        }
+    };
+
     // ========== RENDER ==========
     return (
         <div className="h-screen overflow-hidden bg-gray-950 text-white relative flex flex-col">
@@ -1091,7 +1118,49 @@ export default function Map() {
                 )}
 
                 {/* ========== CONTROLS ROW ========== */}
-                <div className="mb-4 flex justify-end items-center">
+                <div className="mb-4 flex justify-between items-center gap-3">
+                    {/* Address search — left side */}
+                    <div className="flex items-center gap-2">
+                        {showAddressInput ? (
+                            <form onSubmit={handleAddressSearch} className="flex items-center gap-2">
+                                <input
+                                    autoFocus
+                                    type="text"
+                                    value={addressQuery}
+                                    onChange={e => setAddressQuery(e.target.value)}
+                                    placeholder="Enter an address..."
+                                    className="bg-gray-900 border border-gray-700 text-white text-sm px-3 py-2 rounded-xl outline-none focus:border-emerald-500 w-56 transition-colors"
+                                />
+                                <button
+                                    type="submit"
+                                    disabled={geocoding}
+                                    className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-sm px-3 py-2 rounded-xl transition-colors"
+                                >
+                                    {geocoding ? '...' : 'Go'}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => { setShowAddressInput(false); setAddressQuery(''); }}
+                                    className="text-gray-500 hover:text-gray-300 text-sm px-2 py-2 transition-colors"
+                                >
+                                    ✕
+                                </button>
+                            </form>
+                        ) : (
+                            <button
+                                onClick={() => setShowAddressInput(true)}
+                                className="bg-gray-900 hover:bg-gray-800 border border-gray-700 text-gray-300 font-bold text-sm px-4 py-2 rounded-xl transition-colors flex items-center gap-2"
+                            >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <circle cx="11" cy="11" r="8"/>
+                                    <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                                </svg>
+                                Input Address
+                            </button>
+                        )}
+                    </div>
+
+                    {/* My Location — right side */}
                     <button
                         onClick={handleMyLocation}
                         className="bg-gray-900 hover:bg-gray-800 border border-gray-700 text-emerald-400 font-bold text-sm px-4 py-2 rounded-xl transition-colors flex items-center gap-2"
