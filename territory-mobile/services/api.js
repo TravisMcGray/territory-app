@@ -38,7 +38,7 @@ export const getProfile = () => api.get('/api/user/profile');
 export const updateBodyStats = (data) => api.put('/api/user/body-stats', data);
 export const updateProfile = (data) => api.put('/api/user/profile', data);
 export const updateUsername = (data) => api.put('/api/user/username', data);
-export const getTerritories = () => api.get('/api/user/territories');
+export const getTerritories = (params) => api.get('/api/user/territories', { params });
 export const requestAccountDeletion = () => api.post('/api/user/account/delete-request');
 export const confirmAccountDeletion = (data) => api.delete('/api/user/account/confirm', { data });
 

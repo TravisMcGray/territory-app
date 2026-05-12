@@ -561,7 +561,7 @@ export default function Landing() {
                         What is HexCapture
                     </div>
                     <p style={{ fontSize: 'clamp(18px, 2.5vw, 26px)', fontWeight: 700, color: '#0f172a', lineHeight: 1.6 }}>
-                        HexCapture turns every walk and run into a real-time battle for territory. Step through a hexagon on the live map and it's yours. Build your empire block by block — or take it from someone else.
+                        HexCapture turns every walk and run into a live battle for territory. Step through a hexagon and it's yours. Build your empire street by street, or steal it straight from someone else!
                     </p>
                 </div>
             </div>
@@ -585,7 +585,7 @@ export default function Landing() {
                                     Lace up and go.
                                 </h2>
                                 <p style={{ fontSize: 15, color: '#475569', lineHeight: 1.8, fontWeight: 500 }}>
-                                    Open the app, pick Walk or Run, and hit Start. Your GPS tracks every step in real time — hexagons light up as you move through them. No setup, no gear, just your phone and your legs.
+                                    Open the app, pick Walk or Run, and hit Start. Your GPS tracks every step in real time and hexagons light up the moment you move through them. No setup, no gear, no excuses. Just your phone and your legs.
                                 </p>
                             </div>
                             <div ref={f1Vis} style={{ background: 'rgba(59,130,246,0.05)', borderLeft: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 32px' }}>
@@ -604,7 +604,7 @@ export default function Landing() {
                                     Own your turf.
                                 </h2>
                                 <p style={{ fontSize: 15, color: '#475569', lineHeight: 1.8, fontWeight: 500 }}>
-                                    Walkers lock down territory permanently — nobody can take it from you. Runners play offense: sprint through rival hexagons to steal them. Every route is a strategic decision.
+                                    Walkers lock down territory permanently. Once it's yours, it stays yours. Runners play offense and sprint through rival hexagons to steal them. Every route is a calculated attack.
                                 </p>
                             </div>
                         </div>
@@ -617,7 +617,7 @@ export default function Landing() {
                                     Rise through the ranks.
                                 </h2>
                                 <p style={{ fontSize: 15, color: '#475569', lineHeight: 1.8, fontWeight: 500 }}>
-                                    A live global leaderboard tracks territory owned, miles logged, and total tiles captured. Earn tier ranks from Recruit to Overlord. The map is always live — someone might be taking your hexagons right now.
+                                    A live global leaderboard tracks territory owned, miles logged, and total tiles captured. Earn tier ranks from Recruit to Overlord. The map never stops updating. Someone is probably stealing your hexagons right now.
                                 </p>
                             </div>
                             <div ref={f3Vis} style={{ background: 'rgba(245,158,11,0.05)', borderLeft: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 32px' }}>
@@ -651,7 +651,7 @@ export default function Landing() {
                             <div style={{ fontSize: 11, fontWeight: 800, color: '#10b981', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 12 }}>Step outside</div>
                             <h3 style={{ fontSize: 24, fontWeight: 900, color: '#0f172a', marginBottom: 12, lineHeight: 1.3 }}>Open, walk, conquer.</h3>
                             <p style={{ fontSize: 15, color: '#475569', lineHeight: 1.8, fontWeight: 500 }}>
-                                No expensive equipment. No gym membership. Just your phone and wherever your feet take you. Your morning commute, a lunch break, a weekend run — every step counts.
+                                No expensive equipment. No gym membership. Just your phone and wherever your feet take you. Your morning commute, a lunch break, a late night run. Every single step counts.
                             </p>
                         </div>
                         <div style={{ background: 'rgba(16,185,129,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40, borderLeft: '1px solid #e2e8f0' }}>
@@ -691,7 +691,7 @@ export default function Landing() {
                             <div style={{ fontSize: 11, fontWeight: 800, color: '#e879f9', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 12 }}>Live map</div>
                             <h3 style={{ fontSize: 24, fontWeight: 900, color: '#0f172a', marginBottom: 12, lineHeight: 1.3 }}>Your city is the battlefield.</h3>
                             <p style={{ fontSize: 15, color: '#475569', lineHeight: 1.8, fontWeight: 500 }}>
-                                Every hexagon on the live world map belongs to someone — or nobody yet. Multiple players, multiple colors, one map. See exactly where your empire ends and your rivals' begins.
+                                Every hexagon on the live world map belongs to someone, or nobody yet. Multiple players, multiple colors, one map. See exactly where your empire ends and the fight begins.
                             </p>
                         </div>
                     </div>
@@ -706,7 +706,7 @@ export default function Landing() {
                             <div style={{ fontSize: 11, fontWeight: 800, color: '#f59e0b', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 12 }}>Compete</div>
                             <h3 style={{ fontSize: 24, fontWeight: 900, color: '#0f172a', marginBottom: 12, lineHeight: 1.3 }}>The leaderboard never sleeps.</h3>
                             <p style={{ fontSize: 15, color: '#475569', lineHeight: 1.8, fontWeight: 500 }}>
-                                Rankings update the moment anyone completes an activity. Follow friends, give kudos, leave comments. Climb from Recruit to Overlord while someone two blocks away plans their revenge run.
+                                Rankings update the second anyone finishes an activity. Follow friends, drop kudos, talk trash in the comments. Climb from Recruit to Overlord while someone two blocks away is already planning their revenge run.
                             </p>
                         </div>
                         <div style={{ background: 'rgba(245,158,11,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40, borderLeft: '1px solid #e2e8f0' }}>
@@ -747,14 +747,14 @@ export default function Landing() {
                                     <polygon points="34,22 28,11.61 16,11.61 10,22 16,32.39 28,32.39" fill="#10b981"/>
                                 </svg>,
                                 title: 'Capture & Claim',
-                                desc: 'Walk any hex to claim it permanently. Your walker tiles are yours forever — a map of everywhere you\'ve ever been.',
+                                desc: 'Walk any hex to claim it forever. Your tiles are permanent proof of every street you\'ve conquered and every mile you\'ve put in.',
                             },
                             {
                                 ref: g2Ref,
                                 color: '#ef4444',
                                 icon: <svg width="44" height="44" viewBox="0 0 44 44" fill="none"><polygon points="22,2 40,12 40,32 22,42 4,32 4,12" stroke="#ef4444" strokeWidth="2" fill="rgba(239,68,68,0.08)"/><polygon points="22,10 30,15 30,29 22,34 14,29 14,15" fill="#ef4444" opacity="0.7"/></svg>,
                                 title: 'Battle & Steal',
-                                desc: 'Runners steal territory from other runners only. Every route is a raid — plan it right and you can flip a whole neighborhood.',
+                                desc: 'Runners steal territory from other runners only. Every route is a raid. Plan it right and you can flip an entire neighborhood in one go.',
                             },
                             {
                                 ref: g3Ref,
@@ -784,7 +784,7 @@ export default function Landing() {
                         Every hex has a tier. Earn yours.
                     </h2>
                     <p style={{ fontSize: 15, color: '#64748b', marginBottom: 52, fontWeight: 500, lineHeight: 1.7 }}>
-                        Run the same hex multiple times to level it up. Higher tiers glow brighter on the map — and are harder for rivals to steal back.
+                        Run the same hex multiple times to level it up. Higher tiers burn brighter on the map and become nearly impossible for rivals to take back.
                     </p>
 
                     {/* Zigzag connected hex chain */}
@@ -842,7 +842,7 @@ export default function Landing() {
                         Ready to claim your first hex?
                     </h2>
                     <p style={{ fontSize: 16, color: '#64748b', marginBottom: 36, fontWeight: 500 }}>
-                        Your neighborhood is unclaimed. Go take it.
+                        Your neighborhood is sitting there unclaimed. Go take it before someone else does.
                     </p>
                     <button onClick={() => navigate('/login')}
                         style={{

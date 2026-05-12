@@ -7,7 +7,7 @@
 // 5. SUMMARY — pre-save review
 // 6. RESULT — post-save showing captures, achievements, milestones
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
     View,
     Text,
@@ -32,28 +32,68 @@ const COLOR_MINE_FILL = 'rgba(16, 185, 129, 0.45)';
 const COLOR_MINE_STROKE = '#10b981';
 const COLOR_OTHERS_FILL = 'rgba(168, 85, 247, 0.35)';
 const COLOR_OTHERS_STROKE = '#a855f7';
-const COLOR_GRID_FILL = 'rgba(107, 114, 128, 0.08)';
-const COLOR_GRID_STROKE = 'rgba(107, 114, 128, 0.25)';
 const COLOR_WALK = '#3b82f6';
 const COLOR_RUN = '#10b981';
 
-// Light map style
-const LIGHT_MAP_STYLE = [
-    { elementType: 'geometry', stylers: [{ color: '#f5f5f5' }] },
-    { elementType: 'labels.text.fill', stylers: [{ color: '#616161' }] },
-    { elementType: 'labels.text.stroke', stylers: [{ color: '#f5f5f5' }] },
-    { featureType: 'administrative.land_parcel', elementType: 'labels', stylers: [{ visibility: 'off' }] },
-    { featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] },
-    { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#eeeeee' }] },
-    { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#e0f2e9' }] },
-    { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#ffffff' }] },
-    { featureType: 'road', elementType: 'labels', stylers: [{ visibility: 'simplified' }] },
-    { featureType: 'road.arterial', elementType: 'geometry', stylers: [{ color: '#f0f0f0' }] },
-    { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#dadada' }] },
-    { featureType: 'road.local', elementType: 'labels', stylers: [{ visibility: 'off' }] },
+// ========== RAINBOW HELPERS ==========
+function hslToHex(h, s, l) {
+    s /= 100; l /= 100;
+    const k = n => (n + h / 30) % 12;
+    const a = s * Math.min(l, 1 - l);
+    const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+    const toHex = x => Math.round(x * 255).toString(16).padStart(2, '0');
+    return `#${toHex(f(0))}${toHex(f(8))}${toHex(f(4))}`;
+}
+
+// Returns a rainbow stroke color for an uncaptured hex based on
+// its longitude position and a global time offset (slow wave sweep).
+function getRainbowColor(longitude, minLng, lngSpan, timeOffset) {
+    const norm = lngSpan > 0 ? (longitude - minLng) / lngSpan : 0;
+    const eased = norm * norm * norm * (norm * (norm * 6 - 15) + 10);
+    const hue = (eased * 320 + timeOffset * 40) % 360;
+    return hslToHex(hue, 100, 62);
+}
+
+// Dark map style — matches web map palette exactly
+const DARK_MAP_STYLE = [
+    // Base
+    { elementType: 'geometry',           stylers: [{ color: '#0f172a' }] },
+    { elementType: 'labels.text.fill',   stylers: [{ color: '#94a3b8' }] },
+    { elementType: 'labels.text.stroke', stylers: [{ color: '#0f172a' }] },
+
+    // Water
+    { featureType: 'water', elementType: 'geometry',         stylers: [{ color: '#172554' }] },
+    { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#60a5fa' }] },
+
+    // Parks / vegetation
+    { featureType: 'poi.park',            elementType: 'geometry', stylers: [{ color: '#0d3320' }] },
+    { featureType: 'landscape.natural',   elementType: 'geometry', stylers: [{ color: '#0a2e1a' }] },
+    { featureType: 'landscape.man_made',  elementType: 'geometry', stylers: [{ color: '#131c2e' }] },
+
+    // Roads — hierarchy matching web palette
+    { featureType: 'road',          elementType: 'geometry',         stylers: [{ color: '#334155' }] },
+    { featureType: 'road',          elementType: 'geometry.stroke',  stylers: [{ color: '#1e293b' }] },
+    { featureType: 'road',          elementType: 'labels.text.fill', stylers: [{ color: '#94a3b8' }] },
+    { featureType: 'road.highway',  elementType: 'geometry',         stylers: [{ color: '#475569' }] },
+    { featureType: 'road.arterial', elementType: 'geometry',         stylers: [{ color: '#334155' }] },
+    { featureType: 'road.local',    elementType: 'geometry',         stylers: [{ color: '#1e293b' }] },
+    { featureType: 'road.local',    elementType: 'labels',           stylers: [{ visibility: 'off' }] },
+
+    // Buildings
+    { featureType: 'building', elementType: 'geometry',        stylers: [{ color: '#1a2744' }] },
+    { featureType: 'building', elementType: 'geometry.stroke', stylers: [{ color: '#374151' }] },
+
+    // POI — hide labels, keep subtle geometry
+    { featureType: 'poi', elementType: 'labels',   stylers: [{ visibility: 'off' }] },
+    { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#131c2e' }] },
+
+    // Transit — hide entirely
     { featureType: 'transit', stylers: [{ visibility: 'off' }] },
-    { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#c9e8f5' }] },
-    { featureType: 'water', elementType: 'labels', stylers: [{ visibility: 'off' }] },
+
+    // Admin boundaries
+    { featureType: 'administrative',          elementType: 'geometry',         stylers: [{ color: '#475569' }] },
+    { featureType: 'administrative',          elementType: 'labels.text.fill', stylers: [{ color: '#cbd5e1' }] },
+    { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#f1f5f9' }] },
 ];
 
 // ========== MOTIVATIONAL TAGLINES ==========
@@ -164,6 +204,7 @@ export default function MapScreen() {
     const [loading, setLoading] = useState(true);
     const [locationError, setLocationError] = useState(null);
     const [tileCount, setTileCount] = useState({ mine: 0, total: 0 });
+    const [rainbowTime, setRainbowTime] = useState(0);
 
     // Tracking state
     // mode: 'explore' | 'select' | 'tracking' | 'paused' | 'summary' | 'result'
@@ -237,24 +278,30 @@ export default function MapScreen() {
         init();
     }, []);
 
-    // Load territories
-    useEffect(() => {
-        const loadTerritories = async () => {
-            try {
-                const res = await getTerritories();
-                const terrs = res.data.territories || [];
-                setTerritories(terrs);
-                let mine = 0;
-                terrs.forEach(t => {
-                    if ((t.owner?.id ?? t.owner?._id)?.toString() === currentUserId) mine++;
-                });
-                setTileCount({ mine, total: terrs.length });
-            } catch (err) {
-                console.error('Failed to load territories:', err);
-            }
-        };
-        loadTerritories();
+    // Load territories around current location
+    const loadTerritories = useCallback(async (coords) => {
+        if (!coords) return;
+        try {
+            const res = await getTerritories({
+                latitude: coords.latitude,
+                longitude: coords.longitude,
+                radius: 5,
+            });
+            const terrs = res.data.territories || [];
+            setTerritories(terrs);
+            let mine = 0;
+            terrs.forEach(t => {
+                if ((t.owner?.id ?? t.owner?._id)?.toString() === currentUserId) mine++;
+            });
+            setTileCount({ mine, total: terrs.length });
+        } catch (err) {
+            console.error('Failed to load territories:', err);
+        }
     }, [currentUserId]);
+
+    useEffect(() => {
+        if (location) loadTerritories(location);
+    }, [location, loadTerritories]);
 
     // ========== GPS TRACKING ==========
     const startGPSWatch = async () => {
@@ -396,17 +443,10 @@ const startTracking = async (type) => {
             setResult(res.data);
             setMode('result');
 
-            // Reload territories
+            // Reload territories and hex grid around current location
             try {
-                const terrRes = await getTerritories();
-                const terrs = terrRes.data.territories || [];
-                setTerritories(terrs);
-                let mine = 0;
-                terrs.forEach(t => {
-                    if ((t.owner?.id ?? t.owner?._id)?.toString() === currentUserId) mine++;
-                });
-                setTileCount({ mine, total: terrs.length });
                 if (location) {
+                    await loadTerritories(location);
                     const gridRes = await getNearbyHexagons(location.latitude, location.longitude, 6);
                     setGridHexagons(gridRes.data.hexagons || []);
                 }
@@ -446,6 +486,30 @@ const startTracking = async (type) => {
             latitudeDelta: delta, longitudeDelta: delta,
         }, 500);
     }, [location, mode]);
+
+    // ========== RAINBOW WAVE TICK ==========
+    // Updates every 200ms — slow enough to be smooth, fast enough to animate
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setRainbowTime(t => t + 0.2);
+        }, 200);
+        return () => clearInterval(interval);
+    }, []);
+
+    // Longitude range of the hex grid — used to normalize position for rainbow
+    const { minLng, maxLng } = useMemo(() => {
+        if (gridHexagons.length === 0) return { minLng: 0, maxLng: 1 };
+        let min = Infinity, max = -Infinity;
+        gridHexagons.forEach(hex => {
+            hex.polygon.forEach(pt => {
+                if (pt.longitude < min) min = pt.longitude;
+                if (pt.longitude > max) max = pt.longitude;
+            });
+        });
+        return { minLng: min, maxLng: max };
+    }, [gridHexagons]);
+
+    const lngSpan = maxLng - minLng || 0.001;
 
     // ========== CLEANUP ==========
     useEffect(() => {
@@ -680,7 +744,7 @@ const startTracking = async (type) => {
                 ref={mapRef}
                 style={styles.map}
                 initialRegion={initialRegion}
-                customMapStyle={LIGHT_MAP_STYLE}
+                customMapStyle={DARK_MAP_STYLE}
                 showsUserLocation={false}
                 showsMyLocationButton={false}
                 showsCompass={false}
@@ -689,13 +753,17 @@ const startTracking = async (type) => {
                 showsTraffic={false}
                 showsIndoors={false}
             >
-                {/* Hex grid */}
+                {/* Hex grid — rainbow wave on uncaptured tiles */}
                 {gridHexagons.map(hex => {
                     const isCaptured = territories.some(t => t.hexagonId === hex.hexagonId);
                     if (isCaptured) return null;
+                    const centerLng = hex.polygon.reduce((sum, pt) => sum + pt.longitude, 0) / hex.polygon.length;
+                    const strokeColor = getRainbowColor(centerLng, minLng, lngSpan, rainbowTime);
                     return (
                         <Polygon key={`grid-${hex.hexagonId}`} coordinates={hex.polygon}
-                            fillColor={COLOR_GRID_FILL} strokeColor={COLOR_GRID_STROKE} strokeWidth={1} />
+                            fillColor="rgba(0,0,0,0.04)"
+                            strokeColor={strokeColor}
+                            strokeWidth={1.2} />
                     );
                 })}
 
