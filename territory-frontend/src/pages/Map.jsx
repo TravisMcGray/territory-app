@@ -81,6 +81,9 @@ export default function Map() {
     const [showAddressInput, setShowAddressInput] = useState(false);
     const [addressQuery, setAddressQuery] = useState('');
     const [geocoding, setGeocoding] = useState(false);
+    const [geocodeError, setGeocodeError] = useState(null);
+    const [suggestions, setSuggestions] = useState([]);
+    const [pendingLocation, setPendingLocation] = useState(null);
 
     // ========== REFS ==========
     // Map ref lives outside React state because MapLibre manages its own
@@ -274,11 +277,11 @@ export default function Map() {
 
     // ========== LOAD TERRITORIES ==========
     useEffect(() => {
+        if (!mapLoaded) return;
         const loadTerritories = async () => {
             try {
-                // Use user's current location if available, fall back to map center
                 const center = userLocation
-                    ? { latitude: userLocation.lat, longitude: userLocation.lng }
+                    ? { latitude: userLocation.latitude, longitude: userLocation.longitude }
                     : mapRef.current
                         ? { latitude: mapRef.current.getCenter().lat, longitude: mapRef.current.getCenter().lng }
                         : null;
@@ -298,7 +301,7 @@ export default function Map() {
             }
         };
         loadTerritories();
-    }, [userLocation]);
+    }, [userLocation, mapLoaded]);
 
     // ========== DRAW HEX TILES ==========
     // Runs whenever territories load, user changes, or map finishes loading.
@@ -546,41 +549,6 @@ export default function Map() {
                 paint: { 'line-color': '#ffffff', 'line-width': 1.5, 'line-opacity': 1, 'line-blur': 0 },
             });
 
-            // ---- Others: per-player colored shield icons ----
-            // Load a uniquely colored shield for each player, then add the layer
-            // with a data-driven icon-image so each hex shows its owner's color.
-            const uniqueOwnerIds = [...new Set(
-                territories
-                    .filter(t => t.owner?.id?.toString() !== currentUserId)
-                    .map(t => t.owner?.id?.toString())
-                    .filter(Boolean)
-            )];
-
-            Promise.all(
-                uniqueOwnerIds.map(async (ownerId) => {
-                    const key = `shield-${ownerId}`;
-                    if (!map.hasImage(key)) {
-                        const img = await makeShieldImage(playerColor(ownerId));
-                        if (!map.hasImage(key)) map.addImage(key, img);
-                    }
-                })
-            ).then(() => {
-                if (map.getLayer('hex-others-icon')) return;
-                map.addLayer({
-                    id: 'hex-others-icon',
-                    type: 'symbol',
-                    source: 'shield-points',
-                    layout: {
-                        'icon-image': ['concat', 'shield-', ['get', 'ownerId']],
-                        'icon-size': 0.22,
-                        'icon-allow-overlap': true,
-                        'icon-ignore-placement': true,
-                        'icon-anchor': 'center',
-                    },
-                    paint: { 'icon-opacity': 0.92 },
-                });
-            });
-
             // ---- Click → popup showing owner info ----
             map.on('click', 'hex-fill', (e) => {
                 if (!e.features?.length) return;
@@ -667,6 +635,40 @@ export default function Map() {
             map.on('mouseenter', 'hex-others-icon', () => { map.getCanvas().style.cursor = 'pointer'; });
             map.on('mouseleave', 'hex-others-icon', () => { map.getCanvas().style.cursor = ''; });
         }
+
+        // ---- Shield icons — runs on every territory update ----
+        // Must be outside the if/else so new owners get images loaded even on reload.
+        const uniqueOwnerIds = [...new Set(
+            territories
+                .filter(t => t.owner?.id?.toString() !== currentUserId)
+                .map(t => t.owner?.id?.toString())
+                .filter(Boolean)
+        )];
+
+        Promise.all(
+            uniqueOwnerIds.map(async (ownerId) => {
+                const key = `shield-${ownerId}`;
+                if (!map.hasImage(key)) {
+                    const img = await makeShieldImage(playerColor(ownerId));
+                    if (!map.hasImage(key)) map.addImage(key, img);
+                }
+            })
+        ).then(() => {
+            if (map.getLayer('hex-others-icon') || !map.getSource('shield-points')) return;
+            map.addLayer({
+                id: 'hex-others-icon',
+                type: 'symbol',
+                source: 'shield-points',
+                layout: {
+                    'icon-image': ['concat', 'shield-', ['get', 'ownerId']],
+                    'icon-size': 0.22,
+                    'icon-allow-overlap': true,
+                    'icon-ignore-placement': true,
+                    'icon-anchor': 'center',
+                },
+                paint: { 'icon-opacity': 0.92 },
+            });
+        });
 
         setTileCount({ mine: mineCount, total: territories.length });
 
@@ -991,28 +993,83 @@ export default function Map() {
         );
     };
 
+    // ========== ADDRESS AUTOCOMPLETE ==========
+    useEffect(() => {
+        if (addressQuery.trim().length < 3) { setSuggestions([]); return; }
+        const timer = setTimeout(async () => {
+            try {
+                const res = await fetch(
+                    `https://nominatim.openstreetmap.org/search?format=json&limit=5&email=tmcgray204@gmail.com&q=${encodeURIComponent(addressQuery)}`,
+                    { headers: { 'Accept-Language': 'en' } }
+                );
+                const results = await res.json();
+                setSuggestions(results);
+            } catch {
+                setSuggestions([]);
+            }
+        }, 400);
+        return () => clearTimeout(timer);
+    }, [addressQuery]);
+
+    const handleSuggestionClick = (suggestion) => {
+        const lat = parseFloat(suggestion.lat);
+        const lon = parseFloat(suggestion.lon);
+        mapRef.current?.flyTo({ center: [lon, lat], zoom: DEFAULT_ZOOM });
+        setShowAddressInput(false);
+        setAddressQuery('');
+        setSuggestions([]);
+        setGeocodeError(null);
+        setPendingLocation({ latitude: lat, longitude: lon, label: suggestion.display_name.split(',')[0] });
+    };
+
     // ========== ADDRESS SEARCH HANDLER ==========
     const handleAddressSearch = async (e) => {
         e.preventDefault();
         if (!addressQuery.trim()) return;
         setGeocoding(true);
+        setGeocodeError(null);
         try {
             const res = await fetch(
-                `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(addressQuery)}`,
+                `https://nominatim.openstreetmap.org/search?format=json&limit=1&email=tmcgray204@gmail.com&q=${encodeURIComponent(addressQuery)}`,
                 { headers: { 'Accept-Language': 'en' } }
             );
             const results = await res.json();
             if (results.length > 0) {
-                const { lat, lon } = results[0];
-                mapRef.current?.flyTo({ center: [parseFloat(lon), parseFloat(lat)], zoom: DEFAULT_ZOOM });
+                const lat = parseFloat(results[0].lat);
+                const lon = parseFloat(results[0].lon);
+                mapRef.current?.flyTo({ center: [lon, lat], zoom: DEFAULT_ZOOM });
                 setShowAddressInput(false);
                 setAddressQuery('');
+                setSuggestions([]);
+                setPendingLocation({ latitude: lat, longitude: lon, label: results[0].display_name.split(',')[0] });
+            } else {
+                setGeocodeError('Address not found. Try being more specific.');
             }
         } catch (err) {
             console.error('Geocoding failed:', err);
+            setGeocodeError('Search failed. Please try again.');
         } finally {
             setGeocoding(false);
         }
+    };
+
+    // ========== SET LOCATION FROM ADDRESS ==========
+    const handleSetLocationFromAddress = () => {
+        if (!pendingLocation) return;
+        const { latitude, longitude } = pendingLocation;
+        setUserLocation({ latitude, longitude });
+
+        // Place the blue dot marker at the searched location
+        if (locationMarkerRef.current) {
+            locationMarkerRef.current.setLngLat([longitude, latitude]);
+        } else {
+            const el = document.createElement('div');
+            el.className = 'location-dot';
+            locationMarkerRef.current = new maplibregl.Marker({ element: el })
+                .setLngLat([longitude, latitude])
+                .addTo(mapRef.current);
+        }
+        setPendingLocation(null);
     };
 
     // ========== RENDER ==========
@@ -1122,12 +1179,13 @@ export default function Map() {
                     {/* Address search — left side */}
                     <div className="flex items-center gap-2">
                         {showAddressInput ? (
+                            <div className="flex flex-col gap-1 relative">
                             <form onSubmit={handleAddressSearch} className="flex items-center gap-2">
                                 <input
                                     autoFocus
                                     type="text"
                                     value={addressQuery}
-                                    onChange={e => setAddressQuery(e.target.value)}
+                                    onChange={e => { setAddressQuery(e.target.value); setGeocodeError(null); }}
                                     placeholder="Enter an address..."
                                     className="bg-gray-900 border border-gray-700 text-white text-sm px-3 py-2 rounded-xl outline-none focus:border-emerald-500 w-56 transition-colors"
                                 />
@@ -1140,12 +1198,29 @@ export default function Map() {
                                 </button>
                                 <button
                                     type="button"
-                                    onClick={() => { setShowAddressInput(false); setAddressQuery(''); }}
+                                    onClick={() => { setShowAddressInput(false); setAddressQuery(''); setGeocodeError(null); }}
                                     className="text-gray-500 hover:text-gray-300 text-sm px-2 py-2 transition-colors"
                                 >
                                     ✕
                                 </button>
                             </form>
+                            {geocodeError && <p className="text-yellow-400 text-xs font-semibold pl-1">{geocodeError}</p>}
+                            {suggestions.length > 0 && (
+                                <div className="absolute top-full left-0 mt-1 w-80 bg-gray-900 border border-gray-700 rounded-xl overflow-hidden shadow-2xl z-50">
+                                    {suggestions.map((s, i) => (
+                                        <button
+                                            key={i}
+                                            type="button"
+                                            onClick={() => handleSuggestionClick(s)}
+                                            className="w-full text-left px-4 py-2.5 text-sm text-gray-200 hover:bg-gray-800 border-b border-gray-800 last:border-0 transition-colors"
+                                        >
+                                            <span className="font-semibold text-white">{s.display_name.split(',')[0]}</span>
+                                            <span className="text-gray-500 text-xs block truncate">{s.display_name.split(',').slice(1).join(',').trim()}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                            </div>
                         ) : (
                             <button
                                 onClick={() => setShowAddressInput(true)}
@@ -1204,6 +1279,35 @@ export default function Map() {
                         zIndex: 1,
                     }}
                 />
+                {/* Set location banner — appears after address search */}
+                {pendingLocation && (
+                    <div style={{
+                        position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)',
+                        zIndex: 20, display: 'flex', alignItems: 'center', gap: 10,
+                        background: 'rgba(10,10,20,0.92)', backdropFilter: 'blur(12px)',
+                        border: '1px solid rgba(16,185,129,0.3)', borderRadius: 14,
+                        padding: '10px 16px', boxShadow: '0 0 24px rgba(16,185,129,0.15)',
+                    }}>
+                        <span style={{ fontSize: 13, color: '#94a3b8', fontWeight: 600 }}>
+                            Viewing <span style={{ color: '#fff', fontWeight: 700 }}>{pendingLocation.label}</span>
+                        </span>
+                        <button
+                            onClick={handleSetLocationFromAddress}
+                            style={{
+                                background: '#10b981', color: '#fff', fontWeight: 700,
+                                fontSize: 12, padding: '6px 14px', borderRadius: 9,
+                                border: 'none', cursor: 'pointer',
+                            }}
+                        >
+                            📍 Set as my location
+                        </button>
+                        <button
+                            onClick={() => setPendingLocation(null)}
+                            style={{ background: 'none', border: 'none', color: '#475569', fontSize: 16, cursor: 'pointer', lineHeight: 1 }}
+                        >×</button>
+                    </div>
+                )}
+
                 {/* Atmosphere halo — only visible at globe zoom levels */}
                 <div style={{
                     position: 'absolute',
