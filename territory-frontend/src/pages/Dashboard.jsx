@@ -195,13 +195,51 @@ export default function Dashboard() {
                             <h1 style={{ fontSize: 32, fontWeight: 900, color: '#0f172a', lineHeight: 1.2 }}>
                                 Welcome back, <span style={{ color: '#10b981' }}>{profile?.username}</span>
                             </h1>
-                            <p style={{ fontSize: 14, color: '#64748b', marginTop: 6, fontWeight: 600 }}>
-                                {profile?.tilesOwned > 0
-                                    ? `You control ${profile.tilesOwned} tiles. ${myRank ? `You're ranked #${myRank} globally.` : 'Keep capturing.'}`
-                                    : 'Ready to capture more territory?'
-                                }
-                            </p>
                         </div>
+
+                        {/* Global Rank Achievement Card */}
+                        {profile?.tilesOwned > 0 && myRank && (
+                            <div style={{
+                                background: '#ffffff',
+                                border: '1px solid #e2e8f0',
+                                borderLeft: myRank === 1 ? '4px solid #f59e0b' : '4px solid #10b981',
+                                borderRadius: 16,
+                                padding: '16px 20px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 16,
+                                boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+                            }}>
+                                {/* Icon badge */}
+                                <div style={{
+                                    width: 52, height: 52, borderRadius: 12, flexShrink: 0,
+                                    background: myRank === 1 ? 'rgba(245,158,11,0.08)' : 'rgba(16,185,129,0.08)',
+                                    border: `1px solid ${myRank === 1 ? 'rgba(245,158,11,0.25)' : 'rgba(16,185,129,0.2)'}`,
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    fontSize: 26,
+                                }}>
+                                    {myRank === 1 ? '🏆' : '🌐'}
+                                </div>
+                                {/* Text */}
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{
+                                        fontSize: 10, fontWeight: 800, letterSpacing: '0.1em',
+                                        textTransform: 'uppercase', marginBottom: 3,
+                                        color: myRank === 1 ? '#d97706' : '#059669',
+                                    }}>
+                                        Global Ranking
+                                    </div>
+                                    <div style={{ fontSize: 22, fontWeight: 900, color: '#0f172a', lineHeight: 1.1, fontFamily: "'Oxanium', sans-serif" }}>
+                                        #{myRank} Worldwide
+                                    </div>
+                                    <div style={{ fontSize: 12, fontWeight: 700, marginTop: 3, fontFamily: "'Oxanium', sans-serif",
+                                        color: myRank === 1 ? '#d97706' : '#10b981',
+                                    }}>
+                                        {profile.tilesOwned} tiles captured
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Stats strip */}
                         <div style={{

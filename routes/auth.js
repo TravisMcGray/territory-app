@@ -176,9 +176,18 @@ router.post('/login', async (req, res) => {
         const token = jwt.sign(
             { userId: user._id, email: user.email },
             JWT_SECRET,
-            { expiresIn: '7d' }
+            { expiresIn: '24h' }
         );
 
+        // httpOnly cookie for web — JS cannot read this, immune to XSS
+        res.cookie('token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: 24 * 60 * 60 * 1000,
+        });
+
+        // Token also returned in body for React Native (can't use httpOnly cookies)
         res.json({
             message: 'Login successful',
             token,
@@ -266,6 +275,16 @@ router.post('/resend-verification', validateEmailFormat, async (req, res) => {
             message: 'Error resending verification email'
         });
     }
+});
+
+// ========== POST /api/auth/logout ==========
+router.post('/logout', (req, res) => {
+    res.clearCookie('token', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+    });
+    res.json({ message: 'Logged out' });
 });
 
 module.exports = router;

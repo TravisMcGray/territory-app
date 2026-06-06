@@ -7,13 +7,9 @@ import axios from 'axios';
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 // ========== AXIOS INSTANCE ==========
-const api = axios.create({ baseURL: BASE_URL });
-
-api.interceptors.request.use((config) => {
-    const token = localStorage.getItem('token');
-    if (token) config.headers.Authorization = `Bearer ${token}`;
-    return config;
-});
+// withCredentials sends the httpOnly auth cookie on every request automatically.
+// No token is ever read or stored in JS — the browser handles it transparently.
+const api = axios.create({ baseURL: BASE_URL, withCredentials: true });
 
 // ========== AUTH ==========
 export const signup = (data) => api.post('/api/auth/signup', data);

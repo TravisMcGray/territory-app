@@ -4,6 +4,7 @@
 
 import { createContext, useContext, useState, useEffect } from 'react';
 import { getProfile } from '../services/api';
+import api from '../services/api';
 
 const AuthContext = createContext(null);
 
@@ -12,41 +13,26 @@ export function AuthProvider({ children }) {
     const [loading, setLoading] = useState(true);
 
     // ========== INITIALIZE ==========
-    // Check if user has a token on app load and fetch their profile.
+    // Attempt profile fetch on load — the httpOnly cookie is sent automatically.
+    // 200 means valid session; 401 means no cookie or expired, user stays null.
     useEffect(() => {
-    const token = localStorage.getItem('token');
-    
-    if (token) {
-        setUser({ _id: 'loading' });
-        
         getProfile()
             .then(res => setUser(res.data.profile))
-            .catch((err) => {
-                if (err.response?.status === 401) {
-                    localStorage.removeItem('token');
-                    setUser(null);
-                } else {
-                    setUser({ _id: 'offline' });
-                }
-            })
+            .catch(() => setUser(null))
             .finally(() => setLoading(false));
-    } else {
-        setLoading(false);
-    }
-}, []);
+    }, []);
 
     // ========== AUTH ACTIONS ==========
-    const loginUser = (token, userData) => {
-        localStorage.setItem('token', token);
+    const loginUser = (userData) => {
         setUser(userData);
-        // Fetch full profile immediately so username and stats are available
+        // Fetch full profile so username and stats are immediately available
         getProfile()
             .then(res => setUser(res.data.profile))
-            .catch(() => {}); // silently keep the partial user if profile fetch fails
+            .catch(() => {});
     };
 
-    const logoutUser = () => {
-        localStorage.removeItem('token');
+    const logoutUser = async () => {
+        try { await api.post('/api/auth/logout'); } catch {}
         setUser(null);
     };
 

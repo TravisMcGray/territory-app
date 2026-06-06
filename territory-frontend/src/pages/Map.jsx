@@ -28,7 +28,7 @@ import { getLibertyNoBuildingsStyle } from '../utils/mapStyle';
 // Emerald = yours, neon purple = theirs. No ambiguity.
 const COLOR_MINE = '#10b981';
 const COLOR_THEIRS = '#e879f9';
-const DEFAULT_ZOOM = 15;
+const DEFAULT_ZOOM = 14;
 const FALLBACK_LAT = 27.9506;
 const FALLBACK_LNG = -82.4572;
 const H3_RESOLUTION = 10;
@@ -83,7 +83,12 @@ export default function Map() {
     const [geocoding, setGeocoding] = useState(false);
     const [geocodeError, setGeocodeError] = useState(null);
     const [suggestions, setSuggestions] = useState([]);
-    const [pendingLocation, setPendingLocation] = useState(null);
+    const [pinnedLocation, setPinnedLocation] = useState(() => {
+        try {
+            const saved = localStorage.getItem('hexcapture_home');
+            return saved ? JSON.parse(saved) : null;
+        } catch { return null; }
+    });
 
     // ========== REFS ==========
     // Map ref lives outside React state because MapLibre manages its own
@@ -97,7 +102,11 @@ export default function Map() {
     const hexGridLngRangeRef = useRef({ minLng: 0, maxLng: 1 });
     const hasZoomedToTerritoryRef = useRef(false);
     const spinFrameRef = useRef(null);
+    const programmaticNavRef = useRef(false);
     const territoriesRef = useRef([]);
+    // Approximate location from low-accuracy geolocation — used to bias address
+    // search suggestions before high-accuracy GPS resolves (or if it never does).
+    const approxLocationRef = useRef(null);
 
     // ========== STARFIELD ==========
     useEffect(() => {
@@ -159,24 +168,27 @@ export default function Map() {
         map.easeTo({ bearing: 0, pitch: 0, duration: 600 });
 
         const spin = () => {
-            const idle = Date.now() - lastInteraction > 5000;
-            const atGlobeZoom = map.getZoom() < 4;
+            // Pause spin while applyAddressLocation (or any programmatic nav) is flying
+            if (!programmaticNavRef.current) {
+                const idle = Date.now() - lastInteraction > 5000;
+                const atGlobeZoom = map.getZoom() < 4;
 
-            if (state === 'idle' && idle && atGlobeZoom) {
-                state = 'resetting';
-                map.easeTo({
-                    center: [-98, 39], // geographic center of the US
-                    zoom: 2.5,
-                    bearing: 0,
-                    pitch: 0,
-                    duration: 2000,
-                });
-                map.once('moveend', () => {
-                    if (state === 'resetting') state = 'spinning';
-                });
-            } else if (state === 'spinning' && atGlobeZoom) {
-                const { lng, lat } = map.getCenter();
-                map.setCenter([(lng - 0.08 + 180) % 360 - 180, lat]);
+                if (state === 'idle' && idle && atGlobeZoom) {
+                    state = 'resetting';
+                    map.easeTo({
+                        center: [-98, 39],
+                        zoom: 2.5,
+                        bearing: 0,
+                        pitch: 0,
+                        duration: 2000,
+                    });
+                    map.once('moveend', () => {
+                        if (state === 'resetting') state = 'spinning';
+                    });
+                } else if (state === 'spinning' && atGlobeZoom) {
+                    const { lng, lat } = map.getCenter();
+                    map.setCenter([(lng - 0.08 + 180) % 360 - 180, lat]);
+                }
             }
 
             spinFrameRef.current = requestAnimationFrame(spin);
@@ -207,11 +219,20 @@ export default function Map() {
             const style = await getLibertyNoBuildingsStyle();
             if (cancelled) return;
 
+            const savedHome = (() => {
+                try {
+                    const s = localStorage.getItem('hexcapture_home');
+                    return s ? JSON.parse(s) : null;
+                } catch { return null; }
+            })();
+
             const map = new maplibregl.Map({
                 container: mapContainerRef.current,
                 style,
-                center: [FALLBACK_LNG, FALLBACK_LAT],  // MapLibre uses [lng, lat]
-                zoom: DEFAULT_ZOOM,
+                // Pinned home → start there at street zoom.
+                // No pin → globe view over the US so the user knows to set their location.
+                center: savedHome ? [savedHome.longitude, savedHome.latitude] : [-98, 39],
+                zoom: savedHome ? DEFAULT_ZOOM : 2.5,
                 attributionControl: false, // rendered manually below the map card
                 renderWorldCopies: false,
                 projection: { type: 'globe' },
@@ -228,24 +249,70 @@ export default function Map() {
 
             map.on('load', () => {
                 map.setProjection({ type: 'globe' });
+                if (savedHome) {
+                    // Place marker only if it doesn't already exist
+                    if (!locationMarkerRef.current) {
+                        const el = document.createElement('div');
+                        el.className = 'location-dot';
+                        locationMarkerRef.current = new maplibregl.Marker({ element: el })
+                            .setLngLat([savedHome.longitude, savedHome.latitude])
+                            .addTo(map);
+                    }
+                    // Always seed userLocation — decoupled from marker so the hex
+                    // grid draws even if a stale GPS callback already set the marker ref
+                    setUserLocation({ latitude: savedHome.latitude, longitude: savedHome.longitude });
+                }
                 setMapLoaded(true);
             });
 
             map.on('zoom', () => setMapZoom(map.getZoom()));
 
-            // ---- GPS location ----
+            // ---- Fast low-accuracy pass ----
+            // Resolves in <1s via IP/Wi-Fi. Seeds the territory load so shields
+            // appear on the globe immediately without waiting for GPS.
+            // No blue dot — low-accuracy can be miles off, a dot implies precision.
+            // High-accuracy GPS overrides it when it resolves.
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    const loc = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+                    approxLocationRef.current = loc;
+                    // Only use if GPS hasn't already resolved (functional update prevents override)
+                    setUserLocation(prev => prev ?? loc);
+                },
+                () => {},
+                { enableHighAccuracy: false, timeout: 3000, maximumAge: 300000 }
+            );
+
+            // ---- High-accuracy GPS ----
+            // If a home is pinned: updates userLocation (hex grid) but never moves
+            // the marker — desktop IP-based GPS can be miles off and would push the
+            // dot off-screen. The pin IS the home; trust it over coarse GPS.
+            // If no home is pinned: flies there and places the blue dot normally.
             navigator.geolocation.getCurrentPosition(
                 (position) => {
-                    const { latitude, longitude } = position.coords;
-                    map.flyTo({ center: [longitude, latitude], zoom: DEFAULT_ZOOM });
-                    setUserLocation({ latitude, longitude });
+                    const { latitude, longitude, accuracy } = position.coords;
+                    const homeIsPinned = !!localStorage.getItem('hexcapture_home');
 
-                    // Blue dot marker for current location
-                    const el = document.createElement('div');
-                    el.className = 'location-dot';
-                    locationMarkerRef.current = new maplibregl.Marker({ element: el })
-                        .setLngLat([longitude, latitude])
-                        .addTo(map);
+                    if (!homeIsPinned) {
+                        // No pin — GPS is the only source of truth
+                        if (accuracy < ACCURACY_THRESHOLD_M) {
+                            map.flyTo({ center: [longitude, latitude], zoom: DEFAULT_ZOOM });
+                        }
+                        setUserLocation({ latitude, longitude });
+
+                        const el = document.createElement('div');
+                        el.className = 'location-dot';
+                        if (locationMarkerRef.current) {
+                            locationMarkerRef.current.setLngLat([longitude, latitude]);
+                        } else {
+                            locationMarkerRef.current = new maplibregl.Marker({ element: el })
+                                .setLngLat([longitude, latitude])
+                                .addTo(map);
+                        }
+                    }
+                    // When home is pinned: userLocation already seeded from savedHome in
+                    // map.on('load'). GPS here would only override with a potentially
+                    // wrong desktop location — skip it entirely.
                 },
                 (err) => {
                     console.warn('GPS unavailable:', err.message);
@@ -267,6 +334,7 @@ export default function Map() {
 
         return () => {
             cancelled = true;
+            if (spinFrameRef.current) cancelAnimationFrame(spinFrameRef.current);
             if (shimmerRef.current) cancelAnimationFrame(shimmerRef.current);
             if (mapRef.current) {
                 mapRef.current.remove();
@@ -276,23 +344,13 @@ export default function Map() {
     }, []);
 
     // ========== LOAD TERRITORIES ==========
+    // Loads all territories globally — no location filter. Fires once when the
+    // map is ready. Shields appear on the globe regardless of where the viewer is.
     useEffect(() => {
         if (!mapLoaded) return;
         const loadTerritories = async () => {
             try {
-                const center = userLocation
-                    ? { latitude: userLocation.latitude, longitude: userLocation.longitude }
-                    : mapRef.current
-                        ? { latitude: mapRef.current.getCenter().lat, longitude: mapRef.current.getCenter().lng }
-                        : null;
-
-                if (!center) return;
-
-                const res = await getTerritories({
-                    latitude: center.latitude,
-                    longitude: center.longitude,
-                    radius: 5
-                });
+                const res = await getTerritories();
                 setTerritories(res.data.territories || []);
             } catch (err) {
                 console.error('Failed to load territories:', err);
@@ -301,7 +359,7 @@ export default function Map() {
             }
         };
         loadTerritories();
-    }, [userLocation, mapLoaded]);
+    }, [mapLoaded]);
 
     // ========== DRAW HEX TILES ==========
     // Runs whenever territories load, user changes, or map finishes loading.
@@ -753,19 +811,7 @@ export default function Map() {
             }
         }
 
-        // ---- First load: fly to show full territory on the globe ----
-        if (!hasZoomedToTerritoryRef.current && features.length > 0) {
-            const myFeatures = features.filter(f => f.properties.isMine);
-            const allCoords = (myFeatures.length > 0 ? myFeatures : features)
-                .flatMap(f => f.geometry.coordinates[0]);
-            const lngs = allCoords.map(([lng]) => lng);
-            const lats = allCoords.map(([, lat]) => lat);
-            map.fitBounds(
-                [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
-                { padding: 120, maxZoom: 14, duration: 2000 }
-            );
-            hasZoomedToTerritoryRef.current = true;
-        }
+        // Auto-zoom to territories removed — pinned home and GPS handle starting location.
 
     }, [territories, user, mapLoaded]);
 
@@ -959,15 +1005,29 @@ export default function Map() {
     }, [userLocation, mapLoaded]);
 
     // ========== MY LOCATION HANDLER ==========
+    // Desktop IP geolocation can be off by miles. We gate on coords.accuracy:
+    // <500m → GPS-quality, proceed normally.
+    // ≥500m → stale/IP-based, skip flyTo and nudge the user to address search instead.
+    const ACCURACY_THRESHOLD_M = 500;
+
     const handleMyLocation = () => {
         navigator.geolocation.getCurrentPosition(
             (position) => {
-                const { latitude, longitude } = position.coords;
-                mapRef.current?.flyTo({
-                    center: [longitude, latitude],
-                    zoom: DEFAULT_ZOOM,
-                });
+                const { latitude, longitude, accuracy } = position.coords;
                 setLocationError(null);
+
+                if (accuracy >= ACCURACY_THRESHOLD_M) {
+                    // Desktop / IP-based location — too coarse to be useful
+                    setLocationError(
+                        `Desktop location is only accurate to ~${Math.round(accuracy / 1000)} km. Use "Input Address" for your exact location.`
+                    );
+                    return;
+                }
+
+                // Accurate GPS (mobile or good Wi-Fi triangulation)
+                programmaticNavRef.current = true;
+                mapRef.current?.flyTo({ center: [longitude, latitude], zoom: DEFAULT_ZOOM });
+                mapRef.current?.once('moveend', () => { programmaticNavRef.current = false; });
                 setUserLocation({ latitude, longitude });
 
                 if (locationMarkerRef.current) {
@@ -998,8 +1058,15 @@ export default function Map() {
         if (addressQuery.trim().length < 3) { setSuggestions([]); return; }
         const timer = setTimeout(async () => {
             try {
+                // Prefer GPS location, fall back to low-accuracy approx, then US-wide
+                const bias = userLocation || approxLocationRef.current;
+                let locationParams = 'countrycodes=us';
+                if (bias) {
+                    const { latitude: lat, longitude: lng } = bias;
+                    locationParams = `viewbox=${lng - 1},${lat + 1},${lng + 1},${lat - 1}&bounded=0`;
+                }
                 const res = await fetch(
-                    `https://nominatim.openstreetmap.org/search?format=json&limit=5&email=tmcgray204@gmail.com&q=${encodeURIComponent(addressQuery)}`,
+                    `https://nominatim.openstreetmap.org/search?format=json&limit=5&email=hexcapture.com&${locationParams}&q=${encodeURIComponent(addressQuery)}`,
                     { headers: { 'Accept-Language': 'en' } }
                 );
                 const results = await res.json();
@@ -1009,17 +1076,40 @@ export default function Map() {
             }
         }, 400);
         return () => clearTimeout(timer);
-    }, [addressQuery]);
+    }, [addressQuery, userLocation]);
 
-    const handleSuggestionClick = (suggestion) => {
-        const lat = parseFloat(suggestion.lat);
-        const lon = parseFloat(suggestion.lon);
+    // Shared helper — sets location, places blue dot, saves as home, closes search UI
+    const applyAddressLocation = (lat, lon, label = '') => {
+        programmaticNavRef.current = true;
         mapRef.current?.flyTo({ center: [lon, lat], zoom: DEFAULT_ZOOM });
+        mapRef.current?.once('moveend', () => { programmaticNavRef.current = false; });
+        setUserLocation({ latitude: lat, longitude: lon });
+        if (locationMarkerRef.current) {
+            locationMarkerRef.current.setLngLat([lon, lat]);
+        } else {
+            const el = document.createElement('div');
+            el.className = 'location-dot';
+            locationMarkerRef.current = new maplibregl.Marker({ element: el })
+                .setLngLat([lon, lat])
+                .addTo(mapRef.current);
+        }
+        const home = { latitude: lat, longitude: lon, label };
+        localStorage.setItem('hexcapture_home', JSON.stringify(home));
+        setPinnedLocation(home);
         setShowAddressInput(false);
         setAddressQuery('');
         setSuggestions([]);
         setGeocodeError(null);
-        setPendingLocation({ latitude: lat, longitude: lon, label: suggestion.display_name.split(',')[0] });
+    };
+
+    const clearPin = () => {
+        localStorage.removeItem('hexcapture_home');
+        setPinnedLocation(null);
+    };
+
+    const handleSuggestionClick = (suggestion) => {
+        const label = suggestion.display_name.split(',')[0];
+        applyAddressLocation(parseFloat(suggestion.lat), parseFloat(suggestion.lon), label);
     };
 
     // ========== ADDRESS SEARCH HANDLER ==========
@@ -1029,19 +1119,19 @@ export default function Map() {
         setGeocoding(true);
         setGeocodeError(null);
         try {
+            const bias = userLocation || approxLocationRef.current;
+            let locationParams = 'countrycodes=us';
+            if (bias) {
+                const { latitude: lat, longitude: lng } = bias;
+                locationParams = `viewbox=${lng - 1},${lat + 1},${lng + 1},${lat - 1}&bounded=0`;
+            }
             const res = await fetch(
-                `https://nominatim.openstreetmap.org/search?format=json&limit=1&email=tmcgray204@gmail.com&q=${encodeURIComponent(addressQuery)}`,
+                `https://nominatim.openstreetmap.org/search?format=json&limit=1&email=hexcapture.com&${locationParams}&q=${encodeURIComponent(addressQuery)}`,
                 { headers: { 'Accept-Language': 'en' } }
             );
             const results = await res.json();
             if (results.length > 0) {
-                const lat = parseFloat(results[0].lat);
-                const lon = parseFloat(results[0].lon);
-                mapRef.current?.flyTo({ center: [lon, lat], zoom: DEFAULT_ZOOM });
-                setShowAddressInput(false);
-                setAddressQuery('');
-                setSuggestions([]);
-                setPendingLocation({ latitude: lat, longitude: lon, label: results[0].display_name.split(',')[0] });
+                applyAddressLocation(parseFloat(results[0].lat), parseFloat(results[0].lon), addressQuery.trim());
             } else {
                 setGeocodeError('Address not found. Try being more specific.');
             }
@@ -1053,25 +1143,6 @@ export default function Map() {
         }
     };
 
-    // ========== SET LOCATION FROM ADDRESS ==========
-    const handleSetLocationFromAddress = () => {
-        if (!pendingLocation) return;
-        const { latitude, longitude } = pendingLocation;
-        setUserLocation({ latitude, longitude });
-
-        // Place the blue dot marker at the searched location
-        if (locationMarkerRef.current) {
-            locationMarkerRef.current.setLngLat([longitude, latitude]);
-        } else {
-            const el = document.createElement('div');
-            el.className = 'location-dot';
-            locationMarkerRef.current = new maplibregl.Marker({ element: el })
-                .setLngLat([longitude, latitude])
-                .addTo(mapRef.current);
-        }
-        setPendingLocation(null);
-    };
-
     // ========== RENDER ==========
     return (
         <div className="h-screen overflow-hidden bg-gray-950 text-white relative flex flex-col">
@@ -1081,20 +1152,17 @@ export default function Map() {
             <Navbar />
 
             {/* ========== CONTENT ========== */}
-            <div className="max-w-6xl w-full mx-auto px-4 pt-3 pb-4 relative z-10 flex flex-col flex-1 min-h-0">
+            <div className="max-w-6xl w-full mx-auto px-2 sm:px-4 pt-2 pb-2 relative z-10 flex flex-col flex-1 min-h-0">
 
-                {/* ========== HEADER + LEGEND ========== */}
-                <div className="flex flex-col gap-2 mb-4">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <h2 className="text-xl sm:text-2xl font-bold">Territory Map</h2>
-                            <p className="text-gray-300 font-bold text-xs sm:text-sm mt-0.5">
-                                Every captured hex tile in the world
-                            </p>
+                {/* ========== HEADER + LEGEND (single row) ========== */}
+                <div className="mb-2">
+                    {/* Legend — title on left, counts on right */}
+                    <div className="w-full flex items-center bg-gray-900/80 backdrop-blur border border-gray-700/60 rounded-2xl px-3 py-1.5 shadow-lg">
+                        {/* Title — hidden on mobile to give legend items room */}
+                        <div className="hidden sm:flex flex-col leading-tight mr-4 shrink-0">
+                            <span className="text-sm font-bold text-white">Territory Map</span>
                         </div>
-                    </div>
-                    {/* Legend — full width, items spread evenly */}
-                    <div className="w-full flex items-center bg-gray-900/80 backdrop-blur border border-gray-700/60 rounded-2xl px-3 py-2 shadow-lg">
+                        <div className="hidden sm:block w-px h-7 bg-gray-700 shrink-0 mr-4"/>
                         {/* Yours */}
                         <div className="flex flex-1 items-center justify-center gap-1.5">
                             <svg width="32" height="32" viewBox="-15 -15 130 130">
@@ -1169,13 +1237,13 @@ export default function Map() {
 
                 {/* ========== LOCATION ERROR BANNER ========== */}
                 {locationError && (
-                    <div className="mb-4 px-4 py-3 bg-yellow-500/10 border border-yellow-500/30 rounded-xl">
+                    <div className="mb-2 px-4 py-2 bg-yellow-500/10 border border-yellow-500/30 rounded-xl">
                         <p className="text-yellow-400 font-bold text-sm">{locationError}</p>
                     </div>
                 )}
 
                 {/* ========== CONTROLS ROW ========== */}
-                <div className="mb-4 flex justify-between items-center gap-3">
+                <div className="mb-2 flex justify-between items-center gap-3">
                     {/* Address search — left side */}
                     <div className="flex items-center gap-2">
                         {showAddressInput ? (
@@ -1224,21 +1292,44 @@ export default function Map() {
                         ) : (
                             <button
                                 onClick={() => setShowAddressInput(true)}
-                                className="bg-gray-900 hover:bg-gray-800 border border-gray-700 text-gray-300 font-bold text-sm px-4 py-2 rounded-xl transition-colors flex items-center gap-2"
+                                className="bg-gray-900 hover:bg-gray-800 border border-gray-700 text-gray-300 font-bold text-sm px-3 py-2 rounded-xl transition-colors flex items-center gap-2"
                             >
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                                     <circle cx="11" cy="11" r="8"/>
                                     <line x1="21" y1="21" x2="16.65" y2="16.65"/>
                                 </svg>
-                                Input Address
+                                <span className="hidden sm:inline">Input Address</span>
                             </button>
                         )}
                     </div>
 
+                    {/* Home pin chip — shown when a location is saved */}
+                    {pinnedLocation && !showAddressInput && (
+                        <div className="flex items-center bg-gray-900 border border-emerald-600/40 rounded-xl overflow-hidden shrink-0">
+                            <button
+                                onClick={() => {
+                                    programmaticNavRef.current = true;
+                                    mapRef.current?.flyTo({ center: [pinnedLocation.longitude, pinnedLocation.latitude], zoom: DEFAULT_ZOOM });
+                                    mapRef.current?.once('moveend', () => { programmaticNavRef.current = false; });
+                                }}
+                                className="flex items-center gap-1.5 text-emerald-400 font-bold text-sm px-3 py-2 hover:bg-gray-800 transition-colors"
+                            >
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                                </svg>
+                                <span className="text-xs">Home</span>
+                            </button>
+                            <button
+                                onClick={clearPin}
+                                className="text-gray-500 hover:text-white text-xs px-2.5 py-2 border-l border-gray-700 transition-colors hover:bg-gray-800"
+                            >✕</button>
+                        </div>
+                    )}
+
                     {/* My Location — right side */}
                     <button
                         onClick={handleMyLocation}
-                        className="bg-gray-900 hover:bg-gray-800 border border-gray-700 text-emerald-400 font-bold text-sm px-4 py-2 rounded-xl transition-colors flex items-center gap-2"
+                        className="bg-gray-900 hover:bg-gray-800 border border-gray-700 text-emerald-400 font-bold text-sm px-3 py-2 rounded-xl transition-colors flex items-center gap-2"
                     >
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                             <circle cx="12" cy="12" r="3"/>
@@ -1247,7 +1338,7 @@ export default function Map() {
                             <line x1="2" y1="12" x2="6" y2="12"/>
                             <line x1="18" y1="12" x2="22" y2="12"/>
                         </svg>
-                        My Location
+                        <span className="hidden sm:inline">My Location</span>
                     </button>
                 </div>
 
@@ -1279,35 +1370,6 @@ export default function Map() {
                         zIndex: 1,
                     }}
                 />
-                {/* Set location banner — appears after address search */}
-                {pendingLocation && (
-                    <div style={{
-                        position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)',
-                        zIndex: 20, display: 'flex', alignItems: 'center', gap: 10,
-                        background: 'rgba(10,10,20,0.92)', backdropFilter: 'blur(12px)',
-                        border: '1px solid rgba(16,185,129,0.3)', borderRadius: 14,
-                        padding: '10px 16px', boxShadow: '0 0 24px rgba(16,185,129,0.15)',
-                    }}>
-                        <span style={{ fontSize: 13, color: '#94a3b8', fontWeight: 600 }}>
-                            Viewing <span style={{ color: '#fff', fontWeight: 700 }}>{pendingLocation.label}</span>
-                        </span>
-                        <button
-                            onClick={handleSetLocationFromAddress}
-                            style={{
-                                background: '#10b981', color: '#fff', fontWeight: 700,
-                                fontSize: 12, padding: '6px 14px', borderRadius: 9,
-                                border: 'none', cursor: 'pointer',
-                            }}
-                        >
-                            📍 Set as my location
-                        </button>
-                        <button
-                            onClick={() => setPendingLocation(null)}
-                            style={{ background: 'none', border: 'none', color: '#475569', fontSize: 16, cursor: 'pointer', lineHeight: 1 }}
-                        >×</button>
-                    </div>
-                )}
-
                 {/* Atmosphere halo — only visible at globe zoom levels */}
                 <div style={{
                     position: 'absolute',
@@ -1388,6 +1450,23 @@ export default function Map() {
                         </div>
                     </div>
                 )}
+                {/* ========== EMPTY STATE — globe overlay for new users ========== */}
+                {!loading && territories.length === 0 && (
+                    <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
+                        <div className="pointer-events-auto text-center bg-gray-950/80 backdrop-blur border border-gray-700 rounded-2xl px-8 py-6 shadow-2xl max-w-xs mx-4">
+                            <p className="text-white font-bold text-base">No territory captured yet.</p>
+                            <p className="text-gray-400 font-semibold text-sm mt-1 mb-4">
+                                Log your first activity to claim your first hex tiles!
+                            </p>
+                            <button
+                                onClick={() => navigate('/log-activity')}
+                                className="bg-emerald-500 hover:bg-emerald-400 text-white font-bold px-6 py-2 rounded-xl transition-colors"
+                            >
+                                Log Activity
+                            </button>
+                        </div>
+                    </div>
+                )}
                 </div>{/* end map container */}
 
                 {/* Attribution — outside the map so it's always clickable */}
@@ -1402,21 +1481,6 @@ export default function Map() {
                 </p>
             </div>{/* end max-w-6xl content */}
 
-            {/* ========== EMPTY STATE ========== */}
-            {!loading && territories.length === 0 && (
-                <div className="text-center py-6 relative z-10">
-                    <p className="text-gray-200 font-bold">No territory captured yet.</p>
-                    <p className="text-gray-300 font-bold text-sm mt-1">
-                        Log your first activity to claim your first hex tiles!
-                    </p>
-                    <button
-                        onClick={() => navigate('/log-activity')}
-                        className="mt-4 bg-emerald-500 hover:bg-emerald-400 text-white font-bold px-6 py-2 rounded-xl transition-colors"
-                    >
-                        Log Activity
-                    </button>
-                </div>
-            )}
         </div>
     );
 }

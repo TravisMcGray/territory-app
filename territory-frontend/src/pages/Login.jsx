@@ -53,7 +53,7 @@ export default function Login() {
                 setAwaitingVerification(true);
             } else {
                 const res = await login({ email: form.email, password: form.password });
-                loginUser(res.data.token, { _id: res.data.userId });
+                loginUser({ _id: res.data.userId });
                 navigate('/dashboard');
             }
         } catch (err) {

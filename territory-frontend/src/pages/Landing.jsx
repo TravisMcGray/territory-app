@@ -429,7 +429,7 @@ export default function Landing() {
         <div style={{ background: '#f1f5f9', overflowX: 'hidden' }}>
 
             {/* ========== NAV ========== */}
-            <nav style={{
+            <nav className="lp-nav" style={{
                 position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100,
                 background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(16px)',
                 borderBottom: '1px solid #e2e8f0',
@@ -465,6 +465,22 @@ export default function Landing() {
                 {/* Spinning globe keyframe */}
                 <style>{`
                     @keyframes bounceCue { 0%,100%{transform:translateY(0)} 50%{transform:translateY(10px)} }
+                    @media (max-width: 700px) {
+                        .lp-feature-card { grid-template-columns: 1fr !important; }
+                        .lp-feature-vis { display: none !important; }
+                        .lp-split-panel { grid-template-columns: 1fr !important; }
+                        .lp-split-vis { display: none !important; }
+                        .lp-grid-3 { grid-template-columns: 1fr !important; gap: 32px !important; }
+                        .lp-tier-labels { grid-template-columns: 1fr 1fr !important; }
+                        .lp-privacy-grid { grid-template-columns: 1fr !important; }
+                        .lp-nav { padding: 12px 16px !important; }
+                        .lp-who { padding: 60px 20px !important; }
+                        .lp-tagline { padding: 48px 20px !important; }
+                        .lp-cta { padding: 60px 20px !important; }
+                        .lp-hero-btns { flex-direction: column !important; align-items: center !important; }
+                        .lp-privacy { padding: 60px 20px !important; }
+                        .lp-tier { padding: 60px 20px !important; }
+                    }
                 `}</style>
 
                 <div ref={heroRef} style={{ position: 'relative', zIndex: 10, textAlign: 'center', padding: '0 24px', maxWidth: 800 }}>
@@ -493,7 +509,7 @@ export default function Landing() {
                         Walk and run to capture hexagonal territory on a live world map. Defend your turf. Steal from rivals. Own your city.
                     </p>
 
-                    <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+                    <div className="lp-hero-btns" style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
                         <button onClick={() => navigate('/login')}
                             style={{
                                 background: '#10b981', color: '#fff', fontWeight: 900,
@@ -556,7 +572,7 @@ export default function Landing() {
                 <HexBackground fadeColor="#f1f5f9" />
 
             {/* ========== WHO WE ARE ========== */}
-            <div style={{ background: 'transparent', padding: '100px 24px', textAlign: 'center', position: 'relative' }}>
+            <div className="lp-who" style={{ background: 'transparent', padding: '100px 24px', textAlign: 'center', position: 'relative' }}>
                 <div ref={whoRef} style={{ maxWidth: 680, margin: '0 auto', position: 'relative', zIndex: 10 }}>
                     <div style={{ fontSize: 11, fontWeight: 800, color: '#10b981', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 20 }}>
                         What is HexCapture
@@ -579,29 +595,29 @@ export default function Landing() {
                     }}>
 
                         {/* Card 1 — Lace up and go */}
-                        <div ref={feat1Ref} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', background: '#ffffff', borderBottom: '1px solid #e2e8f0' }}>
-                            <div ref={f1Text} style={{ padding: 'clamp(36px, 5vw, 56px)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                        <div ref={feat1Ref} className="lp-feature-card" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', background: '#ffffff', borderBottom: '1px solid #e2e8f0' }}>
+                            <div ref={f1Text} style={{ padding: 'clamp(28px, 5vw, 56px)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                                 <div style={{ fontSize: 11, fontWeight: 800, color: '#3b82f6', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 12 }}>Step 01</div>
-                                <h2 style={{ fontSize: 'clamp(24px, 3vw, 34px)', fontWeight: 900, color: '#0f172a', lineHeight: 1.2, marginBottom: 14 }}>
+                                <h2 style={{ fontSize: 'clamp(22px, 3vw, 34px)', fontWeight: 900, color: '#0f172a', lineHeight: 1.2, marginBottom: 14 }}>
                                     Lace up and go.
                                 </h2>
                                 <p style={{ fontSize: 15, color: '#475569', lineHeight: 1.8, fontWeight: 500 }}>
                                     Open the app, pick Walk or Run, and hit Start. Your GPS tracks every step in real time and hexagons light up the moment you move through them. No setup, no gear, no excuses. Just your phone and your legs.
                                 </p>
                             </div>
-                            <div ref={f1Vis} style={{ background: 'rgba(59,130,246,0.05)', borderLeft: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 32px' }}>
+                            <div ref={f1Vis} className="lp-feature-vis" style={{ background: 'rgba(59,130,246,0.05)', borderLeft: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 32px' }}>
                                 <TrackingMockup />
                             </div>
                         </div>
 
                         {/* Card 2 — Own your turf */}
-                        <div ref={feat2Ref} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', background: '#ffffff', borderBottom: '1px solid #e2e8f0' }}>
-                            <div ref={f2Vis} style={{ background: 'rgba(16,185,129,0.05)', borderRight: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 32px' }}>
+                        <div ref={feat2Ref} className="lp-feature-card" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', background: '#ffffff', borderBottom: '1px solid #e2e8f0' }}>
+                            <div ref={f2Vis} className="lp-feature-vis" style={{ background: 'rgba(16,185,129,0.05)', borderRight: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 32px' }}>
                                 <MapMockup />
                             </div>
-                            <div ref={f2Text} style={{ padding: 'clamp(36px, 5vw, 56px)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                            <div ref={f2Text} style={{ padding: 'clamp(28px, 5vw, 56px)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                                 <div style={{ fontSize: 11, fontWeight: 800, color: '#10b981', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 12 }}>Step 02</div>
-                                <h2 style={{ fontSize: 'clamp(24px, 3vw, 34px)', fontWeight: 900, color: '#0f172a', lineHeight: 1.2, marginBottom: 14 }}>
+                                <h2 style={{ fontSize: 'clamp(22px, 3vw, 34px)', fontWeight: 900, color: '#0f172a', lineHeight: 1.2, marginBottom: 14 }}>
                                     Own your turf.
                                 </h2>
                                 <p style={{ fontSize: 15, color: '#475569', lineHeight: 1.8, fontWeight: 500 }}>
@@ -611,17 +627,17 @@ export default function Landing() {
                         </div>
 
                         {/* Card 3 — Rise through the ranks */}
-                        <div ref={feat3Ref} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', background: '#ffffff' }}>
-                            <div ref={f3Text} style={{ padding: 'clamp(36px, 5vw, 56px)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                        <div ref={feat3Ref} className="lp-feature-card" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', background: '#ffffff' }}>
+                            <div ref={f3Text} style={{ padding: 'clamp(28px, 5vw, 56px)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                                 <div style={{ fontSize: 11, fontWeight: 800, color: '#f59e0b', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 12 }}>Step 03</div>
-                                <h2 style={{ fontSize: 'clamp(24px, 3vw, 34px)', fontWeight: 900, color: '#0f172a', lineHeight: 1.2, marginBottom: 14 }}>
+                                <h2 style={{ fontSize: 'clamp(22px, 3vw, 34px)', fontWeight: 900, color: '#0f172a', lineHeight: 1.2, marginBottom: 14 }}>
                                     Rise through the ranks.
                                 </h2>
                                 <p style={{ fontSize: 15, color: '#475569', lineHeight: 1.8, fontWeight: 500 }}>
                                     A live global leaderboard tracks territory owned, miles logged, and total tiles captured. Earn tier ranks from Recruit to Overlord. The map never stops updating. Someone is probably stealing your hexagons right now.
                                 </p>
                             </div>
-                            <div ref={f3Vis} style={{ background: 'rgba(245,158,11,0.05)', borderLeft: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 32px' }}>
+                            <div ref={f3Vis} className="lp-feature-vis" style={{ background: 'rgba(245,158,11,0.05)', borderLeft: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 32px' }}>
                                 <LeaderboardMockup />
                             </div>
                         </div>
@@ -631,7 +647,7 @@ export default function Landing() {
             </div>
 
             {/* ========== TAGLINE BREAK ========== */}
-            <div style={{ background: '#fff', padding: '72px 24px', textAlign: 'center', borderTop: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0', position: 'relative', zIndex: 10 }}>
+            <div className="lp-tagline" style={{ background: '#fff', padding: '72px 24px', textAlign: 'center', borderTop: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0', position: 'relative', zIndex: 10 }}>
                 <p ref={tagRef} style={{ fontSize: 'clamp(20px, 3.5vw, 34px)', fontWeight: 800, color: '#0f172a' }}>
                     Walk for the tiles,{' '}
                     <span style={{ color: '#10b981' }}>stay for the rivalry.</span>
@@ -643,19 +659,19 @@ export default function Landing() {
                 <div style={{ maxWidth: 960, margin: '0 auto', position: 'relative', zIndex: 10, display: 'flex', flexDirection: 'column', gap: 24 }}>
 
                     {/* Panel A */}
-                    <div ref={sp1Ref} style={{
+                    <div ref={sp1Ref} className="lp-split-panel" style={{
                         background: '#ffffff', borderRadius: 20, border: '1px solid #e2e8f0',
                         boxShadow: '0 4px 24px rgba(0,0,0,0.06)',
                         display: 'grid', gridTemplateColumns: '1fr 1fr', overflow: 'hidden',
                     }}>
-                        <div style={{ padding: 'clamp(36px, 5vw, 56px)' }}>
+                        <div style={{ padding: 'clamp(28px, 5vw, 56px)' }}>
                             <div style={{ fontSize: 11, fontWeight: 800, color: '#10b981', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 12 }}>Step outside</div>
                             <h3 style={{ fontSize: 24, fontWeight: 900, color: '#0f172a', marginBottom: 12, lineHeight: 1.3 }}>Open, walk, conquer.</h3>
                             <p style={{ fontSize: 15, color: '#475569', lineHeight: 1.8, fontWeight: 500 }}>
                                 No expensive equipment. No gym membership. Just your phone and wherever your feet take you. Your morning commute, a lunch break, a late night run. Every single step counts.
                             </p>
                         </div>
-                        <div style={{ background: 'rgba(16,185,129,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40, borderLeft: '1px solid #e2e8f0' }}>
+                        <div className="lp-split-vis" style={{ background: 'rgba(16,185,129,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40, borderLeft: '1px solid #e2e8f0' }}>
                             <svg width="160" height="160" viewBox="0 0 160 160">
                                 <polygon points="80,8 148,46 148,114 80,152 12,114 12,46" fill="none" stroke="#10b981" strokeWidth="2" opacity="0.3"/>
                                 <polygon points="80,24 132,54 132,106 80,136 28,106 28,54" fill="none" stroke="#10b981" strokeWidth="2" opacity="0.5"/>
@@ -669,12 +685,12 @@ export default function Landing() {
                     </div>
 
                     {/* Panel B */}
-                    <div ref={sp2Ref} style={{
+                    <div ref={sp2Ref} className="lp-split-panel" style={{
                         background: '#ffffff', borderRadius: 20, border: '1px solid #e2e8f0',
                         boxShadow: '0 4px 24px rgba(0,0,0,0.06)',
                         display: 'grid', gridTemplateColumns: '1fr 1fr', overflow: 'hidden',
                     }}>
-                        <div style={{ background: 'rgba(232,121,249,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40, borderRight: '1px solid #e2e8f0' }}>
+                        <div className="lp-split-vis" style={{ background: 'rgba(232,121,249,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40, borderRight: '1px solid #e2e8f0' }}>
                             <svg width="200" height="130" viewBox="0 0 200 130">
                                 {[
                                     [30,65,'#10b981'],[50,51,'#10b981'],[50,79,'#10b981'],
@@ -688,7 +704,7 @@ export default function Landing() {
                                 ))}
                             </svg>
                         </div>
-                        <div style={{ padding: 'clamp(36px, 5vw, 56px)' }}>
+                        <div style={{ padding: 'clamp(28px, 5vw, 56px)' }}>
                             <div style={{ fontSize: 11, fontWeight: 800, color: '#e879f9', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 12 }}>Live map</div>
                             <h3 style={{ fontSize: 24, fontWeight: 900, color: '#0f172a', marginBottom: 12, lineHeight: 1.3 }}>Your city is the battlefield.</h3>
                             <p style={{ fontSize: 15, color: '#475569', lineHeight: 1.8, fontWeight: 500 }}>
@@ -698,19 +714,19 @@ export default function Landing() {
                     </div>
 
                     {/* Panel C */}
-                    <div ref={sp3Ref} style={{
+                    <div ref={sp3Ref} className="lp-split-panel" style={{
                         background: '#ffffff', borderRadius: 20, border: '1px solid #e2e8f0',
                         boxShadow: '0 4px 24px rgba(0,0,0,0.06)',
                         display: 'grid', gridTemplateColumns: '1fr 1fr', overflow: 'hidden',
                     }}>
-                        <div style={{ padding: 'clamp(36px, 5vw, 56px)' }}>
+                        <div style={{ padding: 'clamp(28px, 5vw, 56px)' }}>
                             <div style={{ fontSize: 11, fontWeight: 800, color: '#f59e0b', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 12 }}>Compete</div>
                             <h3 style={{ fontSize: 24, fontWeight: 900, color: '#0f172a', marginBottom: 12, lineHeight: 1.3 }}>The leaderboard never sleeps.</h3>
                             <p style={{ fontSize: 15, color: '#475569', lineHeight: 1.8, fontWeight: 500 }}>
                                 Rankings update the second anyone finishes an activity. Follow friends, drop kudos, talk trash in the comments. Climb from Recruit to Overlord while someone two blocks away is already planning their revenge run.
                             </p>
                         </div>
-                        <div style={{ background: 'rgba(245,158,11,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40, borderLeft: '1px solid #e2e8f0' }}>
+                        <div className="lp-split-vis" style={{ background: 'rgba(245,158,11,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40, borderLeft: '1px solid #e2e8f0' }}>
                             <svg width="160" height="120" viewBox="0 0 160 120">
                                 {[{x:10,h:70,c:'#94a3b8'},{x:54,h:105,c:'#f59e0b'},{x:98,h:52,c:'#94a3b8'}].map(({x,h,c},i) => (
                                     <g key={i}>
@@ -732,7 +748,7 @@ export default function Landing() {
                         <div style={{ fontSize: 11, fontWeight: 800, color: '#10b981', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 12 }}>Everything you need</div>
                         <h2 style={{ fontSize: 'clamp(24px, 3.5vw, 36px)', fontWeight: 900, color: '#0f172a' }}>Built for competitors who move.</h2>
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 48 }}>
+                    <div className="lp-grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 48 }}>
                         {[
                             {
                                 ref: g1Ref,
@@ -776,7 +792,7 @@ export default function Landing() {
             </div>
 
             {/* ========== TIER PROGRESSION ========== */}
-            <div style={{ background: 'transparent', padding: '80px 24px', position: 'relative' }}>
+            <div className="lp-tier" style={{ background: 'transparent', padding: '80px 24px', position: 'relative' }}>
                 <div style={{ maxWidth: 660, margin: '0 auto', textAlign: 'center', position: 'relative', zIndex: 10 }}>
                     <div style={{ fontSize: 11, fontWeight: 800, color: '#10b981', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 12 }}>
                         Hex Tier System
@@ -817,7 +833,7 @@ export default function Landing() {
                     </div>
 
                     {/* Tier labels */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginTop: 40, position: 'relative', zIndex: 10 }}>
+                    <div className="lp-tier-labels" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginTop: 40, position: 'relative', zIndex: 10 }}>
                         {[
                             { color: '#39ff14', name: 'First Claim', range: '1–3 walks & runs' },
                             { color: '#00ccff', name: 'Scout',       range: '4–6 walks & runs' },
@@ -834,7 +850,7 @@ export default function Landing() {
             </div>
 
             {/* ========== PRIVACY ========== */}
-            <div style={{ background: '#fff', padding: '80px 24px', borderTop: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0', position: 'relative', zIndex: 10 }}>
+            <div className="lp-privacy" style={{ background: '#fff', padding: '80px 24px', borderTop: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0', position: 'relative', zIndex: 10 }}>
                 <div ref={privacyRef} style={{ maxWidth: 720, margin: '0 auto' }}>
                     <div style={{ textAlign: 'center', marginBottom: 48 }}>
                         <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 52, height: 52, background: 'rgba(16,185,129,0.1)', borderRadius: '50%', marginBottom: 16 }}>
@@ -851,7 +867,7 @@ export default function Landing() {
                         </p>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                    <div className="lp-privacy-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                         {[
                             {
                                 saved: false,
@@ -909,7 +925,7 @@ export default function Landing() {
             </div>
 
             {/* ========== FOOTER CTA ========== */}
-            <div style={{ background: 'transparent', padding: '80px 24px', textAlign: 'center', position: 'relative' }}>
+            <div className="lp-cta" style={{ background: 'transparent', padding: '80px 24px', textAlign: 'center', position: 'relative' }}>
                 <div ref={ctaRef} style={{ position: 'relative', zIndex: 10 }}>
                     <div style={{ fontSize: 11, fontWeight: 800, color: '#10b981', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 16 }}>
                         Free to join · Free to play

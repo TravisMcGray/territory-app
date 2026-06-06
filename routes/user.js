@@ -588,7 +588,7 @@ router.delete('/account/confirm', authenticateToken, async (req, res) => {
             await mongoose.connection.collection('deletedaccounts').insertOne({
                 originalUserId: user._id,
                 username: user.username,
-                email: user.email,
+                emailHash: crypto.createHash('sha256').update(user.email).digest('hex'),
                 deletedAt: new Date(),
                 deletedBy: 'self',
                 statsSnapshot: user.stats,
@@ -697,44 +697,13 @@ router.get('/nearby-hexagons', authenticateToken, async (req, res) => {
 });
 
 // ========== GET /api/user/territories ==========
-// Returns captured territories near a given coordinate.
-// Requires ?lat=&lng= query params. Optional ?radius= (1-5, default 3 H3 rings).
-// Only returns hexes visible in the current map view — never the full database.
+// Returns all captured territories globally so shields appear on the spinning globe
+// regardless of the viewer's location. Capped at 5,000 to stay safe as the app
+// scales — implement geospatial clustering when that limit is reached.
 router.get('/territories', authenticateToken, async (req, res) => {
     try {
-        const { latitude, longitude, radius } = req.query;
-
-        if (!latitude || !longitude) {
-            return res.status(400).json({
-                status: 'error',
-                code: 'MISSING_COORDINATES',
-                message: 'latitude and longitude query params are required'
-            });
-        }
-
-        const lat = parseFloat(latitude);
-        const lng = parseFloat(longitude);
-
-        if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-            return res.status(400).json({
-                status: 'error',
-                code: 'INVALID_COORDINATES',
-                message: 'Invalid latitude or longitude'
-            });
-        }
-
-        // Cap radius at 6 rings (~127 hexes) to prevent abuse
-        const k = Math.min(6, Math.max(1, parseInt(radius) || 3));
-
-        const { latLngToCell, gridDisk } = require('h3-js');
-        const centerHex = latLngToCell(lat, lng, 10);
-        const nearbyHexIds = new Set(gridDisk(centerHex, k));
-
-        // Only fetch territories whose hexagonId is in the nearby set
-        const territories = await Territory.find({
-            hexagonId: { $in: [...nearbyHexIds] },
-            ownerId: { $exists: true }
-        })
+        const territories = await Territory.find({ ownerId: { $exists: true } })
+            .limit(5000)
             .populate({ path: 'ownerId', match: { isActive: true }, select: 'username' })
             .select('hexagonId ownerId ownerActivityType capturedAt timesVisited')
             .lean();

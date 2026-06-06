@@ -15,8 +15,9 @@ if (JWT_SECRET.length < 32) {
 }
 
 const authenticateToken = (req, res, next) => {
+    // Web: httpOnly cookie (XSS-safe). Mobile: Authorization header (RN can't use httpOnly cookies).
     const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
+    const token = req.cookies?.token || (authHeader && authHeader.split(' ')[1]);
 
     if (!token) {
         return res.status(401).json({

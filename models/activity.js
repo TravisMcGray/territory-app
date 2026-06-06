@@ -13,11 +13,14 @@ const activitySchema = new mongoose.Schema({
             default: 'walk',
             required: true,
         },
-        coordinates: [{
-            latitude: { type: Number, required: true },
-            longitude: { type: Number, required: true },
-            timestamp: Date
-        }],
+        coordinates: {
+            type: [{
+                latitude: { type: Number, required: true },
+                longitude: { type: Number, required: true },
+                timestamp: Date
+            }],
+            select: false
+        },
         distance: {
             type: Number,
             default: 0,

@@ -567,8 +567,9 @@ router.get('/', authenticateToken, async (req, res) => {
         // Get total count
         const total = await Activity.countDocuments(query);
 
-        // Get paginated activities
+        // Get paginated activities — explicitly include coordinates for own route replay
         const activities = await Activity.find(query)
+            .select('+coordinates')
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(limit);
@@ -832,9 +833,8 @@ router.get('/feed', authenticateToken, async (req, res) => {
                                         }
                                     ]
                                 },
-                                capturedHexagons: { $size: '$capturedHexagons' },
+                                capturedHexagons: '$capturedHexagons',
                                 stolenHexagons: 1,
-                                coordinates: 1,
                                 createdAt: 1,
                                 username: '$userInfo.username',
                                 avatar: '$userInfo.avatar',
