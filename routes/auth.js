@@ -179,11 +179,14 @@ router.post('/login', async (req, res) => {
             { expiresIn: '24h' }
         );
 
-        // httpOnly cookie for web — JS cannot read this, immune to XSS
+        // httpOnly cookie — scoped to .hexcapture.com so it's shared between
+        // hexcapture.com (Vercel frontend) and api.hexcapture.com (Render backend).
+        // Same eTLD+1 means sameSite: 'lax' works without cross-site cookie risk.
         res.cookie('token', token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
+            sameSite: process.env.NODE_ENV === 'production' ? 'lax' : 'strict',
+            domain: process.env.NODE_ENV === 'production' ? '.hexcapture.com' : undefined,
             maxAge: 24 * 60 * 60 * 1000,
         });
 
@@ -282,7 +285,8 @@ router.post('/logout', (req, res) => {
     res.clearCookie('token', {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        sameSite: process.env.NODE_ENV === 'production' ? 'lax' : 'strict',
+        domain: process.env.NODE_ENV === 'production' ? '.hexcapture.com' : undefined,
     });
     res.json({ message: 'Logged out' });
 });
