@@ -471,7 +471,7 @@ export default function Profile() {
                         <p style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
                             This Week
                         </p>
-                        <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
                             {weekRings.map((day, i) => (
                                 <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
                                     <div style={{
@@ -531,9 +531,9 @@ export default function Profile() {
                                 return (
                                     <button key={key} type="button" onClick={() => setActiveTab(key)}
                                         style={{
-                                            flex: 1, padding: '12px 8px',
-                                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                                            fontSize: 13, fontWeight: 700,
+                                            flex: 1, padding: '12px 4px',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+                                            fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap',
                                             background: active ? `${tier.color}10` : 'transparent',
                                             color: active ? tier.color : '#94a3b8',
                                             borderRight: i < 2 ? '1px solid #e2e8f0' : 'none',

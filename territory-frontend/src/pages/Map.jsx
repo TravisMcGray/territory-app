@@ -474,7 +474,7 @@ export default function Map() {
                 type: 'fill',
                 source: 'territories',
                 paint: {
-                    'fill-color': ['match', ['get', 'captureCount'],
+                    'fill-color': ['match', ['coalesce', ['get', 'captureCount'], 0],
                         1, '#39ff14', 2, '#39ff14', 3, '#39ff14',
                         4, '#00ccff', 5, '#00ccff', 6, '#00ccff',
                         7, '#f5a623', 8, '#f5a623', 9, '#f5a623',
@@ -491,7 +491,7 @@ export default function Map() {
                 source: 'territories',
                 filter: ['!=', ['get', 'isMine'], true],
                 paint: {
-                    'fill-color': ['match', ['get', 'captureCount'],
+                    'fill-color': ['match', ['coalesce', ['get', 'captureCount'], 0],
                         1, '#39ff14', 2, '#39ff14', 3, '#39ff14',
                         4, '#00ccff', 5, '#00ccff', 6, '#00ccff',
                         7, '#f5a623', 8, '#f5a623', 9, '#f5a623',
@@ -508,7 +508,7 @@ export default function Map() {
                 source: 'territories',
                 filter: ['!=', ['get', 'isMine'], true],
                 paint: {
-                    'line-color': ['match', ['get', 'captureCount'],
+                    'line-color': ['match', ['coalesce', ['get', 'captureCount'], 0],
                         1, '#39ff14', 2, '#39ff14', 3, '#39ff14',
                         4, '#00ccff', 5, '#00ccff', 6, '#00ccff',
                         7, '#f5a623', 8, '#f5a623', 9, '#f5a623',
@@ -527,7 +527,7 @@ export default function Map() {
                 source: 'territories',
                 filter: ['!=', ['get', 'isMine'], true],
                 paint: {
-                    'line-color': ['match', ['get', 'captureCount'],
+                    'line-color': ['match', ['coalesce', ['get', 'captureCount'], 0],
                         1, '#39ff14', 2, '#39ff14', 3, '#39ff14',
                         4, '#00ccff', 5, '#00ccff', 6, '#00ccff',
                         7, '#f5a623', 8, '#f5a623', 9, '#f5a623',
@@ -546,36 +546,36 @@ export default function Map() {
                 paint: { 'line-color': '#ffffff', 'line-width': 3, 'line-opacity': 1, 'line-blur': 0 },
             });
             map.addLayer({ id: 'hex-glow-others-t1', type: 'line', source: 'territories',
-                filter: ['all', ['!=', ['get', 'isMine'], true], ['>=', ['get', 'captureCount'], 1], ['<=', ['get', 'captureCount'], 3]],
+                filter: ['all', ['!=', ['get', 'isMine'], true], ['>=', ['coalesce', ['get', 'captureCount'], 0], 1], ['<=', ['coalesce', ['get', 'captureCount'], 0], 3]],
                 paint: { 'line-color': '#39ff14', 'line-width': 8, 'line-opacity': 0.5, 'line-blur': 6 },
             });
             map.addLayer({ id: 'hex-glow-others-t2', type: 'line', source: 'territories',
-                filter: ['all', ['!=', ['get', 'isMine'], true], ['>=', ['get', 'captureCount'], 4], ['<=', ['get', 'captureCount'], 6]],
+                filter: ['all', ['!=', ['get', 'isMine'], true], ['>=', ['coalesce', ['get', 'captureCount'], 0], 4], ['<=', ['coalesce', ['get', 'captureCount'], 0], 6]],
                 paint: { 'line-color': '#00ccff', 'line-width': 10, 'line-opacity': 0.5, 'line-blur': 7 },
             });
             map.addLayer({ id: 'hex-glow-others-t3', type: 'line', source: 'territories',
-                filter: ['all', ['!=', ['get', 'isMine'], true], ['>=', ['get', 'captureCount'], 7], ['<=', ['get', 'captureCount'], 9]],
+                filter: ['all', ['!=', ['get', 'isMine'], true], ['>=', ['coalesce', ['get', 'captureCount'], 0], 7], ['<=', ['coalesce', ['get', 'captureCount'], 0], 9]],
                 paint: { 'line-color': '#f5a623', 'line-width': 10, 'line-opacity': 0.5, 'line-blur': 7 },
             });
             map.addLayer({ id: 'hex-glow-others-t4', type: 'line', source: 'territories',
-                filter: ['all', ['!=', ['get', 'isMine'], true], ['>=', ['get', 'captureCount'], 10]],
+                filter: ['all', ['!=', ['get', 'isMine'], true], ['>=', ['coalesce', ['get', 'captureCount'], 0], 10]],
                 paint: { 'line-color': '#ff00aa', 'line-width': 12, 'line-opacity': 0.5, 'line-blur': 8 },
             });
 
             // ---- Glow layers — mine only, one per tier ----
             // T1: green breathe
             map.addLayer({ id: 'hex-glow-t1', type: 'line', source: 'territories',
-                filter: ['all', ['==', ['get', 'isMine'], true], ['>=', ['get', 'captureCount'], 1], ['<=', ['get', 'captureCount'], 3]],
+                filter: ['all', ['==', ['get', 'isMine'], true], ['>=', ['coalesce', ['get', 'captureCount'], 0], 1], ['<=', ['coalesce', ['get', 'captureCount'], 0], 3]],
                 paint: { 'line-color': '#39ff14', 'line-width': 8, 'line-opacity': 0, 'line-blur': 6 },
             });
             // T2: blue shimmer
             map.addLayer({ id: 'hex-glow-t2', type: 'line', source: 'territories',
-                filter: ['all', ['==', ['get', 'isMine'], true], ['>=', ['get', 'captureCount'], 4], ['<=', ['get', 'captureCount'], 6]],
+                filter: ['all', ['==', ['get', 'isMine'], true], ['>=', ['coalesce', ['get', 'captureCount'], 0], 4], ['<=', ['coalesce', ['get', 'captureCount'], 0], 6]],
                 paint: { 'line-color': '#00ccff', 'line-width': 10, 'line-opacity': 0, 'line-blur': 7 },
             });
             // T3: honey sparkle
             map.addLayer({ id: 'hex-glow-t3', type: 'line', source: 'territories',
-                filter: ['all', ['==', ['get', 'isMine'], true], ['>=', ['get', 'captureCount'], 7], ['<=', ['get', 'captureCount'], 9]],
+                filter: ['all', ['==', ['get', 'isMine'], true], ['>=', ['coalesce', ['get', 'captureCount'], 0], 7], ['<=', ['coalesce', ['get', 'captureCount'], 0], 9]],
                 paint: { 'line-color': '#f5a623', 'line-width': 10, 'line-opacity': 0, 'line-blur': 7 },
             });
 
@@ -586,7 +586,7 @@ export default function Map() {
                 source: 'territories',
                 filter: ['==', ['get', 'isMine'], true],
                 paint: {
-                    'line-color': ['match', ['get', 'captureCount'],
+                    'line-color': ['match', ['coalesce', ['get', 'captureCount'], 0],
                         1, '#39ff14', 2, '#39ff14', 3, '#39ff14',
                         4, '#00ccff', 5, '#00ccff', 6, '#00ccff',
                         7, '#f5a623', 8, '#f5a623', 9, '#f5a623',
