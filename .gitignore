@@ -1,6 +1,11 @@
 # Dependencies
 node_modules/
-package-lock.json
+# NOTE: package-lock.json is intentionally committed. The lockfile pins exact
+# dependency versions so every machine, CI, and the deploy hosts install the
+# same tree. Never ignore it.
+
+# Expo / Metro build caches (regenerated automatically, never commit)
+.expo/
 
 # Environment variables (CRITICAL - never commit secrets)
 .env
