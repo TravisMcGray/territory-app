@@ -18,50 +18,24 @@ import { useAuth } from '../context/AuthContext';
 import { getTerritories } from '../services/api';
 import HexBackground from '../components/HexBackground';
 import Navbar from '../components/Navbar';
-import { latLngToCell, gridDisk, cellToBoundary, cellsToMultiPolygon, cellToLatLng } from 'h3-js';
+import { latLngToCell, gridDisk, cellToBoundary, cellToLatLng } from 'h3-js';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { getLibertyNoBuildingsStyle } from '../utils/mapStyle';
-
-// ========== CONSTANTS ==========
-// Colors chosen for outdoor visibility and instant ownership recognition.
-// Emerald = yours, neon purple = theirs. No ambiguity.
-const COLOR_MINE = '#10b981';
-const COLOR_THEIRS = '#e879f9';
-const DEFAULT_ZOOM = 14;
-const FALLBACK_LAT = 27.9506;
-const FALLBACK_LNG = -82.4572;
-const H3_RESOLUTION = 10;
-const HEX_GRID_RING_SIZE = 5;
-
-// Deterministic color from ownerId — same player always gets the same color
-const playerColor = (ownerId) => {
-    const hash = ownerId.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
-    const hue = (hash * 137) % 360; // golden angle keeps colors visually distinct
-    return `hsl(${hue}, 100%, 62%)`;
-};
-
-// Returns a Promise that resolves to an HTMLImageElement of a colored shield
-const makeShieldImage = (color) => new Promise((resolve) => {
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
-        <path d="M32,4 L56,12 L56,34 Q56,54 32,62 Q8,54 8,34 L8,12 Z"
-            fill="#111111" stroke="${color}" stroke-width="3.5"/>
-        <path d="M32,11 L50,17 L50,34 Q50,49 32,56 Q14,49 14,34 L14,17 Z"
-            fill="none" stroke="${color}" stroke-width="1.5" stroke-opacity="0.5"/>
-    </svg>`;
-    const img = new Image(64, 64);
-    img.onload = () => resolve(img);
-    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
-});
-
-function hslToHex(h, s, l) {
-    s /= 100; l /= 100;
-    const k = n => (n + h / 30) % 12;
-    const a = s * Math.min(l, 1 - l);
-    const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
-    const hex = x => Math.round(x * 255).toString(16).padStart(2, '0');
-    return `#${hex(f(0))}${hex(f(8))}${hex(f(4))}`;
-}
+import {
+    COLOR_MINE,
+    COLOR_THEIRS,
+    DEFAULT_ZOOM,
+    H3_RESOLUTION,
+    HEX_GRID_RING_SIZE,
+    ACCURACY_THRESHOLD_M,
+} from '../utils/mapConstants';
+import { playerColor, makeShieldImage, hslToHex, getTierColor } from '../utils/mapHelpers';
+import MapLegend from '../components/map/MapLegend';
+import PlayerCard from '../components/map/PlayerCard';
+import MapEmptyState from '../components/map/MapEmptyState';
+import MapControls from '../components/map/MapControls';
+import { buildTerritoryFeatures, buildShieldFeatures, buildHullGeoJSON } from '../utils/territoryGeo';
 
 export default function Map() {
     const { user } = useAuth();
@@ -375,83 +349,14 @@ export default function Map() {
 
         // ID normalization — profile returns 'id', AuthContext may store '_id'
         const currentUserId = (user?.id ?? user?._id)?.toString();
-        let mineCount = 0;
-        let myMaxCaptureCount = 1;
-
-        // ---- Build GeoJSON from territory data ----
-        const features = [];
-        const myHexIds = [];
-
-        territories.forEach((territory) => {
-            const isMine = territory.owner?.id?.toString() === currentUserId;
-            if (isMine) { mineCount++; myHexIds.push(territory.hexagonId); }
-            if (isMine && (territory.captureCount ?? 1) > myMaxCaptureCount) myMaxCaptureCount = territory.captureCount ?? 1;
-
-            let boundary;
-            try {
-                boundary = cellToBoundary(territory.hexagonId);
-            } catch {
-                // Skip malformed H3 indices rather than crashing the whole map
-                console.warn('Invalid H3 index:', territory.hexagonId);
-                return;
-            }
-
-            // CRITICAL: h3-js cellToBoundary returns [[lat, lng], ...]
-            // but GeoJSON spec requires [lng, lat]. Flipping these is the
-            // single most common mapping bug — hexes render in the ocean.
-            const coordinates = boundary.map(([lat, lng]) => [lng, lat]);
-            // GeoJSON polygon rings MUST be closed (first point = last point)
-            coordinates.push(coordinates[0]);
-
-            const capturedDate = territory.capturedAt
-                ? new Date(territory.capturedAt).toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                    year: 'numeric',
-                })
-                : 'Unknown';
-
-            features.push({
-                type: 'Feature',
-                geometry: {
-                    type: 'Polygon',
-                    coordinates: [coordinates],
-                },
-                properties: {
-                    isMine,
-                    owner: territory.owner?.username ?? 'Unknown',
-                    ownerId: territory.owner?.id,
-                    activityType: territory.activityType,
-                    capturedAt: capturedDate,
-                    captureCount: territory.captureCount ?? 1,
-                },
-            });
-        });
-
-        const geojson = { type: 'FeatureCollection', features };
+        // Build GeoJSON, ownership counts, and my hex ids in one pass.
+        const { geojson, mineCount, myMaxCaptureCount, myHexIds } = buildTerritoryFeatures(territories, currentUserId);
 
         // Keep ref current so MapLibre click handlers can read latest territories
         territoriesRef.current = territories;
 
         // ---- Build point source for shield icons (exact H3 cell centers) ----
-        const shieldFeatures = territories
-            .filter(t => t.owner?.id?.toString() !== currentUserId)
-            .reduce((acc, t) => {
-                try {
-                    const [lat, lng] = cellToLatLng(t.hexagonId);
-                    acc.push({
-                        type: 'Feature',
-                        geometry: { type: 'Point', coordinates: [lng, lat] },
-                        properties: {
-                            captureCount: t.captureCount ?? 1,
-                            ownerId: t.owner?.id?.toString() ?? '',
-                            ownerUsername: t.owner?.username ?? 'Unknown',
-                        },
-                    });
-                } catch { /* skip invalid hex */ }
-                return acc;
-            }, []);
-        const shieldGeojson = { type: 'FeatureCollection', features: shieldFeatures };
+        const shieldGeojson = buildShieldFeatures(territories, currentUserId);
 
         // ---- Update existing source or create fresh ----
         // If territories reload (e.g. after logging a new activity),
@@ -730,12 +635,6 @@ export default function Map() {
         setTileCount({ mine: mineCount, total: territories.length });
 
         // ---- Hull color matches player's highest tier ----
-        const getTierColor = (count) => {
-            if (count >= 10) return '#ff00aa';  // T4 pink
-            if (count >= 7)  return '#f5a623';  // T3 honey
-            if (count >= 4)  return '#00ccff';  // T2 blue
-            return '#39ff14';                   // T1 green
-        };
         const hullColor = getTierColor(myMaxCaptureCount);
         if (map.getLayer('hull-outer-glow')) map.setPaintProperty('hull-outer-glow', 'line-color', hullColor);
         if (map.getLayer('hull-inner-glow')) map.setPaintProperty('hull-inner-glow', 'line-color', hullColor);
@@ -743,24 +642,7 @@ export default function Map() {
         // ---- Territory hull — glowing outer boundary of all your captured hexes ----
         if (myHexIds.length > 0) {
             try {
-                const clusters = cellsToMultiPolygon(myHexIds);
-                const hullCoords = clusters.map(polygon =>
-                    polygon.map(ring => {
-                        const coords = ring.map(([lat, lng]) => [lng, lat]);
-                        // Ensure ring is closed
-                        if (coords[0][0] !== coords[coords.length - 1][0] ||
-                            coords[0][1] !== coords[coords.length - 1][1]) {
-                            coords.push(coords[0]);
-                        }
-                        return coords;
-                    })
-                );
-
-                const hullGeoJSON = {
-                    type: 'Feature',
-                    geometry: { type: 'MultiPolygon', coordinates: hullCoords },
-                    properties: {},
-                };
+                const hullGeoJSON = buildHullGeoJSON(myHexIds);
 
                 if (map.getSource('territory-hull')) {
                     map.getSource('territory-hull').setData(hullGeoJSON);
@@ -1004,11 +886,9 @@ export default function Map() {
     }, [userLocation, mapLoaded]);
 
     // ========== MY LOCATION HANDLER ==========
-    // Desktop IP geolocation can be off by miles. We gate on coords.accuracy:
-    // <500m → GPS-quality, proceed normally.
-    // ≥500m → stale/IP-based, skip flyTo and nudge the user to address search instead.
-    const ACCURACY_THRESHOLD_M = 500;
-
+    // Desktop IP geolocation can be off by miles. We gate on coords.accuracy
+    // against ACCURACY_THRESHOLD_M: below it is GPS quality and we fly there; at
+    // or above it the location is too coarse, so we nudge to address search.
     const handleMyLocation = () => {
         navigator.geolocation.getCurrentPosition(
             (position) => {
@@ -1106,6 +986,15 @@ export default function Map() {
         setPinnedLocation(null);
     };
 
+    // Fly the camera back to the saved home pin. Lives here (not in MapControls)
+    // because it touches the map instance and the programmatic-nav guard.
+    const handleGoHome = () => {
+        if (!pinnedLocation) return;
+        programmaticNavRef.current = true;
+        mapRef.current?.flyTo({ center: [pinnedLocation.longitude, pinnedLocation.latitude], zoom: DEFAULT_ZOOM });
+        mapRef.current?.once('moveend', () => { programmaticNavRef.current = false; });
+    };
+
     const handleSuggestionClick = (suggestion) => {
         const label = suggestion.display_name.split(',')[0];
         applyAddressLocation(parseFloat(suggestion.lat), parseFloat(suggestion.lon), label);
@@ -1153,86 +1042,8 @@ export default function Map() {
             {/* ========== CONTENT ========== */}
             <div className="max-w-6xl w-full mx-auto px-2 sm:px-4 pt-2 pb-2 relative z-10 flex flex-col flex-1 min-h-0">
 
-                {/* ========== HEADER + LEGEND (single row) ========== */}
-                <div className="mb-2">
-                    {/* Legend — title on left, counts on right */}
-                    <div className="w-full flex items-center bg-gray-900/80 backdrop-blur border border-gray-700/60 rounded-2xl px-3 py-1.5 shadow-lg">
-                        {/* Title — hidden on mobile to give legend items room */}
-                        <div className="hidden sm:flex flex-col leading-tight mr-4 shrink-0">
-                            <span className="text-sm font-bold text-white">Territory Map</span>
-                        </div>
-                        <div className="hidden sm:block w-px h-7 bg-gray-700 shrink-0 mr-4"/>
-                        {/* Yours */}
-                        <div className="flex flex-1 items-center justify-center gap-1.5">
-                            <svg width="32" height="32" viewBox="-15 -15 130 130">
-                                <defs>
-                                    <filter id="hex-outer-glow" x="-60%" y="-60%" width="220%" height="220%">
-                                        <feGaussianBlur stdDeviation="6" result="blur"/>
-                                        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-                                    </filter>
-                                </defs>
-                                <polygon points="50,5 95,27.5 95,72.5 50,95 5,72.5 5,27.5"
-                                    fill="none" stroke="#39ff14" strokeWidth="14"
-                                    filter="url(#hex-outer-glow)" opacity="0.5"/>
-                                <polygon points="50,5 95,27.5 95,72.5 50,95 5,72.5 5,27.5"
-                                    fill="rgba(57,255,20,0.18)" stroke="none"/>
-                                <polygon points="50,5 95,27.5 95,72.5 50,95 5,72.5 5,27.5"
-                                    fill="none" stroke="#39ff14" strokeWidth="7"/>
-                                <polygon points="50,5 95,27.5 95,72.5 50,95 5,72.5 5,27.5"
-                                    fill="none" stroke="#ffffff" strokeWidth="2.5"/>
-                            </svg>
-                            <div className="flex flex-col leading-tight">
-                                <span className="text-xs text-gray-500 font-semibold uppercase tracking-wider">Yours</span>
-                                <span className="text-sm font-bold text-white">{tileCount.mine}</span>
-                            </div>
-                        </div>
-                        <div className="w-px h-7 bg-gray-700 shrink-0"/>
-                        {/* Others */}
-                        <div className="flex flex-1 items-center justify-center gap-1.5">
-                            <svg width="26" height="26" viewBox="0 0 64 64">
-                                <defs>
-                                    <filter id="shield-legend-glow" x="-40%" y="-40%" width="180%" height="180%">
-                                        <feGaussianBlur stdDeviation="2.5" result="blur"/>
-                                        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-                                    </filter>
-                                </defs>
-                                <path d="M32,4 L56,12 L56,34 Q56,54 32,62 Q8,54 8,34 L8,12 Z"
-                                    fill="#111827" stroke="#FFD700" strokeWidth="3.5"
-                                    filter="url(#shield-legend-glow)"/>
-                                <path d="M32,11 L50,17 L50,34 Q50,49 32,56 Q14,49 14,34 L14,17 Z"
-                                    fill="none" stroke="#FFD700" strokeWidth="1.5" strokeOpacity="0.5"/>
-                            </svg>
-                            <div className="flex flex-col leading-tight">
-                                <span className="text-xs text-gray-500 font-semibold uppercase tracking-wider">Others</span>
-                                <span className="text-sm font-bold text-white">{tileCount.total - tileCount.mine}</span>
-                            </div>
-                        </div>
-                        <div className="w-px h-7 bg-gray-700 shrink-0"/>
-                        {/* Uncaptured */}
-                        <div className="flex flex-1 items-center justify-center gap-1.5">
-                            <svg width="32" height="32" viewBox="-15 -15 130 130">
-                                <defs>
-                                    <linearGradient id="rainbow-legend" x1="0%" y1="0%" x2="100%" y2="100%">
-                                        <stop offset="0%"   stopColor="#ff0080"/>
-                                        <stop offset="25%"  stopColor="#ff6600"/>
-                                        <stop offset="50%"  stopColor="#39ff14"/>
-                                        <stop offset="75%"  stopColor="#00ccff"/>
-                                        <stop offset="100%" stopColor="#a855f7"/>
-                                    </linearGradient>
-                                </defs>
-                                <polygon points="50,5 95,27.5 95,72.5 50,95 5,72.5 5,27.5"
-                                    fill="rgba(168,85,247,0.08)" stroke="none"/>
-                                <polygon points="50,5 95,27.5 95,72.5 50,95 5,72.5 5,27.5"
-                                    fill="none" stroke="url(#rainbow-legend)" strokeWidth="7"/>
-                                <polygon points="50,5 95,27.5 95,72.5 50,95 5,72.5 5,27.5"
-                                    fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="2.5"/>
-                            </svg>
-                            <div className="flex flex-col leading-tight">
-                                <span className="text-xs text-gray-500 font-semibold uppercase tracking-wider">Open</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                {/* Header + legend row */}
+                <MapLegend tileCount={tileCount} />
 
                 {/* ========== LOCATION ERROR BANNER ========== */}
                 {locationError && (
@@ -1241,105 +1052,23 @@ export default function Map() {
                     </div>
                 )}
 
-                {/* ========== CONTROLS ROW ========== */}
-                <div className="mb-2 flex justify-between items-center gap-3">
-                    {/* Address search — left side */}
-                    <div className="flex items-center gap-2">
-                        {showAddressInput ? (
-                            <div className="flex flex-col gap-1 relative">
-                            <form onSubmit={handleAddressSearch} className="flex items-center gap-2">
-                                <input
-                                    autoFocus
-                                    type="text"
-                                    value={addressQuery}
-                                    onChange={e => { setAddressQuery(e.target.value); setGeocodeError(null); }}
-                                    placeholder="Enter an address..."
-                                    className="bg-gray-900 border border-gray-700 text-white text-sm px-3 py-2 rounded-xl outline-none focus:border-emerald-500 w-56 transition-colors"
-                                />
-                                <button
-                                    type="submit"
-                                    disabled={geocoding}
-                                    className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-sm px-3 py-2 rounded-xl transition-colors"
-                                >
-                                    {geocoding ? '...' : 'Go'}
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => { setShowAddressInput(false); setAddressQuery(''); setGeocodeError(null); }}
-                                    className="text-gray-500 hover:text-gray-300 text-sm px-2 py-2 transition-colors"
-                                >
-                                    ✕
-                                </button>
-                            </form>
-                            {geocodeError && <p className="text-yellow-400 text-xs font-semibold pl-1">{geocodeError}</p>}
-                            {suggestions.length > 0 && (
-                                <div className="absolute top-full left-0 mt-1 w-80 bg-gray-900 border border-gray-700 rounded-xl overflow-hidden shadow-2xl z-50">
-                                    {suggestions.map((s, i) => (
-                                        <button
-                                            key={i}
-                                            type="button"
-                                            onClick={() => handleSuggestionClick(s)}
-                                            className="w-full text-left px-4 py-2.5 text-sm text-gray-200 hover:bg-gray-800 border-b border-gray-800 last:border-0 transition-colors"
-                                        >
-                                            <span className="font-semibold text-white">{s.display_name.split(',')[0]}</span>
-                                            <span className="text-gray-500 text-xs block truncate">{s.display_name.split(',').slice(1).join(',').trim()}</span>
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-                            </div>
-                        ) : (
-                            <button
-                                onClick={() => setShowAddressInput(true)}
-                                className="bg-gray-900 hover:bg-gray-800 border border-gray-700 text-gray-300 font-bold text-sm px-3 py-2 rounded-xl transition-colors flex items-center gap-2"
-                            >
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                    <circle cx="11" cy="11" r="8"/>
-                                    <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                                </svg>
-                                <span className="hidden sm:inline">Input Address</span>
-                            </button>
-                        )}
-                    </div>
-
-                    {/* Home pin chip — shown when a location is saved */}
-                    {pinnedLocation && !showAddressInput && (
-                        <div className="flex items-center bg-gray-900 border border-emerald-600/40 rounded-xl overflow-hidden shrink-0">
-                            <button
-                                onClick={() => {
-                                    programmaticNavRef.current = true;
-                                    mapRef.current?.flyTo({ center: [pinnedLocation.longitude, pinnedLocation.latitude], zoom: DEFAULT_ZOOM });
-                                    mapRef.current?.once('moveend', () => { programmaticNavRef.current = false; });
-                                }}
-                                className="flex items-center gap-1.5 text-emerald-400 font-bold text-sm px-3 py-2 hover:bg-gray-800 transition-colors"
-                            >
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-                                </svg>
-                                <span className="text-xs">Home</span>
-                            </button>
-                            <button
-                                onClick={clearPin}
-                                className="text-gray-500 hover:text-white text-xs px-2.5 py-2 border-l border-gray-700 transition-colors hover:bg-gray-800"
-                            >✕</button>
-                        </div>
-                    )}
-
-                    {/* My Location — right side */}
-                    <button
-                        onClick={handleMyLocation}
-                        className="bg-gray-900 hover:bg-gray-800 border border-gray-700 text-emerald-400 font-bold text-sm px-3 py-2 rounded-xl transition-colors flex items-center gap-2"
-                    >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <circle cx="12" cy="12" r="3"/>
-                            <line x1="12" y1="2" x2="12" y2="6"/>
-                            <line x1="12" y1="18" x2="12" y2="22"/>
-                            <line x1="2" y1="12" x2="6" y2="12"/>
-                            <line x1="18" y1="12" x2="22" y2="12"/>
-                        </svg>
-                        <span className="hidden sm:inline">My Location</span>
-                    </button>
-                </div>
+                {/* Controls row: address search, home pin, my location */}
+                <MapControls
+                    showAddressInput={showAddressInput}
+                    setShowAddressInput={setShowAddressInput}
+                    addressQuery={addressQuery}
+                    setAddressQuery={setAddressQuery}
+                    geocoding={geocoding}
+                    geocodeError={geocodeError}
+                    setGeocodeError={setGeocodeError}
+                    suggestions={suggestions}
+                    onSearch={handleAddressSearch}
+                    onSuggestionClick={handleSuggestionClick}
+                    pinnedLocation={pinnedLocation}
+                    onGoHome={handleGoHome}
+                    onClearPin={clearPin}
+                    onMyLocation={handleMyLocation}
+                />
 
                 {/* ========== MAP CONTAINER ========== */}
                 <div
@@ -1380,92 +1109,17 @@ export default function Map() {
                     background: 'radial-gradient(ellipse at center, transparent 38%, rgba(30, 80, 220, 0.18) 55%, rgba(10, 30, 120, 0.35) 68%, rgba(5, 5, 20, 0.88) 82%)',
                 }}/>
 
-                {/* ========== PLAYER PROFILE CARD ========== */}
-                {selectedPlayer && (
-                    <div style={{
-                        position: 'absolute', bottom: 20, left: 20, zIndex: 10,
-                        background: 'rgba(10,10,20,0.92)', backdropFilter: 'blur(16px)',
-                        border: `1.5px solid ${selectedPlayer.tier.color}44`,
-                        borderRadius: 16, padding: '16px 18px', minWidth: 210,
-                        boxShadow: `0 0 24px ${selectedPlayer.tier.color}33`,
-                        animation: 'fadeSlideUp 0.25s ease',
-                    }}>
-                        {/* Close */}
-                        <button
-                            onClick={() => setSelectedPlayer(null)}
-                            style={{ position: 'absolute', top: 10, right: 12, background: 'none', border: 'none',
-                                color: '#6b7280', fontSize: 18, cursor: 'pointer', lineHeight: 1 }}
-                        >×</button>
-
-                        {/* Shield + username */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-                            <svg width="32" height="32" viewBox="0 0 64 64">
-                                <path d="M32,4 L56,12 L56,34 Q56,54 32,62 Q8,54 8,34 L8,12 Z"
-                                    fill="#111" stroke={selectedPlayer.tier.color} strokeWidth="3.5"/>
-                                <path d="M32,11 L50,17 L50,34 Q50,49 32,56 Q14,49 14,34 L14,17 Z"
-                                    fill="none" stroke={selectedPlayer.tier.color} strokeWidth="1.5" strokeOpacity="0.5"/>
-                            </svg>
-                            <div>
-                                <div
-                                    onClick={() => navigate(`/profile/${selectedPlayer.ownerId}`)}
-                                    style={{ fontSize: 16, fontWeight: 800, color: '#fff', lineHeight: 1.2, cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 3 }}
-                                >
-                                    {selectedPlayer.username}
-                                </div>
-                                <div style={{ fontSize: 11, fontWeight: 700, color: selectedPlayer.tier.color, marginTop: 2 }}>
-                                    {selectedPlayer.tier.name}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Stats */}
-                        <div style={{ display: 'flex', gap: 16 }}>
-                            <div style={{ textAlign: 'center' }}>
-                                <div style={{ fontSize: 20, fontWeight: 800, color: selectedPlayer.tier.color }}>
-                                    {selectedPlayer.totalTiles}
-                                </div>
-                                <div style={{ fontSize: 10, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                    Tiles
-                                </div>
-                            </div>
-                            <div style={{ width: 1, background: '#2a2a3a' }}/>
-                            <div style={{ textAlign: 'center' }}>
-                                <div style={{ fontSize: 20, fontWeight: 800, color: selectedPlayer.tier.color }}>
-                                    {selectedPlayer.maxCapture}×
-                                </div>
-                                <div style={{ fontSize: 10, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                    Max Cap
-                                </div>
-                            </div>
-                            <div style={{ width: 1, background: '#2a2a3a' }}/>
-                            <div style={{ textAlign: 'center' }}>
-                                <div style={{ fontSize: 20 }}>
-                                    {selectedPlayer.preferredActivity === 'RUN' ? '🏃' : '🚶'}
-                                </div>
-                                <div style={{ fontSize: 10, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                    {selectedPlayer.preferredActivity === 'RUN' ? 'Runner' : 'Walker'}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
-                {/* ========== EMPTY STATE — globe overlay for new users ========== */}
-                {!loading && territories.length === 0 && (
-                    <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
-                        <div className="pointer-events-auto text-center bg-gray-950/80 backdrop-blur border border-gray-700 rounded-2xl px-8 py-6 shadow-2xl max-w-xs mx-4">
-                            <p className="text-white font-bold text-base">No territory captured yet.</p>
-                            <p className="text-gray-400 font-semibold text-sm mt-1 mb-4">
-                                Log your first activity to claim your first hex tiles!
-                            </p>
-                            <button
-                                onClick={() => navigate('/log-activity')}
-                                className="bg-emerald-500 hover:bg-emerald-400 text-white font-bold px-6 py-2 rounded-xl transition-colors"
-                            >
-                                Log Activity
-                            </button>
-                        </div>
-                    </div>
-                )}
+                {/* Player profile card: shown when a rival shield is tapped */}
+                <PlayerCard
+                    player={selectedPlayer}
+                    onClose={() => setSelectedPlayer(null)}
+                    onViewProfile={(id) => navigate(`/profile/${id}`)}
+                />
+                {/* Empty state: globe overlay for new users with no territory */}
+                <MapEmptyState
+                    visible={!loading && territories.length === 0}
+                    onLogActivity={() => navigate('/log-activity')}
+                />
                 </div>{/* end map container */}
 
                 {/* Attribution — outside the map so it's always clickable */}
