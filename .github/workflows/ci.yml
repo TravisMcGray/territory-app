@@ -1,0 +1,43 @@
+name: CI
+
+# Run on every push to main and on every pull request targeting main.
+# A failure here shows a red X on the commit/PR and signals a broken build
+# before it reaches Render (backend) or Vercel (frontend).
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    name: Backend tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+      # npm ci installs the exact versions from package-lock.json (reproducible).
+      - run: npm ci
+      # Jest spins up an in-memory MongoDB, so no database secrets are needed.
+      - run: npm test
+
+  frontend:
+    name: Frontend lint and build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: territory-frontend/package-lock.json
+      - run: npm ci
+        working-directory: territory-frontend
+      - run: npm run lint
+        working-directory: territory-frontend
+      - run: npm run build
+        working-directory: territory-frontend
