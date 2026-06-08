@@ -37,6 +37,8 @@ import MapEmptyState from '../components/map/MapEmptyState';
 import MapControls from '../components/map/MapControls';
 import { buildTerritoryFeatures, buildShieldFeatures, buildHullGeoJSON } from '../utils/territoryGeo';
 import { addTerritoryLayers, addHullLayers, addHexGridLayers } from '../utils/mapLayers';
+import { useStarfield } from '../hooks/useStarfield';
+import { useGlobeSpin } from '../hooks/useGlobeSpin';
 
 export default function Map() {
     const { user } = useAuth();
@@ -82,101 +84,9 @@ export default function Map() {
     // search suggestions before high-accuracy GPS resolves (or if it never does).
     const approxLocationRef = useRef(null);
 
-    // ========== STARFIELD ==========
-    useEffect(() => {
-        const canvas = starCanvasRef.current;
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-        const W = canvas.width = canvas.offsetWidth;
-        const H = canvas.height = canvas.offsetHeight;
-
-        const stars = Array.from({ length: 220 }, () => ({
-            x: Math.random() * W,
-            y: Math.random() * H,
-            r: Math.random() * 1.4 + 0.2,
-            opacity: Math.random() * 0.7 + 0.2,
-            twinkleSpeed: Math.random() * 0.02 + 0.005,
-            phase: Math.random() * Math.PI * 2,
-        }));
-
-        let frame;
-        let t = 0;
-        const draw = () => {
-            ctx.clearRect(0, 0, W, H);
-            t += 1;
-            stars.forEach(s => {
-                const alpha = s.opacity * (0.6 + 0.4 * Math.sin(t * s.twinkleSpeed + s.phase));
-                ctx.beginPath();
-                ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-                ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
-                ctx.fill();
-            });
-            frame = requestAnimationFrame(draw);
-        };
-        draw();
-        return () => cancelAnimationFrame(frame);
-    }, []);
-
-    // ========== GLOBE AUTO-SPIN ==========
-    // After 5s idle at globe zoom: eases back to US, then spins left-to-right.
-    // Poles stay fixed — only center longitude shifts each frame.
-    useEffect(() => {
-        const map = mapRef.current;
-        if (!map || !mapLoaded) return;
-
-        // States: 'idle' → 'resetting' (easeTo US) → 'spinning' → back to 'idle' on interact
-        let state = 'idle';
-        let lastInteraction = Date.now();
-
-        const onInteract = () => {
-            if (state === 'resetting') return; // ignore programmatic movement
-            lastInteraction = Date.now();
-            state = 'idle';
-        };
-
-        map.on('mousedown', onInteract);
-        map.on('touchstart', onInteract);
-        map.on('wheel', onInteract);
-        map.on('dragstart', onInteract);
-
-        map.easeTo({ bearing: 0, pitch: 0, duration: 600 });
-
-        const spin = () => {
-            // Pause spin while applyAddressLocation (or any programmatic nav) is flying
-            if (!programmaticNavRef.current) {
-                const idle = Date.now() - lastInteraction > 5000;
-                const atGlobeZoom = map.getZoom() < 4;
-
-                if (state === 'idle' && idle && atGlobeZoom) {
-                    state = 'resetting';
-                    map.easeTo({
-                        center: [-98, 39],
-                        zoom: 2.5,
-                        bearing: 0,
-                        pitch: 0,
-                        duration: 2000,
-                    });
-                    map.once('moveend', () => {
-                        if (state === 'resetting') state = 'spinning';
-                    });
-                } else if (state === 'spinning' && atGlobeZoom) {
-                    const { lng, lat } = map.getCenter();
-                    map.setCenter([(lng - 0.08 + 180) % 360 - 180, lat]);
-                }
-            }
-
-            spinFrameRef.current = requestAnimationFrame(spin);
-        };
-        spin();
-
-        return () => {
-            cancelAnimationFrame(spinFrameRef.current);
-            map.off('mousedown', onInteract);
-            map.off('touchstart', onInteract);
-            map.off('wheel', onInteract);
-            map.off('dragstart', onInteract);
-        };
-    }, [mapLoaded]);
+    // Twinkling starfield behind the globe and the idle globe auto-spin.
+    useStarfield(starCanvasRef);
+    useGlobeSpin(mapRef, mapLoaded, programmaticNavRef, spinFrameRef);
 
     // ========== INITIALIZE MAP ==========
     // Async init: fetches the style JSON, customizes colors for visibility,
