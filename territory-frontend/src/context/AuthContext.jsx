@@ -32,7 +32,7 @@ export function AuthProvider({ children }) {
     };
 
     const logoutUser = async () => {
-        try { await api.post('/api/auth/logout'); } catch {}
+        try { await api.post('/api/auth/logout'); } catch { /* best-effort: ignore logout network errors */ }
         setUser(null);
     };
 
@@ -54,7 +54,10 @@ export function AuthProvider({ children }) {
 }
 
 // ========== HOOK ==========
-// Clean way for any component to access auth state.
+// Clean way for any component to access auth state. The hook is intentionally
+// colocated with the provider; disabling the fast-refresh rule for this one
+// export keeps the common useAuth + AuthProvider pattern in a single file.
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
     return useContext(AuthContext);
 }

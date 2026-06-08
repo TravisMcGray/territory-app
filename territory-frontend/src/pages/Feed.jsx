@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getFeed, addKudos, removeKudos, addComment } from '../services/api';
+import { getFeed, addKudos, removeKudos } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import HexBackground from '../components/HexBackground';
 import Navbar from '../components/Navbar';
@@ -65,7 +65,7 @@ export default function Feed() {
             try {
                 const res = await getFeed();
                 setActivities(res.data.activities || []);
-            } catch (err) {
+            } catch {
                 setError('Failed to load feed. Please try again.');
             } finally {
                 setLoading(false);
@@ -198,7 +198,7 @@ function ActivityCard({ activity, index, currentUserId, onKudos, onCommentAdded,
                 const { getActivity } = await import('../services/api');
                 const res = await getActivity(activity._id);
                 setComments(res.data.social.comments || []);
-            } catch {}
+            } catch { /* non-fatal: comments stay empty if the load fails */ }
             finally { setCommentsLoading(false); }
         }
         setCommentsOpen(prev => !prev);
@@ -214,7 +214,7 @@ function ActivityCard({ activity, index, currentUserId, onKudos, onCommentAdded,
             setComments(prev => [res.data.comment, ...prev]);
             setCommentText('');
             onCommentAdded(activity._id);
-        } catch {}
+        } catch { /* non-fatal: submit button re-enables in finally */ }
         finally { setSubmittingComment(false); }
     };
 

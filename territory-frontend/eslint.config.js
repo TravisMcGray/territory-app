@@ -23,7 +23,11 @@ export default defineConfig([
       },
     },
     rules: {
-      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      // PascalCase / underscore names are ignored for both variables and
+      // arguments. This covers React components used only in JSX (this project
+      // has no eslint-plugin-react), including components destructured as
+      // callback arguments such as `Icon` in a `.map(({ Icon }) => ...)`.
+      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]', argsIgnorePattern: '^[A-Z_]' }],
     },
   },
 ])

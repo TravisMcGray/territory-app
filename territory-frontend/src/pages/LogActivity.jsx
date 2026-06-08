@@ -67,7 +67,7 @@ export default function LogActivity() {
 
     const [phase, setPhase] = useState('setup');
     const [activityType, setActivityType] = useState('walk');
-    const [lastActivity, setLastActivity] = useState(null);
+    const [lastActivity] = useState(null);
     const [coordinates, setCoordinates] = useState([]);
     const [distanceMeters, setDistanceMeters] = useState(0);
     const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -213,7 +213,7 @@ export default function LogActivity() {
                     <TrackingPhase
                         activityType={activityType} phase={phase}
                         elapsedSeconds={elapsedSeconds} distanceMeters={distanceMeters}
-                        coordinateCount={coordinates.length} coordinates={coordinates}
+                        coordinates={coordinates}
                         gpsStatus={gpsStatus} gpsAccuracy={gpsAccuracy}
                         elevationGainMeters={elevationGain}
                         onPause={handlePause} onResume={handleResume} onStop={handleStop}
@@ -236,25 +236,40 @@ export default function LogActivity() {
     );
 }
 
+// Static motivational copy, defined once at module scope.
+const TAGLINES = {
+    walk: [
+        "Every step claims new ground!",
+        "Your territory grows with every stride!",
+        "Walkers never lose what they earn!",
+        "The map is yours for the taking!",
+    ],
+    run: [
+        "Runners take what they want!",
+        "Speed is power. Go steal some hexagons!",
+        "Other runners won't know what hit them!",
+        "Fast feet, more territory. Let's go!",
+    ],
+};
+
+// Pick a random tagline for the given activity type. Called from the lazy state
+// initializer and from the activity toggle handler, never during render.
+function pickTagline(type) {
+    const list = TAGLINES[type];
+    return list[Math.floor(Math.random() * list.length)];
+}
+
 function SetupPhase({ activityType, setActivityType, onStart, lastActivity }) {
     const isWalk = activityType === 'walk';
 
-    const taglines = {
-        walk: [
-            "Every step claims new ground!",
-            "Your territory grows with every stride!",
-            "Walkers never lose what they earn!",
-            "The map is yours for the taking!",
-        ],
-        run: [
-            "Runners take what they want!",
-            "Speed is power. Go steal some hexagons!",
-            "Other runners won't know what hit them!",
-            "Fast feet, more territory. Let's go!",
-        ],
-    };
+    // Tagline re-rolls whenever the user switches activity (see handleSelectType),
+    // so each mode gets a fresh, exciting line.
+    const [tagline, setTagline] = useState(() => pickTagline(activityType));
 
-    const tagline = taglines[activityType][Math.floor(Math.random() * taglines[activityType].length)];
+    const handleSelectType = (type) => {
+        setActivityType(type);
+        setTagline(pickTagline(type));
+    };
 
     return (
         <div className="space-y-6">
@@ -276,7 +291,7 @@ function SetupPhase({ activityType, setActivityType, onStart, lastActivity }) {
             {/* Activity cards */}
             <div className="grid grid-cols-2 gap-3">
 
-                <button type="button" onClick={() => setActivityType('walk')}
+                <button type="button" onClick={() => handleSelectType('walk')}
                     className={`relative rounded-2xl border-2 transition-all overflow-hidden text-left ${
                         activityType === 'walk'
                             ? 'border-blue-400 bg-blue-50'
@@ -303,7 +318,7 @@ function SetupPhase({ activityType, setActivityType, onStart, lastActivity }) {
                     </div>
                 </button>
 
-                <button type="button" onClick={() => setActivityType('run')}
+                <button type="button" onClick={() => handleSelectType('run')}
                     className={`relative rounded-2xl border-2 transition-all overflow-hidden text-left ${
                         activityType === 'run'
                             ? 'border-emerald-400 bg-emerald-50'
@@ -432,10 +447,13 @@ function SetupPhase({ activityType, setActivityType, onStart, lastActivity }) {
     );
 }
 
-function TrackingPhase({ activityType, phase, elapsedSeconds, distanceMeters, coordinateCount, coordinates, gpsStatus, gpsAccuracy, elevationGainMeters, onPause, onResume, onStop }) {
+function TrackingPhase({ activityType, phase, elapsedSeconds, distanceMeters, coordinates, gpsStatus, gpsAccuracy, elevationGainMeters, onPause, onResume, onStop }) {
     const isWalk = activityType === 'walk';
     const isPaused = phase === 'paused';
     const activityColor = isWalk ? '#3b82f6' : '#10b981';
+
+    // Mirror the visited-hex count into state so render never reads a ref.
+    const [hexCount, setHexCount] = useState(0);
 
     const mapRef = useRef(null);
     const mapContainerRef = useRef(null);
@@ -502,6 +520,7 @@ function TrackingPhase({ activityType, phase, elapsedSeconds, distanceMeters, co
         const latest = coordinates[coordinates.length - 1];
         const currentH3 = latLngToCell(latest.latitude, latest.longitude, H3_RESOLUTION);
         visitedHexesRef.current.add(currentH3);
+        setHexCount(visitedHexesRef.current.size);
 
         const gridHexes = gridDisk(currentH3, HEX_GRID_RING_SIZE);
         const hexFeatures = [];
@@ -595,7 +614,7 @@ function TrackingPhase({ activityType, phase, elapsedSeconds, distanceMeters, co
                 </div>
                 <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
                     <div className={`text-2xl font-black ${isWalk ? 'text-blue-500' : 'text-emerald-600'}`}>
-                        {visitedHexesRef.current.size}
+                        {hexCount}
                     </div>
                     <div className="font-bold text-slate-400 text-xs mt-1">Hexagons</div>
                 </div>

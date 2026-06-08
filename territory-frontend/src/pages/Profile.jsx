@@ -266,7 +266,7 @@ export default function Profile() {
                     try {
                         const activitiesRes = await getUserActivities(userId);
                         setUserActivities(activitiesRes.data.activities || []);
-                    } catch {}
+                    } catch { /* non-fatal: profile still shows without activities */ }
                 }
             } catch (err) {
                 console.error('Profile load error:', err);
@@ -291,7 +291,7 @@ export default function Profile() {
                 setIsFollowing(true);
                 setFollowersCount(prev => prev + 1);
             }
-        } catch {}
+        } catch { /* non-fatal: button re-enables in finally */ }
         finally { setFollowLoading(false); }
     };
 

@@ -3,14 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import HexBackground from '../components/HexBackground';
 
 // ========== PHONE SHOWCASE ==========
-function PhoneShowcase() {
-    const [active, setActive] = useState('iphone');
-
-    const iphoneActive = active === 'iphone';
-    const androidActive = active === 'android';
-
-    // Shared app screen content
-    const AppScreen = ({ tint }) => (
+// Shared app screen content. Defined at module scope so it is not recreated
+// on every render of PhoneShowcase. It is purely static, so it takes no props.
+function AppScreen() {
+    return (
         <div style={{ width: '100%', height: '100%', background: '#0f172a', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             {/* App header */}
             <div style={{ background: '#10b981', padding: '10px 14px 8px' }}>
@@ -58,6 +54,13 @@ function PhoneShowcase() {
             </div>
         </div>
     );
+}
+
+function PhoneShowcase() {
+    const [active, setActive] = useState('iphone');
+
+    const iphoneActive = active === 'iphone';
+    const androidActive = active === 'android';
 
     return (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0, height: 520, perspective: '1200px', perspectiveOrigin: 'center center' }}>
@@ -88,7 +91,7 @@ function PhoneShowcase() {
                 }}>
                     {/* Screen */}
                     <div style={{ width: '100%', height: '100%', borderRadius: 40, overflow: 'hidden', position: 'relative', background: '#000' }}>
-                        <AppScreen tint="iphone"/>
+                        <AppScreen />
                         {/* Dynamic Island */}
                         <div style={{ position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', width: 80, height: 24, background: '#000', borderRadius: 12, zIndex: 20 }}/>
                     </div>
@@ -125,7 +128,7 @@ function PhoneShowcase() {
                 }}>
                     {/* Screen */}
                     <div style={{ width: '100%', height: '100%', borderRadius: 30, overflow: 'hidden', position: 'relative', background: '#000' }}>
-                        <AppScreen tint="android"/>
+                        <AppScreen />
                         {/* Punch hole camera */}
                         <div style={{ position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', width: 10, height: 10, background: '#000', borderRadius: '50%', zIndex: 20 }}/>
                     </div>
@@ -382,7 +385,7 @@ function LeaderboardMockup() {
 // ========== LANDING PAGE ==========
 export default function Landing() {
     const navigate = useNavigate();
-    const [activeDot, setActiveDot] = useState(0);
+    const [, setActiveDot] = useState(0);
 
     const feat1Ref = useRef(null);
     const feat2Ref = useRef(null);
@@ -422,8 +425,6 @@ export default function Landing() {
     const g3Ref      = useSlideIn('up', 0.2);
     const privacyRef  = useSlideIn('up');
     const ctaRef     = useSlideIn('up');
-
-    const scrollTo = (ref) => ref.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
     return (
         <div style={{ background: '#f1f5f9', overflowX: 'hidden' }}>
@@ -780,7 +781,7 @@ export default function Landing() {
                                 title: 'Track & Rank',
                                 desc: 'Live leaderboards, tier progression, weekly activity rings, kudos, and a social feed to see what your rivals are up to.',
                             },
-                        ].map(({ ref, color, icon, title, desc }) => (
+                        ].map(({ ref, icon, title, desc }) => (
                             <div key={title} ref={ref}>
                                 <div style={{ marginBottom: 16 }}>{icon}</div>
                                 <h4 style={{ fontSize: 17, fontWeight: 900, color: '#0f172a', marginBottom: 8 }}>{title}</h4>

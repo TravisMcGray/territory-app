@@ -72,7 +72,7 @@ export default function Leaderboard() {
                     distance:  distRes.data.leaderboard || [],
                     activity:  actRes.data.leaderboard  || [],
                 });
-            } catch (err) {
+            } catch {
                 setError('Failed to load leaderboards. Please try again.');
             } finally {
                 setLoading(false);

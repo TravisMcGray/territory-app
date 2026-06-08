@@ -100,7 +100,6 @@ export default function Map() {
     const shimmerRef = useRef(null);
     const hexGridFeaturesRef = useRef([]);
     const hexGridLngRangeRef = useRef({ minLng: 0, maxLng: 1 });
-    const hasZoomedToTerritoryRef = useRef(false);
     const spinFrameRef = useRef(null);
     const programmaticNavRef = useRef(false);
     const territoriesRef = useRef([]);
@@ -383,7 +382,7 @@ export default function Map() {
         const features = [];
         const myHexIds = [];
 
-        territories.forEach((territory, index) => {
+        territories.forEach((territory) => {
             const isMine = territory.owner?.id?.toString() === currentUserId;
             if (isMine) { mineCount++; myHexIds.push(territory.hexagonId); }
             if (isMine && (territory.captureCount ?? 1) > myMaxCaptureCount) myMaxCaptureCount = territory.captureCount ?? 1;
@@ -391,7 +390,7 @@ export default function Map() {
             let boundary;
             try {
                 boundary = cellToBoundary(territory.hexagonId);
-            } catch (err) {
+            } catch {
                 // Skip malformed H3 indices rather than crashing the whole map
                 console.warn('Invalid H3 index:', territory.hexagonId);
                 return;
@@ -677,7 +676,7 @@ export default function Map() {
 
                 // Fly to show all of this player's territory
                 const coords = playerTiles.reduce((acc, t) => {
-                    try { const [lat, lng] = cellToLatLng(t.hexagonId); acc.push([lng, lat]); } catch {}
+                    try { const [lat, lng] = cellToLatLng(t.hexagonId); acc.push([lng, lat]); } catch { /* skip malformed H3 index */ }
                     return acc;
                 }, []);
                 if (coords.length) {
