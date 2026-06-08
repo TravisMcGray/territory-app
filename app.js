@@ -8,6 +8,7 @@ const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const rateLimit = require('express-rate-limit');
+const morgan = require('morgan');
 const authRouter = require('./routes/auth');
 const activitiesRouter = require('./routes/activities');
 const userRouter = require('./routes/user');
@@ -34,6 +35,14 @@ app.use((req, res, next) => {
     }
     next();
 });
+
+// Request logging. Writes to stdout, which Render captures automatically.
+// Skipped during tests so the suite output stays clean. 'combined' in
+// production gives IP, timestamp, status, response time, and user agent;
+// 'dev' is a concise colored line for local development.
+if (process.env.NODE_ENV !== 'test') {
+    app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+}
 
 // Request size limits (prevent DoS)
 app.use(express.json({ limit: '1mb' }));
@@ -116,7 +125,9 @@ app.use((req, res) => {
 // ========== GLOBAL ERROR HANDLER ==========
 // Must come last. Express identifies error handlers by the 4-param signature.
 app.use((err, req, res, next) => {
-    console.error('Error:', err.message);
+    // Log the full stack server-side for debugging. The client still receives
+    // only the safe, generic message below (never the stack in production).
+    console.error(`Error on ${req.method} ${req.originalUrl}:`, err.stack || err.message);
 
     // Mongoose validation errors
     if (err.name === 'ValidationError') {
