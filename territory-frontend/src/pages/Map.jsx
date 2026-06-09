@@ -740,7 +740,18 @@ export default function Map() {
         setSelectedPlayer(null);
         programmaticNavRef.current = true;
         const navSeq = ++navSeqRef.current;
-        map.flyTo({ center: map.getCenter(), zoom: 2.2, bearing: 0, pitch: 0, duration: GLOBE_FLY_DURATION_MS, essential: true });
+        // easeTo with an ease-out curve: zoom out to the globe quickly (firing
+        // the low-zoom tile requests early), then decelerate into a gentle
+        // settle so those tiles finish loading before the camera stops.
+        map.easeTo({
+            center: map.getCenter(),
+            zoom: 2.2,
+            bearing: 0,
+            pitch: 0,
+            duration: GLOBE_FLY_DURATION_MS,
+            easing: (t) => 1 - Math.pow(1 - t, 3),
+            essential: true,
+        });
         map.once('moveend', () => { if (navSeqRef.current === navSeq) programmaticNavRef.current = false; });
     };
 

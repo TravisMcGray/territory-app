@@ -22,5 +22,7 @@ export const ACCURACY_THRESHOLD_M = 500;
 export const FLY_DURATION_MS = 3500;
 
 // The Globe button pulls back across the whole zoom range, so it gets an even
-// slower, more cinematic duration of its own.
-export const GLOBE_FLY_DURATION_MS = 4500;
+// slower, more cinematic duration of its own. Paired with an ease-out curve, it
+// reaches the globe view early (requesting those tiles) then settles slowly,
+// giving the globe tiles time to load before the motion stops.
+export const GLOBE_FLY_DURATION_MS = 3500;
