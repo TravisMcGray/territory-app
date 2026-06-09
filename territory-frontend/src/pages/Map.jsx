@@ -92,6 +92,11 @@ export default function Map() {
     // The currently selected player's id, so a second shield tap (or the card)
     // can tell it is the same player and zoom to their territory.
     const selectedPlayerIdRef = useRef(null);
+    // Monotonic token for programmatic camera flights. If one flight interrupts
+    // another, only the latest flight's moveend clears the nav guard, so a
+    // cancelled flight's stale moveend cannot release it early (which would make
+    // the lazy spin start before the new flight has actually finished).
+    const navSeqRef = useRef(0);
     // Approximate location from low-accuracy geolocation — used to bias address
     // search suggestions before high-accuracy GPS resolves (or if it never does).
     const approxLocationRef = useRef(null);
@@ -121,11 +126,12 @@ export default function Map() {
         const lngs = coords.map(c => c[0]);
         const lats = coords.map(c => c[1]);
         programmaticNavRef.current = true;
+        const navSeq = ++navSeqRef.current;
         map.fitBounds(
             [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
             { padding: 140, maxZoom: 14, duration: FLY_DURATION_MS }
         );
-        map.once('moveend', () => { programmaticNavRef.current = false; });
+        map.once('moveend', () => { if (navSeqRef.current === navSeq) programmaticNavRef.current = false; });
     }, []);
 
     // ========== INITIALIZE MAP ==========
@@ -401,8 +407,9 @@ export default function Map() {
                 // zooming in, so the card reads against a framed, paused view.
                 const [shieldLng, shieldLat] = e.features[0].geometry.coordinates;
                 programmaticNavRef.current = true;
+                const navSeq = ++navSeqRef.current;
                 map.easeTo({ center: [shieldLng, shieldLat], duration: 1200 });
-                map.once('moveend', () => { programmaticNavRef.current = false; });
+                map.once('moveend', () => { if (navSeqRef.current === navSeq) programmaticNavRef.current = false; });
             });
 
             map.on('mouseenter', 'hex-others-icon', () => { map.getCanvas().style.cursor = 'pointer'; });
@@ -621,8 +628,9 @@ export default function Map() {
 
                 // Accurate GPS (mobile or good Wi-Fi triangulation)
                 programmaticNavRef.current = true;
+                const navSeq = ++navSeqRef.current;
                 mapRef.current?.flyTo({ center: [longitude, latitude], zoom: DEFAULT_ZOOM, duration: FLY_DURATION_MS });
-                mapRef.current?.once('moveend', () => { programmaticNavRef.current = false; });
+                mapRef.current?.once('moveend', () => { if (navSeqRef.current === navSeq) programmaticNavRef.current = false; });
                 setUserLocation({ latitude, longitude });
 
                 if (locationMarkerRef.current) {
@@ -677,8 +685,9 @@ export default function Map() {
     // and stage it as pending. Does NOT save it as Home; that needs confirmation.
     const previewAddressLocation = (lat, lon, label = '') => {
         programmaticNavRef.current = true;
+        const navSeq = ++navSeqRef.current;
         mapRef.current?.flyTo({ center: [lon, lat], zoom: DEFAULT_ZOOM, duration: FLY_DURATION_MS });
-        mapRef.current?.once('moveend', () => { programmaticNavRef.current = false; });
+        mapRef.current?.once('moveend', () => { if (navSeqRef.current === navSeq) programmaticNavRef.current = false; });
         setUserLocation({ latitude: lat, longitude: lon });
         if (locationMarkerRef.current) {
             locationMarkerRef.current.setLngLat([lon, lat]);
@@ -718,8 +727,9 @@ export default function Map() {
     const handleGoHome = () => {
         if (!pinnedLocation) return;
         programmaticNavRef.current = true;
+        const navSeq = ++navSeqRef.current;
         mapRef.current?.flyTo({ center: [pinnedLocation.longitude, pinnedLocation.latitude], zoom: DEFAULT_ZOOM, duration: FLY_DURATION_MS });
-        mapRef.current?.once('moveend', () => { programmaticNavRef.current = false; });
+        mapRef.current?.once('moveend', () => { if (navSeqRef.current === navSeq) programmaticNavRef.current = false; });
     };
 
     // Pull the camera straight back to the globe view. Closes any open card and
@@ -729,8 +739,9 @@ export default function Map() {
         if (!map) return;
         setSelectedPlayer(null);
         programmaticNavRef.current = true;
+        const navSeq = ++navSeqRef.current;
         map.flyTo({ center: map.getCenter(), zoom: 2.2, bearing: 0, pitch: 0, duration: GLOBE_FLY_DURATION_MS, essential: true });
-        map.once('moveend', () => { programmaticNavRef.current = false; });
+        map.once('moveend', () => { if (navSeqRef.current === navSeq) programmaticNavRef.current = false; });
     };
 
     const handleSuggestionClick = (suggestion) => {
