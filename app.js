@@ -54,6 +54,7 @@ const allowedOrigins = [process.env.FRONTEND_URL].filter(Boolean);
 if (process.env.NODE_ENV !== 'production') {
     allowedOrigins.push(
         'http://localhost:5173', // npm run dev
+        'http://localhost:4173', // npm run preview (production build)
         'http://localhost:3000',
         'http://localhost:8081', // expo go
     );
