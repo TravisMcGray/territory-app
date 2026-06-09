@@ -293,6 +293,13 @@ export async function getLibertyNoBuildingsStyle() {
             if (type === 'fill' && layer.paint?.['fill-pattern']) {
                 const paint = { ...layer.paint };
                 delete paint['fill-pattern'];
+                // A pattern-only fill has no color of its own, so removing the
+                // texture would leave it MapLibre's default black. Give those a
+                // neutral light fill (piers, plazas, etc.) so they blend into the
+                // light map instead of rendering as black blobs.
+                if (!paint['fill-color']) {
+                    paint['fill-color'] = '#e2e8ee';
+                }
                 return { ...layer, paint };
             }
 
