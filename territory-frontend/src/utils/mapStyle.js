@@ -397,7 +397,8 @@ export async function getLibertyNoBuildingsStyle() {
             return layer;
         });
 
-        // Force globe projection — the style JSON may set mercator which overrides the constructor
+        // Force globe projection: the style JSON may set mercator, which would
+        // otherwise override the constructor setting.
         style.projection = { type: 'globe' };
 
         // Atmosphere glow around the globe edge (MapLibre v5 uses style property, not setFog)

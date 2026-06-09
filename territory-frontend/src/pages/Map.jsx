@@ -12,7 +12,7 @@
 // Tap any tile to see who owns it and when they captured it.
 // Centers on your GPS location on load so you immediately see your neighborhood.
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getTerritories } from '../services/api';
@@ -29,12 +29,15 @@ import {
     H3_RESOLUTION,
     HEX_GRID_RING_SIZE,
     ACCURACY_THRESHOLD_M,
+    FLY_DURATION_MS,
+    GLOBE_FLY_DURATION_MS,
 } from '../utils/mapConstants';
 import { playerColor, makeShieldImage, hslToHex, getTierColor } from '../utils/mapHelpers';
 import MapLegend from '../components/map/MapLegend';
 import PlayerCard from '../components/map/PlayerCard';
 import MapEmptyState from '../components/map/MapEmptyState';
 import MapControls from '../components/map/MapControls';
+import StartingLocationPrompt from '../components/map/StartingLocationPrompt';
 import { buildTerritoryFeatures, buildShieldFeatures, buildHullGeoJSON } from '../utils/territoryGeo';
 import { addTerritoryLayers, addHullLayers, addHexGridLayers } from '../utils/mapLayers';
 import { useStarfield } from '../hooks/useStarfield';
@@ -66,6 +69,9 @@ export default function Map() {
             return saved ? JSON.parse(saved) : null;
         } catch { return null; }
     });
+    // A searched address that has been previewed on the map but not yet saved as
+    // Home. It only becomes the Home pin once the user confirms the prompt.
+    const [pendingLocation, setPendingLocation] = useState(null);
 
     // ========== REFS ==========
     // Map ref lives outside React state because MapLibre manages its own
@@ -80,13 +86,47 @@ export default function Map() {
     const spinFrameRef = useRef(null);
     const programmaticNavRef = useRef(false);
     const territoriesRef = useRef([]);
+    // Mirrors whether a player card is open, so the globe spin can hold still
+    // over the selected shield (read inside the requestAnimationFrame loop).
+    const cardOpenRef = useRef(false);
+    // The currently selected player's id, so a second shield tap (or the card)
+    // can tell it is the same player and zoom to their territory.
+    const selectedPlayerIdRef = useRef(null);
     // Approximate location from low-accuracy geolocation — used to bias address
     // search suggestions before high-accuracy GPS resolves (or if it never does).
     const approxLocationRef = useRef(null);
 
     // Twinkling starfield behind the globe and the idle globe auto-spin.
     useStarfield(starCanvasRef);
-    useGlobeSpin(mapRef, mapLoaded, programmaticNavRef, spinFrameRef);
+    useGlobeSpin(mapRef, mapLoaded, programmaticNavRef, spinFrameRef, cardOpenRef);
+
+    // Hold the globe still while a player card is open, and remember which player
+    // is selected so a second shield tap can zoom to their territory.
+    useEffect(() => {
+        cardOpenRef.current = !!selectedPlayer;
+        selectedPlayerIdRef.current = selectedPlayer?.ownerId ?? null;
+    }, [selectedPlayer]);
+
+    // Zoom to fit a player's entire territory. Stable (refs only) so the shield
+    // click handler and the player card can share the same action.
+    const zoomToPlayerTerritory = useCallback((ownerId) => {
+        const map = mapRef.current;
+        if (!map || !ownerId) return;
+        const tiles = territoriesRef.current.filter(t => t.owner?.id?.toString() === ownerId);
+        const coords = tiles.reduce((acc, t) => {
+            try { const [lat, lng] = cellToLatLng(t.hexagonId); acc.push([lng, lat]); } catch { /* skip malformed H3 index */ }
+            return acc;
+        }, []);
+        if (!coords.length) return;
+        const lngs = coords.map(c => c[0]);
+        const lats = coords.map(c => c[1]);
+        programmaticNavRef.current = true;
+        map.fitBounds(
+            [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
+            { padding: 140, maxZoom: 14, duration: FLY_DURATION_MS }
+        );
+        map.once('moveend', () => { programmaticNavRef.current = false; });
+    }, []);
 
     // ========== INITIALIZE MAP ==========
     // Async init: fetches the style JSON, customizes colors for visibility,
@@ -180,7 +220,7 @@ export default function Map() {
                     if (!homeIsPinned) {
                         // No pin — GPS is the only source of truth
                         if (accuracy < ACCURACY_THRESHOLD_M) {
-                            map.flyTo({ center: [longitude, latitude], zoom: DEFAULT_ZOOM });
+                            map.flyTo({ center: [longitude, latitude], zoom: DEFAULT_ZOOM, duration: FLY_DURATION_MS });
                         }
                         setUserLocation({ latitude, longitude });
 
@@ -328,6 +368,13 @@ export default function Map() {
             map.on('click', 'hex-others-icon', (e) => {
                 if (!e.features?.length) return;
                 const { ownerId, ownerUsername } = e.features[0].properties;
+
+                // Second tap on the already-selected shield zooms to their turf.
+                if (selectedPlayerIdRef.current === ownerId) {
+                    zoomToPlayerTerritory(ownerId);
+                    return;
+                }
+
                 const all = territoriesRef.current;
 
                 const playerTiles = all.filter(t => t.owner?.id?.toString() === ownerId);
@@ -350,19 +397,12 @@ export default function Map() {
                     maxCapture,
                 });
 
-                // Fly to show all of this player's territory
-                const coords = playerTiles.reduce((acc, t) => {
-                    try { const [lat, lng] = cellToLatLng(t.hexagonId); acc.push([lng, lat]); } catch { /* skip malformed H3 index */ }
-                    return acc;
-                }, []);
-                if (coords.length) {
-                    const lngs = coords.map(c => c[0]);
-                    const lats = coords.map(c => c[1]);
-                    map.fitBounds(
-                        [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
-                        { padding: 140, maxZoom: 14, duration: 1800 }
-                    );
-                }
+                // Hold the globe still and ease to center the shield without
+                // zooming in, so the card reads against a framed, paused view.
+                const [shieldLng, shieldLat] = e.features[0].geometry.coordinates;
+                programmaticNavRef.current = true;
+                map.easeTo({ center: [shieldLng, shieldLat], duration: 1200 });
+                map.once('moveend', () => { programmaticNavRef.current = false; });
             });
 
             map.on('mouseenter', 'hex-others-icon', () => { map.getCanvas().style.cursor = 'pointer'; });
@@ -428,7 +468,7 @@ export default function Map() {
 
         // Auto-zoom to territories removed — pinned home and GPS handle starting location.
 
-    }, [territories, user, mapLoaded]);
+    }, [territories, user, mapLoaded, zoomToPlayerTerritory]);
 
     // ========== DRAW NEARBY HEX GRID ==========
     // Shows a faint grid of uncaptured hexagons around the user's current
@@ -581,7 +621,7 @@ export default function Map() {
 
                 // Accurate GPS (mobile or good Wi-Fi triangulation)
                 programmaticNavRef.current = true;
-                mapRef.current?.flyTo({ center: [longitude, latitude], zoom: DEFAULT_ZOOM });
+                mapRef.current?.flyTo({ center: [longitude, latitude], zoom: DEFAULT_ZOOM, duration: FLY_DURATION_MS });
                 mapRef.current?.once('moveend', () => { programmaticNavRef.current = false; });
                 setUserLocation({ latitude, longitude });
 
@@ -633,10 +673,11 @@ export default function Map() {
         return () => clearTimeout(timer);
     }, [addressQuery, userLocation]);
 
-    // Shared helper — sets location, places blue dot, saves as home, closes search UI
-    const applyAddressLocation = (lat, lon, label = '') => {
+    // Preview a searched address: fly there, draw the hex grid, drop the marker,
+    // and stage it as pending. Does NOT save it as Home; that needs confirmation.
+    const previewAddressLocation = (lat, lon, label = '') => {
         programmaticNavRef.current = true;
-        mapRef.current?.flyTo({ center: [lon, lat], zoom: DEFAULT_ZOOM });
+        mapRef.current?.flyTo({ center: [lon, lat], zoom: DEFAULT_ZOOM, duration: FLY_DURATION_MS });
         mapRef.current?.once('moveend', () => { programmaticNavRef.current = false; });
         setUserLocation({ latitude: lat, longitude: lon });
         if (locationMarkerRef.current) {
@@ -648,14 +689,24 @@ export default function Map() {
                 .setLngLat([lon, lat])
                 .addTo(mapRef.current);
         }
-        const home = { latitude: lat, longitude: lon, label };
-        localStorage.setItem('hexcapture_home', JSON.stringify(home));
-        setPinnedLocation(home);
+        setPendingLocation({ latitude: lat, longitude: lon, label });
         setShowAddressInput(false);
         setAddressQuery('');
         setSuggestions([]);
         setGeocodeError(null);
     };
+
+    // Confirm the previewed address as the saved Home pin.
+    const confirmStartingLocation = () => {
+        if (!pendingLocation) return;
+        localStorage.setItem('hexcapture_home', JSON.stringify(pendingLocation));
+        setPinnedLocation(pendingLocation);
+        setPendingLocation(null);
+    };
+
+    // Dismiss the prompt without saving. The map stays where it was previewed,
+    // but nothing is written to storage, so a demo address is never kept.
+    const dismissStartingLocation = () => setPendingLocation(null);
 
     const clearPin = () => {
         localStorage.removeItem('hexcapture_home');
@@ -667,13 +718,26 @@ export default function Map() {
     const handleGoHome = () => {
         if (!pinnedLocation) return;
         programmaticNavRef.current = true;
-        mapRef.current?.flyTo({ center: [pinnedLocation.longitude, pinnedLocation.latitude], zoom: DEFAULT_ZOOM });
+        mapRef.current?.flyTo({ center: [pinnedLocation.longitude, pinnedLocation.latitude], zoom: DEFAULT_ZOOM, duration: FLY_DURATION_MS });
         mapRef.current?.once('moveend', () => { programmaticNavRef.current = false; });
     };
 
+    // Pull the camera straight back to the globe view. Closes any open card and
+    // guards the flight so the auto-spin does not fight it.
+    const handleZoomToGlobe = () => {
+        const map = mapRef.current;
+        if (!map) return;
+        setSelectedPlayer(null);
+        programmaticNavRef.current = true;
+        map.flyTo({ center: map.getCenter(), zoom: 2.2, bearing: 0, pitch: 0, duration: GLOBE_FLY_DURATION_MS, essential: true });
+        map.once('moveend', () => { programmaticNavRef.current = false; });
+    };
+
     const handleSuggestionClick = (suggestion) => {
-        const label = suggestion.display_name.split(',')[0];
-        applyAddressLocation(parseFloat(suggestion.lat), parseFloat(suggestion.lon), label);
+        // Use the street line (house number + road), not just the first segment,
+        // which on a precise address is only the house number.
+        const label = suggestion.display_name.split(',').slice(0, 2).join(',').trim();
+        previewAddressLocation(parseFloat(suggestion.lat), parseFloat(suggestion.lon), label);
     };
 
     // ========== ADDRESS SEARCH HANDLER ==========
@@ -695,7 +759,7 @@ export default function Map() {
             );
             const results = await res.json();
             if (results.length > 0) {
-                applyAddressLocation(parseFloat(results[0].lat), parseFloat(results[0].lon), addressQuery.trim());
+                previewAddressLocation(parseFloat(results[0].lat), parseFloat(results[0].lon), addressQuery.trim());
             } else {
                 setGeocodeError('Address not found. Try being more specific.');
             }
@@ -744,6 +808,7 @@ export default function Map() {
                     onGoHome={handleGoHome}
                     onClearPin={clearPin}
                     onMyLocation={handleMyLocation}
+                    onZoomToGlobe={handleZoomToGlobe}
                 />
 
                 {/* ========== MAP CONTAINER ========== */}
@@ -785,11 +850,19 @@ export default function Map() {
                     background: 'radial-gradient(ellipse at center, transparent 38%, rgba(30, 80, 220, 0.18) 55%, rgba(10, 30, 120, 0.35) 68%, rgba(5, 5, 20, 0.88) 82%)',
                 }}/>
 
+                {/* Confirm prompt before a previewed address is saved as Home */}
+                <StartingLocationPrompt
+                    location={pendingLocation}
+                    onConfirm={confirmStartingLocation}
+                    onDismiss={dismissStartingLocation}
+                />
+
                 {/* Player profile card: shown when a rival shield is tapped */}
                 <PlayerCard
                     player={selectedPlayer}
                     onClose={() => setSelectedPlayer(null)}
                     onViewProfile={(id) => navigate(`/profile/${id}`)}
+                    onZoomToTerritory={() => zoomToPlayerTerritory(selectedPlayer?.ownerId)}
                 />
                 {/* Empty state: globe overlay for new users with no territory */}
                 <MapEmptyState

@@ -19,6 +19,7 @@ export default function MapControls({
     onGoHome,
     onClearPin,
     onMyLocation,
+    onZoomToGlobe,
 }) {
     return (
         <div className="mb-2 flex justify-between items-center gap-3">
@@ -100,20 +101,34 @@ export default function MapControls({
                 </div>
             )}
 
-            {/* My Location: right side */}
-            <button
-                onClick={onMyLocation}
-                className="bg-gray-900 hover:bg-gray-800 border border-gray-700 text-emerald-400 font-bold text-sm px-3 py-2 rounded-xl transition-colors flex items-center gap-2"
-            >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="3"/>
-                    <line x1="12" y1="2" x2="12" y2="6"/>
-                    <line x1="12" y1="18" x2="12" y2="22"/>
-                    <line x1="2" y1="12" x2="6" y2="12"/>
-                    <line x1="18" y1="12" x2="22" y2="12"/>
-                </svg>
-                <span className="hidden sm:inline">My Location</span>
-            </button>
+            {/* Right-side actions: zoom out to globe + my location */}
+            <div className="flex items-center gap-2 shrink-0">
+                <button
+                    onClick={onZoomToGlobe}
+                    title="Zoom out to globe"
+                    className="bg-gray-900 hover:bg-gray-800 border border-gray-700 text-emerald-400 font-bold text-sm px-3 py-2 rounded-xl transition-colors flex items-center gap-2"
+                >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="2" y1="12" x2="22" y2="12"/>
+                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                    </svg>
+                    <span className="hidden sm:inline">Globe</span>
+                </button>
+                <button
+                    onClick={onMyLocation}
+                    className="bg-gray-900 hover:bg-gray-800 border border-gray-700 text-emerald-400 font-bold text-sm px-3 py-2 rounded-xl transition-colors flex items-center gap-2"
+                >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="3"/>
+                        <line x1="12" y1="2" x2="12" y2="6"/>
+                        <line x1="12" y1="18" x2="12" y2="22"/>
+                        <line x1="2" y1="12" x2="6" y2="12"/>
+                        <line x1="18" y1="12" x2="22" y2="12"/>
+                    </svg>
+                    <span className="hidden sm:inline">My Location</span>
+                </button>
+            </div>
         </div>
     );
 }

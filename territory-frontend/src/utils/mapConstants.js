@@ -15,3 +15,12 @@ export const HEX_GRID_RING_SIZE = 5;
 // Desktop IP geolocation can be off by miles. A reported accuracy at or above
 // this many meters is treated as too coarse to fly the camera to.
 export const ACCURACY_THRESHOLD_M = 500;
+
+// How long camera fly/zoom transitions take, in ms. Deliberately slow: a gentle
+// flight reads as cinematic and gives map tiles time to load during the move,
+// which avoids the white flash that fast zooms cause.
+export const FLY_DURATION_MS = 3500;
+
+// The Globe button pulls back across the whole zoom range, so it gets an even
+// slower, more cinematic duration of its own.
+export const GLOBE_FLY_DURATION_MS = 4500;

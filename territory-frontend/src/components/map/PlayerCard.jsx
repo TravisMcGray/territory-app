@@ -1,22 +1,26 @@
 // ========== PLAYER PROFILE CARD ==========
-// Floating card shown when a rival's shield is tapped on the map. Display only:
-// it receives the selected player and two callbacks (close, view profile).
+// Floating card shown when a rival's shield is tapped on the map. Tapping the
+// card (anywhere except the username link or close button) zooms to the player's
+// territory; the username still opens their profile.
 
-export default function PlayerCard({ player, onClose, onViewProfile }) {
+export default function PlayerCard({ player, onClose, onViewProfile, onZoomToTerritory }) {
     if (!player) return null;
 
     return (
-        <div style={{
-            position: 'absolute', bottom: 20, left: 20, zIndex: 10,
-            background: 'rgba(10,10,20,0.92)', backdropFilter: 'blur(16px)',
-            border: `1.5px solid ${player.tier.color}44`,
-            borderRadius: 16, padding: '16px 18px', minWidth: 210,
-            boxShadow: `0 0 24px ${player.tier.color}33`,
-            animation: 'fadeSlideUp 0.25s ease',
-        }}>
+        <div
+            onClick={onZoomToTerritory}
+            style={{
+                position: 'absolute', bottom: 20, left: 20, zIndex: 10,
+                background: 'rgba(10,10,20,0.92)', backdropFilter: 'blur(16px)',
+                border: `1.5px solid ${player.tier.color}44`,
+                borderRadius: 16, padding: '16px 18px', minWidth: 210,
+                boxShadow: `0 0 24px ${player.tier.color}33`,
+                animation: 'fadeSlideUp 0.25s ease', cursor: 'pointer',
+            }}
+        >
             {/* Close */}
             <button
-                onClick={onClose}
+                onClick={(e) => { e.stopPropagation(); onClose(); }}
                 style={{ position: 'absolute', top: 10, right: 12, background: 'none', border: 'none',
                     color: '#6b7280', fontSize: 18, cursor: 'pointer', lineHeight: 1 }}
             >×</button>
@@ -31,7 +35,7 @@ export default function PlayerCard({ player, onClose, onViewProfile }) {
                 </svg>
                 <div>
                     <div
-                        onClick={() => onViewProfile(player.ownerId)}
+                        onClick={(e) => { e.stopPropagation(); onViewProfile(player.ownerId); }}
                         style={{ fontSize: 16, fontWeight: 800, color: '#fff', lineHeight: 1.2, cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 3 }}
                     >
                         {player.username}
@@ -70,6 +74,10 @@ export default function PlayerCard({ player, onClose, onViewProfile }) {
                         {player.preferredActivity === 'RUN' ? 'Runner' : 'Walker'}
                     </div>
                 </div>
+            </div>
+
+            <div style={{ fontSize: 10, color: '#9ca3af', textAlign: 'center', marginTop: 12 }}>
+                Tap to fly to their territory
             </div>
         </div>
     );

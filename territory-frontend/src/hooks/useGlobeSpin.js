@@ -2,8 +2,10 @@ import { useEffect } from 'react';
 
 // After 5s idle at globe zoom, eases the camera back to the US then slowly spins
 // it west to east. Poles stay fixed; only the center longitude shifts each frame.
-// Any user interaction (mouse, touch, wheel, drag) resets it to idle.
-export function useGlobeSpin(mapRef, mapLoaded, programmaticNavRef, spinFrameRef) {
+// Any user interaction (mouse, touch, wheel, drag) resets it to idle. The spin
+// is also held while a player card is open (cardOpenRef) so the globe stays put
+// over the selected shield.
+export function useGlobeSpin(mapRef, mapLoaded, programmaticNavRef, spinFrameRef, cardOpenRef) {
     useEffect(() => {
         const map = mapRef.current;
         if (!map || !mapLoaded) return;
@@ -11,6 +13,7 @@ export function useGlobeSpin(mapRef, mapLoaded, programmaticNavRef, spinFrameRef
         // States: 'idle' -> 'resetting' (easeTo US) -> 'spinning'; back to 'idle' on interact
         let state = 'idle';
         let lastInteraction = Date.now();
+        let wasProgrammatic = false;
 
         const onInteract = () => {
             if (state === 'resetting') return; // ignore programmatic movement
@@ -26,8 +29,20 @@ export function useGlobeSpin(mapRef, mapLoaded, programmaticNavRef, spinFrameRef
         map.easeTo({ bearing: 0, pitch: 0, duration: 600 });
 
         const spin = () => {
-            // Pause spin while a programmatic navigation (address fly-to) is running
-            if (!programmaticNavRef.current) {
+            // Pause spin during a programmatic navigation (address fly-to, globe
+            // button) or while a player card is open (holding over the shield).
+            if (programmaticNavRef.current) {
+                wasProgrammatic = true;
+            } else if (!cardOpenRef.current) {
+                // A programmatic flight just finished: restart the idle countdown
+                // so the lazy spin only begins once you have arrived at the globe
+                // and sat still, not from the moment you clicked the button.
+                if (wasProgrammatic) {
+                    wasProgrammatic = false;
+                    lastInteraction = Date.now();
+                    state = 'idle';
+                }
+
                 const idle = Date.now() - lastInteraction > 5000;
                 const atGlobeZoom = map.getZoom() < 4;
 
@@ -60,5 +75,5 @@ export function useGlobeSpin(mapRef, mapLoaded, programmaticNavRef, spinFrameRef
             map.off('wheel', onInteract);
             map.off('dragstart', onInteract);
         };
-    }, [mapLoaded, mapRef, programmaticNavRef, spinFrameRef]);
+    }, [mapLoaded, mapRef, programmaticNavRef, spinFrameRef, cardOpenRef]);
 }
