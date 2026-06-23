@@ -7,14 +7,14 @@ body {
 /* ==========================================================
     MAPLIBRE GL JS DARK THEME OVERRIDES
     Styles MapLibre's built-in UI to match our gray-950 theme.
-    MapLibre renders vector tiles via WebGL — the map itself is
+    MapLibre renders vector tiles via WebGL. The map itself is
     styled through the OpenFreeMap style JSON, but the UI chrome
     (zoom buttons, popups, attribution) needs CSS overrides.
    ========================================================== */
 
 /* ---------- Navigation Controls (Zoom Buttons) ---------- */
 /* MapLibre's NavigationControl renders a button group with SVG icons.
-   Default is white background with black icons — we flip to dark. */
+   Default is white background with black icons, so we flip to dark. */
 .maplibregl-ctrl-group {
     background: #111827 !important;         /* gray-900 */
     border: 1px solid #1f2937 !important;   /* gray-800 */
@@ -51,10 +51,10 @@ body {
 
 /* ---------- Attribution ---------- */
 /* The small "© OpenStreetMap / OpenFreeMap" text in the corner.
-   Default is white background — this makes it blend into the dark map. */
+   Default is white background, which makes it blend into the dark map. */
 .maplibregl-ctrl-attrib {
     background-color: rgba(3, 7, 18, 0.7) !important;  /* gray-950 semi-transparent */
-    color: #4b5563 !important;              /* gray-600 — visible but not distracting */
+    color: #4b5563 !important;              /* gray-600, visible but not distracting */
     font-size: 10px !important;
 }
 
@@ -62,62 +62,10 @@ body {
     color: #6b7280 !important;              /* gray-500 */
 }
 
-/* Hide the (i) toggle button on the attribution — it's a white circle
+/* Hide the (i) toggle button on the attribution; it's a white circle
    that looks out of place on our dark map. Attribution text stays visible. */
 .maplibregl-ctrl-attrib-button {
     display: none !important;
-}
-
-/* ---------- Popup Container ---------- */
-/* MapLibre wraps popup HTML in .maplibregl-popup-content with a
-   .maplibregl-popup-tip arrow. Default is white — override to gray-900. */
-.maplibregl-popup-content {
-    background: #111827 !important;         /* gray-900 */
-    color: #f9fafb !important;              /* gray-50 */
-    border-radius: 10px !important;
-    border: 1px solid #1f2937;              /* gray-800 subtle border */
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5) !important;
-    padding: 0 !important;                  /* Our inner .hex-popup-inner handles padding */
-}
-
-/* ---------- Popup Inner Content ---------- */
-/* Padding lives here instead of on .maplibregl-popup-content so the
-   border-radius on the outer container clips cleanly. */
-.hex-popup-inner {
-    padding: 10px 14px;
-    min-width: 160px;
-    font-family: sans-serif;
-}
-
-/* ---------- Popup Tip (the triangle arrow) ---------- */
-/* MapLibre uses CSS border tricks for the arrow, with different classes
-    depending on which direction the popup opens. We need to override
-   all four directions so the arrow always matches the dark container. */
-.maplibregl-popup-anchor-bottom .maplibregl-popup-tip {
-    border-top-color: #111827 !important;
-}
-
-.maplibregl-popup-anchor-top .maplibregl-popup-tip {
-    border-bottom-color: #111827 !important;
-}
-
-.maplibregl-popup-anchor-left .maplibregl-popup-tip {
-    border-right-color: #111827 !important;
-}
-
-.maplibregl-popup-anchor-right .maplibregl-popup-tip {
-    border-left-color: #111827 !important;
-}
-
-/* Anchors with sub-directions (bottom-left, bottom-right, etc.) */
-.maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
-.maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip {
-    border-top-color: #111827 !important;
-}
-
-.maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
-.maplibregl-popup-anchor-top-right .maplibregl-popup-tip {
-    border-bottom-color: #111827 !important;
 }
 
 /* ---------- Player card slide-up ---------- */
@@ -126,11 +74,17 @@ body {
     to   { opacity: 1; transform: translateY(0); }
 }
 
+/* ---------- Hexagon stat card: flies in to the top-right dock ---------- */
+@keyframes hexCardIn {
+    from { opacity: 0; transform: translateX(44px) scale(0.92); }
+    to   { opacity: 1; transform: translateX(0) scale(1); }
+}
+
 /* ---------- MapLibre Attribution (hide built-in, we render our own below map) ---------- */
 .maplibregl-ctrl-attrib { display: none !important; }
 
 /* ---------- GPS Location Dot ---------- */
-/* Blue dot with white ring and glow — matches the original Leaflet
+/* Blue dot with white ring and glow, matching the original Leaflet
    version but now rendered as a MapLibre Marker with a custom element. */
 .location-dot {
     width: 16px;

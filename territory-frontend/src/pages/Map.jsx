@@ -23,23 +23,24 @@ import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { getLibertyNoBuildingsStyle } from '../utils/mapStyle';
 import {
-    COLOR_MINE,
-    COLOR_THEIRS,
     DEFAULT_ZOOM,
     H3_RESOLUTION,
     HEX_GRID_RING_SIZE,
     ACCURACY_THRESHOLD_M,
     FLY_DURATION_MS,
     GLOBE_FLY_DURATION_MS,
+    PITCH_ZOOM,
+    SKYLINE_PITCH,
+    TOWER_GAP,
 } from '../utils/mapConstants';
 import { playerColor, makeShieldImage, hslToHex, getTierColor } from '../utils/mapHelpers';
 import MapLegend from '../components/map/MapLegend';
-import PlayerCard from '../components/map/PlayerCard';
+import HexStatCard from '../components/map/HexStatCard';
 import MapEmptyState from '../components/map/MapEmptyState';
 import MapControls from '../components/map/MapControls';
 import StartingLocationPrompt from '../components/map/StartingLocationPrompt';
-import { buildTerritoryFeatures, buildShieldFeatures, buildHullGeoJSON } from '../utils/territoryGeo';
-import { addTerritoryLayers, addHullLayers, addHexGridLayers } from '../utils/mapLayers';
+import { buildTerritoryFeatures, buildShieldFeatures, buildHullGeoJSON, insetFeatureCollection } from '../utils/territoryGeo';
+import { addTerritoryLayers, addRecencyGlow, addTerritoryExtrusion, addRecencyCrown, addHullLayers, addHexGridLayers } from '../utils/mapLayers';
 import { useStarfield } from '../hooks/useStarfield';
 import { useGlobeSpin } from '../hooks/useGlobeSpin';
 
@@ -53,11 +54,17 @@ export default function Map() {
     const [locationError, setLocationError] = useState(null);
     const [tileCount, setTileCount] = useState({ mine: 0, total: 0 });
     const [userLocation, setUserLocation] = useState(null);
-    // Tracks when MapLibre's style has fully loaded — you CANNOT add
+    // Tracks when MapLibre's style has fully loaded: you CANNOT add
     // sources or layers until this is true. Attempting to do so throws.
     const [mapLoaded, setMapLoaded] = useState(false);
     const [mapZoom, setMapZoom] = useState(15);
-    const [selectedPlayer, setSelectedPlayer] = useState(null);
+    // 3D skyline toggle. On by default; when off the towers hide and the camera
+    // stays flat so the map underneath is fully visible.
+    const [skylineOn, setSkylineOn] = useState(true);
+    // The tapped hex (from a tile or a rival's shield) drives the single unified
+    // stat card. For a rival hex it also carries a `player` block (name, id,
+    // highest capture) so the card can show who owns it and a fly-to action.
+    const [selectedHex, setSelectedHex] = useState(null);
     const [showAddressInput, setShowAddressInput] = useState(false);
     const [addressQuery, setAddressQuery] = useState('');
     const [geocoding, setGeocoding] = useState(false);
@@ -75,7 +82,7 @@ export default function Map() {
 
     // ========== REFS ==========
     // Map ref lives outside React state because MapLibre manages its own
-    // DOM and WebGL context — putting it in state would cause issues.
+    // DOM and WebGL context, so putting it in state would cause issues.
     const mapRef = useRef(null);
     const mapContainerRef = useRef(null);
     const starCanvasRef = useRef(null);
@@ -89,15 +96,18 @@ export default function Map() {
     // Mirrors whether a player card is open, so the globe spin can hold still
     // over the selected shield (read inside the requestAnimationFrame loop).
     const cardOpenRef = useRef(false);
-    // The currently selected player's id, so a second shield tap (or the card)
-    // can tell it is the same player and zoom to their territory.
-    const selectedPlayerIdRef = useRef(null);
     // Monotonic token for programmatic camera flights. If one flight interrupts
     // another, only the latest flight's moveend clears the nav guard, so a
     // cancelled flight's stale moveend cannot release it early (which would make
     // the lazy spin start before the new flight has actually finished).
     const navSeqRef = useRef(0);
-    // Approximate location from low-accuracy geolocation — used to bias address
+    // Tracks whether the camera is currently pitched into the skyline view, so
+    // the zoom handler only tilts/flattens once when crossing the threshold.
+    const pitchedRef = useRef(false);
+    // Ref mirror of skylineOn so the map event handlers (registered once) always
+    // read the latest value without being re-bound.
+    const skylineOnRef = useRef(true);
+    // Approximate location from low-accuracy geolocation, used to bias address
     // search suggestions before high-accuracy GPS resolves (or if it never does).
     const approxLocationRef = useRef(null);
 
@@ -105,12 +115,10 @@ export default function Map() {
     useStarfield(starCanvasRef);
     useGlobeSpin(mapRef, mapLoaded, programmaticNavRef, spinFrameRef, cardOpenRef);
 
-    // Hold the globe still while a player card is open, and remember which player
-    // is selected so a second shield tap can zoom to their territory.
+    // Hold the globe still while the stat card is open.
     useEffect(() => {
-        cardOpenRef.current = !!selectedPlayer;
-        selectedPlayerIdRef.current = selectedPlayer?.ownerId ?? null;
-    }, [selectedPlayer]);
+        cardOpenRef.current = !!selectedHex;
+    }, [selectedHex]);
 
     // Zoom to fit a player's entire territory. Stable (refs only) so the shield
     // click handler and the player card can share the same action.
@@ -129,15 +137,30 @@ export default function Map() {
         const navSeq = ++navSeqRef.current;
         map.fitBounds(
             [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
-            { padding: 140, maxZoom: 14, duration: FLY_DURATION_MS }
+            // Tighter padding + a higher cap so the cluster fills the view and
+            // settles past the skyline-tilt threshold (lands in 3D, not flat).
+            { padding: 60, maxZoom: 15, duration: FLY_DURATION_MS }
         );
         map.once('moveend', () => { if (navSeqRef.current === navSeq) programmaticNavRef.current = false; });
+    }, []);
+
+    // Build the rival-owner block for the unified stat card: their name, id, and
+    // highest capture across all their tiles (so the card can read "Max Cap N×").
+    // Stable (refs only) so the map click handlers can share it.
+    const getPlayerBlock = useCallback((ownerId, username, fallbackCapture) => {
+        const id = ownerId ? String(ownerId) : null;
+        if (!id) return null;
+        const tiles = territoriesRef.current.filter(t => t.owner?.id?.toString() === id);
+        const maxCapture = tiles.length
+            ? Math.max(...tiles.map(t => t.captureCount ?? 1))
+            : (fallbackCapture || 1);
+        return { ownerId: id, username, maxCapture };
     }, []);
 
     // ========== INITIALIZE MAP ==========
     // Async init: fetches the style JSON, customizes colors for visibility,
     // then creates the MapLibre instance. Building outlines are baked into
-    // the customized style — no need to add them manually after load.
+    // the customized style, so no need to add them manually after load.
     useEffect(() => {
         if (mapRef.current) return;
 
@@ -169,13 +192,13 @@ export default function Map() {
                 minZoom: 2,
             });
 
-            // Zoom +/- buttons (no compass — not useful for a 2D territory map)
+            // Zoom +/- buttons (no compass, not useful for a 2D territory map)
             map.addControl(
                 new maplibregl.NavigationControl({ showCompass: false }),
                 'top-left'
             );
 
-            // ---- Style loaded — safe to add sources/layers now ----
+            // ---- Style loaded: safe to add sources/layers now ----
 
             map.on('load', () => {
                 map.setProjection({ type: 'globe' });
@@ -188,7 +211,7 @@ export default function Map() {
                             .setLngLat([savedHome.longitude, savedHome.latitude])
                             .addTo(map);
                     }
-                    // Always seed userLocation — decoupled from marker so the hex
+                    // Always seed userLocation, decoupled from marker so the hex
                     // grid draws even if a stale GPS callback already set the marker ref
                     setUserLocation({ latitude: savedHome.latitude, longitude: savedHome.longitude });
                 }
@@ -197,10 +220,37 @@ export default function Map() {
 
             map.on('zoom', () => setMapZoom(map.getZoom()));
 
+            // Dragging the map dismisses any open cards, so a stray tap before a
+            // pan never leaves a card blocking the view. dragstart fires only on
+            // a real user drag, not on programmatic flights (those use movestart).
+            map.on('dragstart', () => {
+                setSelectedHex(null);
+            });
+
+            // Skyline tilt: once settled at street zoom, pitch the camera so the
+            // 3D hexagons read as a skyline; flatten back out when zoomed away.
+            map.on('zoomend', () => {
+                // Skyline turned off: never auto-pitch, keep the map flat.
+                if (!skylineOnRef.current) return;
+                const zoomedIn = map.getZoom() >= PITCH_ZOOM;
+                if (zoomedIn && !pitchedRef.current) {
+                    pitchedRef.current = true;
+                    map.easeTo({ pitch: SKYLINE_PITCH, duration: 800 });
+                    // Shields are ground-anchored (MapLibre cannot float them to
+                    // tower tops), so fade them out in skyline mode and let the
+                    // towers stand in for the players.
+                    if (map.getLayer('hex-others-icon')) map.setPaintProperty('hex-others-icon', 'icon-opacity', 0);
+                } else if (!zoomedIn && pitchedRef.current) {
+                    pitchedRef.current = false;
+                    map.easeTo({ pitch: 0, duration: 800 });
+                    if (map.getLayer('hex-others-icon')) map.setPaintProperty('hex-others-icon', 'icon-opacity', 0.92);
+                }
+            });
+
             // ---- Fast low-accuracy pass ----
             // Resolves in <1s via IP/Wi-Fi. Seeds the territory load so shields
             // appear on the globe immediately without waiting for GPS.
-            // No blue dot — low-accuracy can be miles off, a dot implies precision.
+            // No blue dot: low-accuracy can be miles off, a dot implies precision.
             // High-accuracy GPS overrides it when it resolves.
             navigator.geolocation.getCurrentPosition(
                 (pos) => {
@@ -215,7 +265,7 @@ export default function Map() {
 
             // ---- High-accuracy GPS ----
             // If a home is pinned: updates userLocation (hex grid) but never moves
-            // the marker — desktop IP-based GPS can be miles off and would push the
+            // the marker, since desktop IP-based GPS can be miles off and would push the
             // dot off-screen. The pin IS the home; trust it over coarse GPS.
             // If no home is pinned: flies there and places the blue dot normally.
             navigator.geolocation.getCurrentPosition(
@@ -224,7 +274,7 @@ export default function Map() {
                     const homeIsPinned = !!localStorage.getItem('hexcapture_home');
 
                     if (!homeIsPinned) {
-                        // No pin — GPS is the only source of truth
+                        // No pin: GPS is the only source of truth
                         if (accuracy < ACCURACY_THRESHOLD_M) {
                             map.flyTo({ center: [longitude, latitude], zoom: DEFAULT_ZOOM, duration: FLY_DURATION_MS });
                         }
@@ -242,16 +292,16 @@ export default function Map() {
                     }
                     // When home is pinned: userLocation already seeded from savedHome in
                     // map.on('load'). GPS here would only override with a potentially
-                    // wrong desktop location — skip it entirely.
+                    // wrong desktop location, so skip it entirely.
                 },
                 (err) => {
                     console.warn('GPS unavailable:', err.message);
                     if (err.code === 1) {
-                        setLocationError('Location access denied — enable location permissions for this site in your browser settings, then refresh.');
+                        setLocationError('Location access denied. Enable location permissions for this site in your browser settings, then refresh.');
                     } else if (err.code === 3) {
-                        setLocationError('Location timed out — tap "My Location" to try again.');
+                        setLocationError('Location timed out. Tap "My Location" to try again.');
                     } else {
-                        setLocationError('Could not get your location — tap "My Location" to try again.');
+                        setLocationError('Could not get your location. Tap "My Location" to try again.');
                     }
                 },
                 { enableHighAccuracy: true, timeout: 30000 }
@@ -274,7 +324,7 @@ export default function Map() {
     }, []);
 
     // ========== LOAD TERRITORIES ==========
-    // Loads all territories globally — no location filter. Fires once when the
+    // Loads all territories globally, with no location filter. Fires once when the
     // map is ready. Shields appear on the globe regardless of where the viewer is.
     useEffect(() => {
         if (!mapLoaded) return;
@@ -296,7 +346,7 @@ export default function Map() {
     // Converts territory data into GeoJSON and renders via MapLibre layers.
     //
     // WHY GEOJSON SOURCE INSTEAD OF INDIVIDUAL POLYGONS:
-    // Leaflet created one L.polygon per hex — 1,000 hexes = 1,000 DOM elements.
+    // Leaflet created one L.polygon per hex: 1,000 hexes = 1,000 DOM elements.
     // MapLibre takes a single GeoJSON FeatureCollection and renders ALL hexes
     // in one GPU draw call. This scales to tens of thousands of hexes without
     // any performance degradation.
@@ -304,7 +354,7 @@ export default function Map() {
         const map = mapRef.current;
         if (!map || !mapLoaded || !user) return;
 
-        // ID normalization — profile returns 'id', AuthContext may store '_id'
+        // ID normalization: profile returns 'id', AuthContext may store '_id'
         const currentUserId = (user?.id ?? user?._id)?.toString();
         // Build GeoJSON, ownership counts, and my hex ids in one pass.
         const { geojson, mineCount, myMaxCaptureCount, myHexIds } = buildTerritoryFeatures(territories, currentUserId);
@@ -315,51 +365,54 @@ export default function Map() {
         // ---- Build point source for shield icons (exact H3 cell centers) ----
         const shieldGeojson = buildShieldFeatures(territories, currentUserId);
 
+        // Inset copy of the hexes for the 3D towers, so each tower has a gutter
+        // around it and the flat neon fills below show through.
+        const geojson3d = insetFeatureCollection(geojson, TOWER_GAP);
+
         // ---- Update existing source or create fresh ----
         // If territories reload (e.g. after logging a new activity),
-        // we just swap the GeoJSON data — no need to recreate layers.
+        // we just swap the GeoJSON data, so no need to recreate layers.
         if (map.getSource('territories')) {
             map.getSource('territories').setData(geojson);
+            map.getSource('territories-3d')?.setData(geojson3d);
             map.getSource('shield-points')?.setData(shieldGeojson);
         } else {
             map.addSource('territories', { type: 'geojson', data: geojson });
+            map.addSource('territories-3d', { type: 'geojson', data: geojson3d });
             map.addSource('shield-points', { type: 'geojson', data: shieldGeojson });
 
             // Territory fills, glows, and outlines (tiered by capture count).
             addTerritoryLayers(map);
 
-            // ---- Click → popup showing owner info ----
+            // Fresh-capture bloom: recently captured hexes glow white-hot.
+            addRecencyGlow(map);
+
+            // 3D extruded hexagons rising off the map (the territory skyline),
+            // built from the inset source so towers stay separated.
+            addTerritoryExtrusion(map);
+
+            // White-hot crown on the freshest towers (recency cue for 3D view).
+            addRecencyCrown(map);
+
+            // ---- Click → hexagon stat card (docks top-right, never covers the
+            // tiles the way the old on-map popup did) ----
             map.on('click', 'hex-fill', (e) => {
                 if (!e.features?.length) return;
 
                 const props = e.features[0].properties;
                 // MapLibre may serialize booleans as strings when reading
-                // back from queried features — handle both forms safely
+                // back from queried features, so handle both forms safely
                 const isMine = props.isMine === true || props.isMine === 'true';
-                const color = isMine ? COLOR_MINE : COLOR_THEIRS;
-                const activityLabel = props.activityType === 'WALK' ? '🚶 Walk' : '🏃 Run';
+                const captureCount = Number(props.captureCount) || 1;
 
-                const html = `
-                    <div class="hex-popup-inner">
-                        <div style="font-size: 15px; font-weight: 800; color: ${color}; margin-bottom: 4px;">
-                            ${props.owner}
-                        </div>
-                        <div style="font-size: 12px; color: #9ca3af; margin-bottom: 2px;">
-                            ${activityLabel}
-                        </div>
-                        <div style="font-size: 12px; color: #6b7280;">
-                            Captured ${props.capturedAt}
-                        </div>
-                    </div>
-                `;
-
-                new maplibregl.Popup({
-                    closeButton: false,
-                    maxWidth: '220px',
-                })
-                    .setLngLat(e.lngLat)
-                    .setHTML(html)
-                    .addTo(map);
+                setSelectedHex({
+                    owner: props.owner,
+                    isMine,
+                    activityType: props.activityType,
+                    capturedAt: props.capturedAt,
+                    captureCount,
+                    player: isMine ? null : getPlayerBlock(props.ownerId, props.owner, captureCount),
+                });
             });
 
             // Pointer cursor on hex hover so users know tiles are tappable
@@ -370,37 +423,23 @@ export default function Map() {
                 map.getCanvas().style.cursor = '';
             });
 
-            // ---- Shield click → player profile card ----
+            // ---- Shield click → opens the same unified stat card ----
             map.on('click', 'hex-others-icon', (e) => {
+                // In skyline mode the shields are faded to opacity 0, but opacity
+                // alone does not stop click hit-testing. Without this guard, taps
+                // on a hex would hit the invisible shield underneath.
+                if (pitchedRef.current) return;
                 if (!e.features?.length) return;
-                const { ownerId, ownerUsername } = e.features[0].properties;
+                const p = e.features[0].properties;
+                const captureCount = Number(p.captureCount) || 1;
 
-                // Second tap on the already-selected shield zooms to their turf.
-                if (selectedPlayerIdRef.current === ownerId) {
-                    zoomToPlayerTerritory(ownerId);
-                    return;
-                }
-
-                const all = territoriesRef.current;
-
-                const playerTiles = all.filter(t => t.owner?.id?.toString() === ownerId);
-                if (!playerTiles.length) return;
-
-                const maxCapture = Math.max(...playerTiles.map(t => t.captureCount ?? 1));
-                const runCount = playerTiles.filter(t => t.activityType === 'RUN').length;
-                const tierInfo =
-                    maxCapture >= 10 ? { name: 'Tier 4 · 10+',  color: '#ff00aa' } :
-                    maxCapture >= 7  ? { name: 'Tier 3 · 7–9',  color: '#f5a623' } :
-                    maxCapture >= 4  ? { name: 'Tier 2 · 4–6',  color: '#00ccff' } :
-                                       { name: 'Tier 1 · 1–3',  color: '#39ff14' };
-
-                setSelectedPlayer({
-                    username: ownerUsername,
-                    ownerId,
-                    totalTiles: playerTiles.length,
-                    tier: tierInfo,
-                    preferredActivity: runCount > playerTiles.length / 2 ? 'RUN' : 'WALK',
-                    maxCapture,
+                setSelectedHex({
+                    owner: p.ownerUsername,
+                    isMine: false,
+                    activityType: p.activityType,
+                    capturedAt: p.capturedAt,
+                    captureCount,
+                    player: getPlayerBlock(p.ownerId, p.ownerUsername, captureCount),
                 });
 
                 // Hold the globe still and ease to center the shield without
@@ -412,11 +451,11 @@ export default function Map() {
                 map.once('moveend', () => { if (navSeqRef.current === navSeq) programmaticNavRef.current = false; });
             });
 
-            map.on('mouseenter', 'hex-others-icon', () => { map.getCanvas().style.cursor = 'pointer'; });
+            map.on('mouseenter', 'hex-others-icon', () => { if (!pitchedRef.current) map.getCanvas().style.cursor = 'pointer'; });
             map.on('mouseleave', 'hex-others-icon', () => { map.getCanvas().style.cursor = ''; });
         }
 
-        // ---- Shield icons — runs on every territory update ----
+        // ---- Shield icons: runs on every territory update ----
         // Must be outside the if/else so new owners get images loaded even on reload.
         const uniqueOwnerIds = [...new Set(
             territories
@@ -457,7 +496,7 @@ export default function Map() {
         if (map.getLayer('hull-outer-glow')) map.setPaintProperty('hull-outer-glow', 'line-color', hullColor);
         if (map.getLayer('hull-inner-glow')) map.setPaintProperty('hull-inner-glow', 'line-color', hullColor);
 
-        // ---- Territory hull — glowing outer boundary of all your captured hexes ----
+        // ---- Territory hull: glowing outer boundary of all your captured hexes ----
         if (myHexIds.length > 0) {
             try {
                 const hullGeoJSON = buildHullGeoJSON(myHexIds);
@@ -473,9 +512,9 @@ export default function Map() {
             }
         }
 
-        // Auto-zoom to territories removed — pinned home and GPS handle starting location.
+        // Auto-zoom to territories removed. Pinned home and GPS handle starting location.
 
-    }, [territories, user, mapLoaded, zoomToPlayerTerritory]);
+    }, [territories, user, mapLoaded, zoomToPlayerTerritory, getPlayerBlock]);
 
     // ========== DRAW NEARBY HEX GRID ==========
     // Shows a faint grid of uncaptured hexagons around the user's current
@@ -520,20 +559,20 @@ export default function Map() {
             addHexGridLayers(map, beforeId);
         }
 
-        // Breathing shimmer — one RAF loop animates grid hexes + territory hull together
+        // Breathing shimmer: one RAF loop animates grid hexes + territory hull together
         if (shimmerRef.current) cancelAnimationFrame(shimmerRef.current);
         const animate = () => {
             if (!mapRef.current) return;
             const t = Date.now() / 1000;
 
-            // Rainbow wave — each hex colored by longitude position + time offset
+            // Rainbow wave: each hex colored by longitude position + time offset
             const features = hexGridFeaturesRef.current;
             const { minLng, maxLng } = hexGridLngRangeRef.current;
             const lngSpan = maxLng - minLng || 0.001;
             if (features.length > 0 && map.getSource('hex-grid')) {
                 const updated = features.map(f => {
                     const norm = (f.properties.lngCenter - minLng) / lngSpan;
-                    // Smootherstep easing — edges linger, middle rushes to catch up
+                    // Smootherstep easing: edges linger, middle rushes to catch up
                     const eased = norm * norm * norm * (norm * (norm * 6 - 15) + 10);
                     const hue = (eased * 320 + t * 70) % 360;
                     const glowHue = (hue + 20) % 360;
@@ -551,7 +590,7 @@ export default function Map() {
                 map.getSource('hex-grid').setData({ type: 'FeatureCollection', features: updated });
             }
 
-            // Corona and rays — steady soft glow, no pulsing
+            // Corona and rays: steady soft glow, no pulsing
             if (map.getLayer('hex-grid-corona'))
                 map.setPaintProperty('hex-grid-corona', 'line-opacity', 0.15);
             if (map.getLayer('hex-grid-rays'))
@@ -586,9 +625,9 @@ export default function Map() {
                 map.setPaintProperty('hex-glow-others-t4', 'line-opacity',
                     0.1 + 0.2 * Math.abs(Math.sin(t * 1.3)));
 
-            // Hex border glow — breathes in sync with hull
+            // Hex border glow: breathes in sync with hull
 
-            // Territory hull — slower, more majestic breathing
+            // Territory hull: slower, more majestic breathing
             const hullOuter = 0.15 + 0.12 * Math.sin(t * 0.7);
             const hullInner = 0.45 + 0.25 * Math.sin(t * 0.7 + 0.5);
             const hullEdge  = 0.8  + 0.15 * Math.sin(t * 0.7 + 1.0);
@@ -619,7 +658,7 @@ export default function Map() {
                 setLocationError(null);
 
                 if (accuracy >= ACCURACY_THRESHOLD_M) {
-                    // Desktop / IP-based location — too coarse to be useful
+                    // Desktop / IP-based location: too coarse to be useful
                     setLocationError(
                         `Desktop location is only accurate to ~${Math.round(accuracy / 1000)} km. Use "Input Address" for your exact location.`
                     );
@@ -645,11 +684,11 @@ export default function Map() {
             },
             (err) => {
                 if (err.code === 1) {
-                    setLocationError('Location access denied — enable location permissions for this site in your browser settings, then refresh.');
+                    setLocationError('Location access denied. Enable location permissions for this site in your browser settings, then refresh.');
                 } else if (err.code === 3) {
-                    setLocationError('Location timed out — please try again.');
+                    setLocationError('Location timed out. Please try again.');
                 } else {
-                    setLocationError('Could not get your location — please try again.');
+                    setLocationError('Could not get your location. Please try again.');
                 }
             },
             { enableHighAccuracy: true, timeout: 30000 }
@@ -737,7 +776,7 @@ export default function Map() {
     const handleZoomToGlobe = () => {
         const map = mapRef.current;
         if (!map) return;
-        setSelectedPlayer(null);
+        setSelectedHex(null);
         programmaticNavRef.current = true;
         const navSeq = ++navSeqRef.current;
         // easeTo with an ease-out curve: zoom out to the globe quickly (firing
@@ -753,6 +792,38 @@ export default function Map() {
             essential: true,
         });
         map.once('moveend', () => { if (navSeqRef.current === navSeq) programmaticNavRef.current = false; });
+    };
+
+    // Toggle the 3D skyline. Off hides the towers and flattens the camera so the
+    // map underneath is fully visible; on restores the towers and pitches back
+    // in if already at street zoom. Drives off the ref as source of truth so the
+    // zoomend handler stays in sync.
+    const handleToggleSkyline = () => {
+        const map = mapRef.current;
+        const next = !skylineOnRef.current;
+        skylineOnRef.current = next;
+        setSkylineOn(next);
+        if (!map) return;
+
+        // Towers and their recency crowns hide/show together (a crown with no
+        // tower under it would float).
+        ['hex-extrusion', 'hex-recency-crown'].forEach((id) => {
+            if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', next ? 'visible' : 'none');
+        });
+
+        if (next) {
+            // Pitch up only if already zoomed into street level.
+            if (map.getZoom() >= PITCH_ZOOM) {
+                pitchedRef.current = true;
+                map.easeTo({ pitch: SKYLINE_PITCH, duration: 600 });
+                if (map.getLayer('hex-others-icon')) map.setPaintProperty('hex-others-icon', 'icon-opacity', 0);
+            }
+        } else {
+            // Flatten and bring the map (and shields) back into view.
+            pitchedRef.current = false;
+            map.easeTo({ pitch: 0, duration: 600 });
+            if (map.getLayer('hex-others-icon')) map.setPaintProperty('hex-others-icon', 'icon-opacity', 0.92);
+        }
     };
 
     const handleSuggestionClick = (suggestion) => {
@@ -831,6 +902,8 @@ export default function Map() {
                     onClearPin={clearPin}
                     onMyLocation={handleMyLocation}
                     onZoomToGlobe={handleZoomToGlobe}
+                    skylineOn={skylineOn}
+                    onToggleSkyline={handleToggleSkyline}
                 />
 
                 {/* ========== MAP CONTAINER ========== */}
@@ -861,7 +934,7 @@ export default function Map() {
                         zIndex: 1,
                     }}
                 />
-                {/* Atmosphere halo — only visible at globe zoom levels */}
+                {/* Atmosphere halo: only visible at globe zoom levels */}
                 <div style={{
                     position: 'absolute',
                     inset: 0,
@@ -879,12 +952,13 @@ export default function Map() {
                     onDismiss={dismissStartingLocation}
                 />
 
-                {/* Player profile card: shown when a rival shield is tapped */}
-                <PlayerCard
-                    player={selectedPlayer}
-                    onClose={() => setSelectedPlayer(null)}
+                {/* Unified stat card: flies in top-right for any tapped hex or
+                    rival shield. For a rival it also shows the owner + fly action. */}
+                <HexStatCard
+                    hex={selectedHex}
+                    onClose={() => setSelectedHex(null)}
                     onViewProfile={(id) => navigate(`/profile/${id}`)}
-                    onZoomToTerritory={() => zoomToPlayerTerritory(selectedPlayer?.ownerId)}
+                    onFlyToTerritory={(id) => { zoomToPlayerTerritory(id); setSelectedHex(null); }}
                 />
                 {/* Empty state: globe overlay for new users with no territory */}
                 <MapEmptyState
@@ -893,7 +967,7 @@ export default function Map() {
                 />
                 </div>{/* end map container */}
 
-                {/* Attribution — outside the map so it's always clickable */}
+                {/* Attribution, outside the map so it's always clickable */}
                 <p className="text-center text-gray-600 text-xs mt-1.5">
                     <a href="https://maplibre.org" target="_blank" rel="noreferrer" className="hover:text-emerald-400 transition-colors">© MapLibre</a>
                     {' | '}

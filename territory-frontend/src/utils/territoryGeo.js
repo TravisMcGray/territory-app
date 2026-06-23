@@ -4,6 +4,26 @@
 // the map component stays focused on wiring rather than data munging.
 
 import { cellToBoundary, cellToLatLng, cellsToMultiPolygon } from 'h3-js';
+import { RECENCY_WINDOW_DAYS } from './mapConstants';
+
+// Format a capture timestamp the way the stat card shows it. Shared so a tile
+// and its shield render the same "Captured ..." string.
+function formatCapturedDate(capturedAt) {
+    if (!capturedAt) return 'Unknown';
+    return new Date(capturedAt).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+    });
+}
+
+// How fresh a capture is, 0..1: 1 = captured just now, 0 = at or past the
+// recency window. Drives the fresh-capture bloom on the map.
+function computeRecency(capturedAt) {
+    if (!capturedAt) return 0;
+    const ageDays = (Date.now() - new Date(capturedAt).getTime()) / 86400000;
+    return Math.max(0, Math.min(1, 1 - ageDays / RECENCY_WINDOW_DAYS));
+}
 
 // Build the polygon FeatureCollection for all territory hexes, plus the
 // ownership stats the map needs (how many are mine, my highest capture count,
@@ -35,13 +55,7 @@ export function buildTerritoryFeatures(territories, currentUserId) {
         // GeoJSON polygon rings MUST be closed (first point = last point)
         coordinates.push(coordinates[0]);
 
-        const capturedDate = territory.capturedAt
-            ? new Date(territory.capturedAt).toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric',
-            })
-            : 'Unknown';
+        const capturedDate = formatCapturedDate(territory.capturedAt);
 
         features.push({
             type: 'Feature',
@@ -56,6 +70,7 @@ export function buildTerritoryFeatures(territories, currentUserId) {
                 activityType: territory.activityType,
                 capturedAt: capturedDate,
                 captureCount: territory.captureCount ?? 1,
+                recency: computeRecency(territory.capturedAt),
             },
         });
     });
@@ -66,6 +81,32 @@ export function buildTerritoryFeatures(territories, currentUserId) {
         myMaxCaptureCount,
         myHexIds,
     };
+}
+
+// Shrink every polygon toward its own centroid so the towers built from these
+// hexes leave a gutter between neighbors. `gap` is the fraction removed (0.18
+// keeps 82% of each hex). Properties (captureCount, isMine, ...) are preserved
+// so the extrusion keeps its tier color and height. Used only for the 3D
+// extrusion source; the flat fills keep the full-size hexes.
+export function insetFeatureCollection(geojson, gap) {
+    const keep = 1 - gap;
+    const features = geojson.features.map((feature) => {
+        const ring = feature.geometry.coordinates[0];
+        // Centroid of the ring's unique points (drop the closing duplicate).
+        const points = ring.slice(0, -1);
+        let cx = 0;
+        let cy = 0;
+        points.forEach(([x, y]) => { cx += x; cy += y; });
+        cx /= points.length;
+        cy /= points.length;
+
+        const shrunk = ring.map(([x, y]) => [cx + (x - cx) * keep, cy + (y - cy) * keep]);
+        return {
+            ...feature,
+            geometry: { type: 'Polygon', coordinates: [shrunk] },
+        };
+    });
+    return { type: 'FeatureCollection', features };
 }
 
 // Build the point FeatureCollection for other players' shield icons, placed at
@@ -83,6 +124,8 @@ export function buildShieldFeatures(territories, currentUserId) {
                         captureCount: t.captureCount ?? 1,
                         ownerId: t.owner?.id?.toString() ?? '',
                         ownerUsername: t.owner?.username ?? 'Unknown',
+                        activityType: t.activityType,
+                        capturedAt: formatCapturedDate(t.capturedAt),
                     },
                 });
             } catch { /* skip invalid hex */ }

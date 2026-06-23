@@ -20,6 +20,8 @@ export default function MapControls({
     onClearPin,
     onMyLocation,
     onZoomToGlobe,
+    skylineOn,
+    onToggleSkyline,
 }) {
     return (
         <div className="mb-2 flex justify-between items-center gap-3">
@@ -101,8 +103,25 @@ export default function MapControls({
                 </div>
             )}
 
-            {/* Right-side actions: zoom out to globe + my location */}
+            {/* Right-side actions: 3D toggle + zoom out to globe + my location */}
             <div className="flex items-center gap-2 shrink-0">
+                <button
+                    onClick={onToggleSkyline}
+                    title={skylineOn ? 'Hide 3D skyline' : 'Show 3D skyline'}
+                    aria-pressed={skylineOn}
+                    className={`border font-bold text-sm px-3 py-2 rounded-xl transition-colors flex items-center gap-2 ${
+                        skylineOn
+                            ? 'bg-emerald-600/20 border-emerald-500 text-emerald-300'
+                            : 'bg-gray-900 hover:bg-gray-800 border-gray-700 text-gray-400'
+                    }`}
+                >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 2 2 7l10 5 10-5-10-5z"/>
+                        <path d="M2 17l10 5 10-5"/>
+                        <path d="M2 12l10 5 10-5"/>
+                    </svg>
+                    <span className="hidden sm:inline">3D</span>
+                </button>
                 <button
                     onClick={onZoomToGlobe}
                     title="Zoom out to globe"

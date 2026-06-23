@@ -26,3 +26,20 @@ export const FLY_DURATION_MS = 3500;
 // reaches the globe view early (requesting those tiles) then settles slowly,
 // giving the globe tiles time to load before the motion stops.
 export const GLOBE_FLY_DURATION_MS = 3500;
+
+// Skyline tilt: once zoomed in to at least PITCH_ZOOM, the camera pitches to
+// SKYLINE_PITCH so the 3D extruded hexagons read as a skyline. It flattens back
+// to top-down when zoomed out toward the globe.
+export const PITCH_ZOOM = 14;
+export const SKYLINE_PITCH = 55;
+
+// Fraction each hexagon is shrunk toward its own center before being extruded
+// into a tower, leaving a gutter between neighbors so every tower reads as its
+// own graphic instead of merging into one solid mass. Applied only to the 3D
+// source, never the flat fills.
+export const TOWER_GAP = 0.18;
+
+// Recency glow window, in days. A hex captured just now glows brightest and the
+// bloom fades to nothing once it is this many days old, so an active week visibly
+// lights up the territory. Drives the `recency` property on each hex feature.
+export const RECENCY_WINDOW_DAYS = 14;

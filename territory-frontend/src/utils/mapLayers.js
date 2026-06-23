@@ -13,6 +13,18 @@ const tierColorMatch = () => ['match', ['coalesce', ['get', 'captureCount'], 0],
     '#ff00aa',
 ];
 
+// Tower height in meters, scaled by capture count with a curve so each tier
+// clearly towers over the last. Shared by the tower body and the recency crown
+// so the crown always sits flush on top.
+const towerHeightExpr = () => ['interpolate', ['linear'], ['coalesce', ['get', 'captureCount'], 1],
+    1, 30,
+    3, 70,
+    6, 140,
+    9, 220,
+    12, 320,
+    15, 420,
+];
+
 // Territory fills, glows, and outlines, tiered by capture count. Mine and others
 // are styled separately so ownership reads at a glance.
 export function addTerritoryLayers(map) {
@@ -129,6 +141,70 @@ export function addTerritoryLayers(map) {
         source: 'territories',
         filter: ['==', ['get', 'isMine'], true],
         paint: { 'line-color': '#ffffff', 'line-width': 1.5, 'line-opacity': 1, 'line-blur': 0 },
+    });
+}
+
+// Fresh-capture bloom: hexes captured recently glow white-hot and fade to
+// nothing across the recency window, so a player's active week visibly lights
+// up. Data-driven by the `recency` property (1 = just now, 0 = old), so it costs
+// nothing per frame. Sits above the tier fills on the flat 'territories' source.
+export function addRecencyGlow(map) {
+    const recency = ['coalesce', ['get', 'recency'], 0];
+    map.addLayer({
+        id: 'hex-recency-glow',
+        type: 'line',
+        source: 'territories',
+        paint: {
+            'line-color': '#ffffff',
+            'line-width': ['interpolate', ['linear'], recency, 0, 0, 1, 9],
+            'line-opacity': ['interpolate', ['linear'], recency, 0, 0, 1, 0.6],
+            'line-blur': 6,
+        },
+    });
+}
+
+// 3D extruded hexagons: captured tiles rise as towers, height scaled by capture
+// count and colored by tier. This is the territory "skyline." It looks flat when
+// the camera is top-down and rises into 3D when the camera pitches (see the
+// auto-tilt at street zoom in Map.jsx).
+export function addTerritoryExtrusion(map, sourceId = 'territories-3d') {
+    map.addLayer({
+        id: 'hex-extrusion',
+        type: 'fill-extrusion',
+        source: sourceId,
+        paint: {
+            'fill-extrusion-color': tierColorMatch(),
+            'fill-extrusion-height': towerHeightExpr(),
+            'fill-extrusion-base': 0,
+            // Slightly translucent so the neon ground glow reads at the base and
+            // the vertical gradient (dark-to-light up the walls) shows depth.
+            'fill-extrusion-opacity': 0.85,
+            'fill-extrusion-vertical-gradient': true,
+        },
+    });
+}
+
+// Recency crown: a white-hot cap that sits on top of recently captured towers,
+// its thickness scaling with how fresh the capture is. This is the recency cue
+// that actually reads in the 3D skyline (the ground bloom is hidden behind the
+// towers when the camera is pitched). Fades to nothing as a hex ages out of the
+// recency window, so old towers wear no crown.
+export function addRecencyCrown(map, sourceId = 'territories-3d') {
+    const recency = ['coalesce', ['get', 'recency'], 0];
+    map.addLayer({
+        id: 'hex-recency-crown',
+        type: 'fill-extrusion',
+        source: sourceId,
+        // Skip hexes with no meaningful freshness so we are not drawing flat caps.
+        filter: ['>', recency, 0.04],
+        paint: {
+            'fill-extrusion-color': '#ffffff',
+            'fill-extrusion-base': towerHeightExpr(),
+            // Tower top, plus a crown up to 50m tall for the very freshest hexes.
+            'fill-extrusion-height': ['+', towerHeightExpr(),
+                ['interpolate', ['linear'], recency, 0, 0, 1, 50]],
+            'fill-extrusion-opacity': 0.9,
+        },
     });
 }
 
