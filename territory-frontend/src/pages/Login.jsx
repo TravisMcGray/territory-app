@@ -240,7 +240,7 @@ export default function Login() {
                 </div>
 
                 <p className="font-bold text-center text-slate-600 text-xs mt-6">
-                    HexCapture — built by Travis McGray
+                    HexCapture, built by Travis McGray
                 </p>
             </div>
         </div>

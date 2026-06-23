@@ -1,7 +1,7 @@
 // ========== PROFANITY FILTER ==========
 // Hard blocks inappropriate usernames at signup and username change.
 // Uses a comprehensive blocklist + aggressive leet speak normalization.
-// No suggestions — just a hard reject with a clean error message.
+// No suggestions, just a hard reject with a clean error message.
 //
 // To add new blocked words: add them to the BLOCKLIST array (lowercase).
 // The filter checks both original and leet-speak-normalized versions,

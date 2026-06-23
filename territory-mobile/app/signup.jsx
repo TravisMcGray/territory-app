@@ -62,7 +62,7 @@ export default function Signup() {
                 email: email.trim().toLowerCase(),
                 password,
             });
-            // Success — show verification pending screen
+            // Success: show verification pending screen
             setVerificationEmail(email.trim().toLowerCase());
             setAwaitingVerification(true);
         } catch (err) {
@@ -83,7 +83,7 @@ export default function Signup() {
             setResendSuccess(true);
             setResendCooldown(60);
         } catch (err) {
-            // Generic success — don't reveal if email exists
+            // Generic success: don't reveal if email exists
             setResendSuccess(true);
             setResendCooldown(60);
         } finally {

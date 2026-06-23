@@ -113,7 +113,7 @@ export default function UserProfile() {
         }
     }, [userId, currentUserId]);
 
-    // Load profile + activities — activities are fetched separately so a
+    // Load profile and activities. Activities are fetched separately so a
     // missing backend endpoint doesn't prevent the profile from rendering.
     useEffect(() => {
         const load = async () => {
@@ -135,13 +135,13 @@ export default function UserProfile() {
                 const activitiesRes = await getUserActivities(userId);
                 setActivities(activitiesRes.data.activities || []);
             } catch (err) {
-                // Endpoint not yet available — activities section shows empty state
+                // Endpoint not yet available, so activities section shows empty state
             }
         };
         if (userId) load();
     }, [userId]);
 
-    // Tap an activity row — fetch full detail (includes coordinates + elevation)
+    // Tap an activity row to fetch full detail (includes coordinates + elevation)
     const handleActivityPress = async (activity) => {
         setDetailLoading(true);
         setSelectedActivity({ ...activity, _loading: true });

@@ -24,7 +24,7 @@ const routeAttemptSchema = new mongoose.Schema({
     completionTime: {
         type: Number,
         required: true,
-        min: 1 // Minimum 1 second — a zero completion time is not valid
+        min: 1 // Minimum 1 second, since a zero completion time is not valid
     },
 
     // ========== TIMESTAMPS ==========
@@ -36,7 +36,7 @@ const routeAttemptSchema = new mongoose.Schema({
 
 // ========== INDEXES FOR LEADERBOARDS AND QUERIES ==========
 routeAttemptSchema.index({ createdAt: -1 }); // Timestamp-based sorting
-routeAttemptSchema.index({ route: 1, completionTime: 1 }); // Leaderboards — fastest completions per route
+routeAttemptSchema.index({ route: 1, completionTime: 1 }); // Leaderboards: fastest completions per route
 routeAttemptSchema.index({ user: 1, createdAt: -1 }); // User's attempts sorted by most recent
 routeAttemptSchema.index({ route: 1, user: 1 }); // User's attempts on a specific route
 

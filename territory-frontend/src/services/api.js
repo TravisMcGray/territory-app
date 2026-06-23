@@ -1,6 +1,6 @@
 // ========== API SERVICE ==========
 // Central place for all backend communication.
-// Every component imports from here — never write fetch() calls directly in components.
+// Every component imports from here, so never write fetch() calls directly in components.
 
 import axios from 'axios';
 
@@ -8,14 +8,14 @@ const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 // ========== AXIOS INSTANCE ==========
 // withCredentials sends the httpOnly auth cookie on every request automatically.
-// No token is ever read or stored in JS — the browser handles it transparently.
+// No token is ever read or stored in JS. The browser handles it transparently.
 const api = axios.create({ baseURL: BASE_URL, withCredentials: true });
 
 // ========== AUTH ==========
 export const signup = (data) => api.post('/api/auth/signup', data);
 export const login = (data) => api.post('/api/auth/login', data);
 export const resendVerification = (data) => api.post('/api/auth/resend-verification', data);
-// Note: verifyEmail is handled server-side via redirect — no frontend API call needed
+// Note: verifyEmail is handled server-side via redirect, so no frontend API call needed
 
 // ========== ACTIVITIES ==========
 export const createActivity = (data) => api.post('/api/activities', data);
@@ -33,7 +33,7 @@ export const updateUsername = (data) => api.put('/api/user/username', data);
 export const getUserTerritories = (params) => api.get('/api/user/territories', { params });
 export const getTerritories = (params) => api.get('/api/user/territories', { params });
 
-// Account deletion — two step process:
+// Account deletion is a two-step process:
 // 1. requestAccountDeletion() → sends 6-digit code to user's email
 // 2. confirmAccountDeletion({ code }) → validates code and permanently deletes everything
 export const requestAccountDeletion = () => api.post('/api/user/account/delete-request');

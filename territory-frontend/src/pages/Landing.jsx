@@ -158,7 +158,7 @@ function useSlideIn(direction = 'up', delay = 0) {
                 el.style.opacity = '1';
                 el.style.transform = 'translateX(0) translateY(0)';
             } else if (entry.boundingClientRect.top > 0) {
-                // Element is below viewport — reset to off-screen (for if user scrolls back up past it)
+                // Element is below viewport, so reset to off-screen (for if user scrolls back up past it)
                 el.style.transition = 'none';
                 el.style.opacity = '0';
                 el.style.transform = `translateX(${offX}) translateY(${offY})`;
@@ -167,7 +167,7 @@ function useSlideIn(direction = 'up', delay = 0) {
                     el.style.transition = `opacity 0.7s ease ${delay}s, transform 0.7s ease ${delay}s`;
                 });
             } else {
-                // Element scrolled above viewport — slide it back off the top
+                // Element scrolled above viewport, so slide it back off the top
                 el.style.opacity = '0';
                 el.style.transform = direction === 'left'  ? 'translateX(56px) translateY(0)'
                                    : direction === 'right' ? 'translateX(-56px) translateY(0)'
@@ -225,7 +225,7 @@ function TrackingMockup() {
                     <rect x="0" y="75" width="260" height="14" fill="#f1f5f9"/>
                     <rect x="115" y="0" width="14" height="180" fill="#f1f5f9"/>
                     <rect x="0" y="140" width="260" height="10" fill="#f1f5f9"/>
-                    {/* Captured hexes — blue for walk */}
+                    {/* Captured hexes: blue for walk */}
                     {[
                         [75,55],[93,66],[75,77],[57,66],
                         [93,44],[111,55],[111,66],
@@ -391,7 +391,7 @@ export default function Landing() {
     const feat2Ref = useRef(null);
     const feat3Ref = useRef(null);
 
-    // Progress dots — track which feature section is in view
+    // Progress dots: track which feature section is in view
     useEffect(() => {
         const refs = [feat1Ref, feat2Ref, feat3Ref];
         const handleScroll = () => {
@@ -568,7 +568,7 @@ export default function Landing() {
                 </div>
             </div>
 
-            {/* ======= LIGHT SECTIONS WRAPPER — one shared hex background ======= */}
+            {/* ======= LIGHT SECTIONS WRAPPER: one shared hex background ======= */}
             <div style={{ position: 'relative', background: '#f1f5f9' }}>
                 <HexBackground fadeColor="#f1f5f9" />
 
@@ -595,7 +595,7 @@ export default function Landing() {
                         overflow: 'hidden',
                     }}>
 
-                        {/* Card 1 — Lace up and go */}
+                        {/* Card 1: Lace up and go */}
                         <div ref={feat1Ref} className="lp-feature-card" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', background: '#ffffff', borderBottom: '1px solid #e2e8f0' }}>
                             <div ref={f1Text} style={{ padding: 'clamp(28px, 5vw, 56px)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                                 <div style={{ fontSize: 11, fontWeight: 800, color: '#3b82f6', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 12 }}>Step 01</div>
@@ -611,7 +611,7 @@ export default function Landing() {
                             </div>
                         </div>
 
-                        {/* Card 2 — Own your turf */}
+                        {/* Card 2: Own your turf */}
                         <div ref={feat2Ref} className="lp-feature-card" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', background: '#ffffff', borderBottom: '1px solid #e2e8f0' }}>
                             <div ref={f2Vis} className="lp-feature-vis" style={{ background: 'rgba(16,185,129,0.05)', borderRight: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 32px' }}>
                                 <MapMockup />
@@ -627,7 +627,7 @@ export default function Landing() {
                             </div>
                         </div>
 
-                        {/* Card 3 — Rise through the ranks */}
+                        {/* Card 3: Rise through the ranks */}
                         <div ref={feat3Ref} className="lp-feature-card" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', background: '#ffffff' }}>
                             <div ref={f3Text} style={{ padding: 'clamp(28px, 5vw, 56px)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                                 <div style={{ fontSize: 11, fontWeight: 800, color: '#f59e0b', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 12 }}>Step 03</div>
@@ -836,9 +836,9 @@ export default function Landing() {
                     {/* Tier labels */}
                     <div className="lp-tier-labels" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginTop: 40, position: 'relative', zIndex: 10 }}>
                         {[
-                            { color: '#39ff14', name: 'First Claim', range: '1–3 walks & runs' },
-                            { color: '#00ccff', name: 'Scout',       range: '4–6 walks & runs' },
-                            { color: '#f5a623', name: 'Fortified',   range: '7–9 walks & runs' },
+                            { color: '#39ff14', name: 'First Claim', range: '1-3 walks & runs' },
+                            { color: '#00ccff', name: 'Scout',       range: '4-6 walks & runs' },
+                            { color: '#f5a623', name: 'Fortified',   range: '7-9 walks & runs' },
                             { color: '#ff00aa', name: 'Overlord',    range: '10+ walks & runs' },
                         ].map(({ color, name, range }) => (
                             <div key={name} style={{ borderLeft: `4px solid ${color}`, paddingLeft: 14, textAlign: 'left' }}>

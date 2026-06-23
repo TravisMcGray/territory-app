@@ -76,7 +76,7 @@ const routeSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
         required: true
-        // No standalone index needed — covered by compound index below
+        // No standalone index needed, covered by compound index below
     },
 
     // ========== STATISTICS (Updated by route handlers when attempts are recorded) ==========
@@ -103,7 +103,7 @@ const routeSchema = new mongoose.Schema({
 
     // ========== GEOSPATIAL SEARCH ==========
     // Start location for "routes near me" queries
-    // Uses GeoJSON Point format — index defined below handles 2dsphere queries
+    // Uses GeoJSON Point format; the index defined below handles 2dsphere queries
     startLocation: {
         type: {
             type: String,

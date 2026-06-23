@@ -20,14 +20,14 @@ const achievementSchema = new mongoose.Schema({
         type: String,
         required: true,
         enum: ['TERRITORY', 'SOCIAL', 'DISTANCE', 'ACTIVITY', 'EXPLORATION', 'CONSISTENCY'],
-        // No standalone index needed — covered by compound index below
+        // No standalone index needed, covered by compound index below
     },
     // Which activity type this achievement is for
     activityType: {
         type: String,
         enum: ['WALK', 'RUN', 'UNIVERSAL'],
         default: 'UNIVERSAL',
-        // No standalone index needed — covered by compound index below
+        // No standalone index needed, covered by compound index below
     },
 
     // What triggers this achievement

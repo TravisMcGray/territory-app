@@ -180,7 +180,7 @@ export default function LogActivity() {
         const status = lastError?.response?.status;
         const serverMessage = lastError?.response?.data?.message;
         let message;
-        if (!lastError?.response) message = 'No internet connection. Your run data is safe — check your signal and try again.';
+        if (!lastError?.response) message = 'No internet connection. Your run data is safe. Check your signal and try again.';
         else if (status >= 500) message = serverMessage || 'Our server hit an issue saving your run. Please try again in a moment.';
         else message = serverMessage || 'Could not save your activity. Please try again.';
 
@@ -569,7 +569,7 @@ function TrackingPhase({ activityType, phase, elapsedSeconds, distanceMeters, co
                         : gpsStatus === 'acquiring' ? 'bg-amber-400 animate-pulse'
                         : 'bg-red-400'
                     }`} />
-                    {gpsStatus === 'active' ? `GPS Active — ±${gpsAccuracy}m accuracy`
+                    {gpsStatus === 'active' ? `GPS Active: ±${gpsAccuracy}m accuracy`
                         : gpsStatus === 'acquiring' ? 'Acquiring GPS signal...'
                         : 'GPS Error'}
                 </div>
@@ -752,8 +752,8 @@ function SummaryPhase({ activityType, elapsedSeconds, distanceMeters, coordinate
                     <span className="text-amber-500 text-base mt-0.5">⚠️</span>
                     <p className="text-amber-700 text-xs font-semibold leading-snug">
                         {retryAttempt > 0
-                            ? `Connection issue — retrying to save your run (attempt ${retryAttempt} of 3). Please keep the app open.`
-                            : 'Saving your run — please keep the app open until this completes.'
+                            ? `Connection issue. Retrying to save your run (attempt ${retryAttempt} of 3). Please keep the app open.`
+                            : 'Saving your run. Please keep the app open until this completes.'
                         }
                     </p>
                 </div>

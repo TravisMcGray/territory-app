@@ -1,6 +1,6 @@
 // ========== API SERVICE (REACT NATIVE) ==========
 // Central place for all backend communication.
-// Nearly identical to the web version — same endpoints, same shapes.
+// Nearly identical to the web version: same endpoints, same shapes.
 // Only difference: token storage uses expo-secure-store instead of localStorage.
 
 import axios from 'axios';

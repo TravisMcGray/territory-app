@@ -14,7 +14,7 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 // ========== HELPERS ==========
 
 // Generate a secure random token and return both the raw value (for email)
-// and the hashed value (for DB storage — never store raw tokens)
+// and the hashed value (for DB storage, never store raw tokens)
 const generateVerificationToken = () => {
     const raw = crypto.randomBytes(32).toString('hex');
     const hashed = crypto.createHash('sha256').update(raw).digest('hex');
@@ -85,7 +85,7 @@ router.post('/signup', validateEmailFormat, validatePasswordStrength, async (req
         // Generate verification token
         const { raw, hashed } = generateVerificationToken();
 
-        // Create user — NOT verified yet, NO login token issued
+        // Create user: NOT verified yet, NO login token issued
         await User.create({
             email: email.toLowerCase(),
             password,
@@ -98,7 +98,7 @@ router.post('/signup', validateEmailFormat, validatePasswordStrength, async (req
         // Send verification email
         await sendVerificationEmail(email.toLowerCase(), username, raw);
 
-        // Return success — no token, user must verify first
+        // Return success: no token, user must verify first
         res.status(201).json({
             message: 'Account created! Please check your email to verify your account before logging in.',
             requiresVerification: true
@@ -129,7 +129,7 @@ router.post('/login', async (req, res) => {
         // Find user + select password for comparison
         const user = await User.findByEmail(email, true);
 
-        // Intentionally vague — don't reveal whether email exists
+        // Intentionally vague: don't reveal whether email exists
         if (!user) {
             return res.status(401).json({
                 status: 'error',
@@ -179,7 +179,7 @@ router.post('/login', async (req, res) => {
             { expiresIn: '24h' }
         );
 
-        // httpOnly cookie — scoped to .hexcapture.com so it's shared between
+        // httpOnly cookie, scoped to .hexcapture.com so it's shared between
         // hexcapture.com (Vercel frontend) and api.hexcapture.com (Render backend).
         // Same eTLD+1 means sameSite: 'lax' works without cross-site cookie risk.
         res.cookie('token', token, {
@@ -253,7 +253,7 @@ router.post('/resend-verification', validateEmailFormat, async (req, res) => {
         const user = await User.findByEmail(email)
             .select('+emailVerificationToken +emailVerificationExpires');
 
-        // Always return same message — don't reveal if email exists
+        // Always return same message: don't reveal if email exists
         const genericResponse = {
             message: 'If an unverified account exists with this email, a new verification link has been sent.'
         };

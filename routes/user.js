@@ -118,7 +118,7 @@ router.put('/profile', authenticateToken, async (req, res) => {
 
 // ========== PUT /api/user/body-stats ==========
 // Updates optional body measurements for calorie/distance accuracy.
-// All fields are optional — users only set what they want.
+// All fields are optional. Users only set what they want.
 router.put('/body-stats', authenticateToken, async (req, res) => {
     try {
         const { weight, age, sex, heightFeet, heightInches, stepLength } = req.body;
@@ -364,7 +364,7 @@ router.post('/forgot-password', validateEmailFormat, async (req, res) => {
     try {
         const { email } = req.body;
 
-        // Always return the same response — don't reveal whether email exists
+        // Always return the same response: don't reveal whether email exists
         const genericResponse = {
             message: 'If an account exists with this email, reset instructions have been sent.'
         };
@@ -442,7 +442,7 @@ router.post('/reset-password', validatePasswordStrength, async (req, res) => {
             });
         }
 
-        // Set new password and clear the token — single use, now invalidated
+        // Set new password and clear the token: single use, now invalidated
         user.password = password;
         user.passwordResetToken = undefined;
         user.passwordResetExpires = undefined;
@@ -475,7 +475,7 @@ router.post('/account/delete-request', authenticateToken, async (req, res) => {
         // Generate 6-digit code
         const code = Math.floor(100000 + Math.random() * 900000).toString();
 
-        // Hash before storing — never store raw codes
+        // Hash before storing: never store raw codes
         const hashedCode = crypto.createHash('sha256').update(code).digest('hex');
 
         // Store hashed code with 15 minute expiry
@@ -487,7 +487,7 @@ router.post('/account/delete-request', authenticateToken, async (req, res) => {
         await resend.emails.send({
             from: 'HexCapture <noreply@hexcapture.com>',
             to: user.email,
-            subject: 'Confirm account deletion — HexCapture',
+            subject: 'Confirm account deletion - HexCapture',
             html: `
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #030712; color: #ffffff; padding: 32px; border-radius: 16px;">
                     <h2 style="color: #ef4444;">HexCapture</h2>
@@ -581,7 +581,7 @@ router.delete('/account/confirm', authenticateToken, async (req, res) => {
             });
         }
 
-        // ===== CODE VALID — RUN FULL CLEANUP =====
+        // ===== CODE VALID: RUN FULL CLEANUP =====
 
         // Save tombstone for audit trail
         try {
@@ -596,7 +596,7 @@ router.delete('/account/confirm', authenticateToken, async (req, res) => {
                 reason: 'User requested account deletion'
             });
         } catch (err) {
-            // Non-fatal — continue with deletion even if tombstone fails
+            // Non-fatal: continue with deletion even if tombstone fails
             console.error('Tombstone save failed:', err.message);
         }
 
@@ -648,7 +648,7 @@ router.delete('/account/confirm', authenticateToken, async (req, res) => {
 // ========== GET /api/user/nearby-hexagons ==========
 // Returns hex grid polygons around a given GPS coordinate.
 // Used by mobile app to show uncaptured hexagons (gray grid).
-// Backend does all h3-js math — mobile just renders polygons.
+// Backend does all h3-js math. Mobile just renders polygons.
 router.get('/nearby-hexagons', authenticateToken, async (req, res) => {
     try {
         const { latitude, longitude, rings } = req.query;
@@ -699,7 +699,7 @@ router.get('/nearby-hexagons', authenticateToken, async (req, res) => {
 // ========== GET /api/user/territories ==========
 // Returns all captured territories globally so shields appear on the spinning globe
 // regardless of the viewer's location. Capped at 5,000 to stay safe as the app
-// scales — implement geospatial clustering when that limit is reached.
+// scales. Implement geospatial clustering when that limit is reached.
 router.get('/territories', authenticateToken, async (req, res) => {
     try {
         const territories = await Territory.find({ ownerId: { $exists: true } })

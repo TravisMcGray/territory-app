@@ -35,7 +35,7 @@ export default function App() {
                 path="/login"
                 element={user ? <Navigate to="/dashboard" /> : <Login />}
             />
-            {/* /verify-email is not used directly — backend redirects to /login?verified=true */}
+            {/* /verify-email is not used directly. Backend redirects to /login?verified=true */}
             {/* But we define it as a fallback in case someone navigates here directly */}
             <Route
                 path="/verify-email"

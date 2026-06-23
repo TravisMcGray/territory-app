@@ -1,6 +1,6 @@
 // ========== TAB NAVIGATION LAYOUT ==========
 // Bottom tab bar with five tabs: Home, Feed, Map (center), Ranks, Profile.
-// Map is positioned in the center as the primary action — the heart of the app.
+// Map is positioned in the center as the primary action, the heart of the app.
 // Uses custom dark styling to match the HexCapture design system.
 
 import { View } from 'react-native';

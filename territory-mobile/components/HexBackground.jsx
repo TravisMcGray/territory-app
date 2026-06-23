@@ -1,14 +1,14 @@
-// ========== HEX BACKGROUND (REACT NATIVE — WEBVIEW) ==========
-// Decorative hexagon grid background — pixel-identical to web HexBackground.jsx.
+// ========== HEX BACKGROUND (REACT NATIVE, WEBVIEW) ==========
+// Decorative hexagon grid background, pixel-identical to web HexBackground.jsx.
 // Uses a WebView to render real HTML/SVG/CSS, which eliminates the sub-pixel
 // anti-aliasing artifacts (white dots/lines) that react-native-svg produces
 // when drawing adjacent polygon strokes.
 //
 // IMPORTANT: Uses useIsFocused() so only the ACTIVE tab's WebView renders.
-// Android limits concurrent WebView rendering — without this, tabs progressively
+// Android limits concurrent WebView rendering; without this, tabs progressively
 // stop painting their WebViews as the user navigates between them.
 //
-// NOTE: This is purely decorative — NOT the game map.
+// NOTE: This is purely decorative, NOT the game map.
 
 import { View, Dimensions } from 'react-native';
 import { WebView } from 'react-native-webview';

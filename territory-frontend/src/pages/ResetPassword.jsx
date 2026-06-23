@@ -55,7 +55,7 @@ export default function ResetPassword() {
 
     const inputClass = "w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-500 transition-colors";
 
-    // ========== RESET FORM (token present — came from email link) ==========
+    // ========== RESET FORM (token present, came from email link) ==========
     if (token) {
         return (
             <div className="min-h-screen bg-slate-100 flex items-center justify-center px-4 relative">
@@ -112,7 +112,7 @@ export default function ResetPassword() {
         );
     }
 
-    // ========== FORGOT PASSWORD FORM (no token — entered from login page) ==========
+    // ========== FORGOT PASSWORD FORM (no token, entered from login page) ==========
     return (
         <div className="min-h-screen bg-slate-100 flex items-center justify-center px-4 relative">
             <HexBackground />
@@ -168,7 +168,7 @@ export default function ResetPassword() {
                 )}
 
                 <p className="font-bold text-center text-slate-600 text-xs mt-6">
-                    HexCapture — built by Travis McGray
+                    HexCapture, built by Travis McGray
                 </p>
             </div>
         </div>

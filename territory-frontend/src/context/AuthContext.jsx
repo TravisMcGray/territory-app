@@ -13,7 +13,7 @@ export function AuthProvider({ children }) {
     const [loading, setLoading] = useState(true);
 
     // ========== INITIALIZE ==========
-    // Attempt profile fetch on load — the httpOnly cookie is sent automatically.
+    // Attempt profile fetch on load. The httpOnly cookie is sent automatically.
     // 200 means valid session; 401 means no cookie or expired, user stays null.
     useEffect(() => {
         getProfile()

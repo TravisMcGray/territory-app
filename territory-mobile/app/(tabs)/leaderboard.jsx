@@ -1,6 +1,6 @@
 // ========== LEADERBOARD SCREEN ==========
 // Three leaderboard categories: hexagons, distance, activity.
-// All data loads at once — tabs switch without refetching.
+// All data loads at once, so tabs switch without refetching.
 // Rows navigate to user profiles.
 // Matches web Leaderboard.jsx functionality.
 

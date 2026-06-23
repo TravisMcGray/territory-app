@@ -129,7 +129,7 @@ export default function Notifications() {
         if (type === 'follow' && data.fromUserId) {
             router.push(`/user/${data.fromUserId}`);
         } else if ((type === 'kudos' || type === 'comment') && data.activityId) {
-            // No dedicated activity detail screen on mobile yet — stay on notifications
+            // No dedicated activity detail screen on mobile yet, so stay on notifications
         } else if (type === 'achievement') {
             router.push('/(tabs)/profile');
         }

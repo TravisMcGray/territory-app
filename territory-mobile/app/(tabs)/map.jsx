@@ -1,11 +1,11 @@
 // ========== UNIFIED MAP SCREEN ==========
 // Three modes + activity type selector:
-// 1. EXPLORE — view territory, browse hex grid
-// 2. SELECT — choose walk/run with pulsing hex cards (matches web LogActivity setup phase)
-// 3. TRACKING — live GPS with dark card stats overlay
-// 4. PAUSED — GPS stopped, can resume or stop
-// 5. SUMMARY — pre-save review
-// 6. RESULT — post-save showing captures, achievements, milestones
+// 1. EXPLORE: view territory, browse hex grid
+// 2. SELECT: choose walk/run with pulsing hex cards (matches web LogActivity setup phase)
+// 3. TRACKING: live GPS with dark card stats overlay
+// 4. PAUSED: GPS stopped, can resume or stop
+// 5. SUMMARY: pre-save review
+// 6. RESULT: post-save showing captures, achievements, milestones
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
@@ -54,7 +54,7 @@ function getRainbowColor(longitude, minLng, lngSpan, timeOffset) {
     return hslToHex(hue, 100, 62);
 }
 
-// Dark map style — matches web map palette exactly
+// Dark map style, matches web map palette exactly
 const DARK_MAP_STYLE = [
     // Base
     { elementType: 'geometry',           stylers: [{ color: '#0f172a' }] },
@@ -70,7 +70,7 @@ const DARK_MAP_STYLE = [
     { featureType: 'landscape.natural',   elementType: 'geometry', stylers: [{ color: '#0a2e1a' }] },
     { featureType: 'landscape.man_made',  elementType: 'geometry', stylers: [{ color: '#131c2e' }] },
 
-    // Roads — hierarchy matching web palette
+    // Roads: hierarchy matching web palette
     { featureType: 'road',          elementType: 'geometry',         stylers: [{ color: '#334155' }] },
     { featureType: 'road',          elementType: 'geometry.stroke',  stylers: [{ color: '#1e293b' }] },
     { featureType: 'road',          elementType: 'labels.text.fill', stylers: [{ color: '#94a3b8' }] },
@@ -83,11 +83,11 @@ const DARK_MAP_STYLE = [
     { featureType: 'building', elementType: 'geometry',        stylers: [{ color: '#1a2744' }] },
     { featureType: 'building', elementType: 'geometry.stroke', stylers: [{ color: '#374151' }] },
 
-    // POI — hide labels, keep subtle geometry
+    // POI: hide labels, keep subtle geometry
     { featureType: 'poi', elementType: 'labels',   stylers: [{ visibility: 'off' }] },
     { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#131c2e' }] },
 
-    // Transit — hide entirely
+    // Transit: hide entirely
     { featureType: 'transit', stylers: [{ visibility: 'off' }] },
 
     // Admin boundaries
@@ -488,7 +488,7 @@ const startTracking = async (type) => {
     }, [location, mode]);
 
     // ========== RAINBOW WAVE TICK ==========
-    // Updates every 200ms — slow enough to be smooth, fast enough to animate
+    // Updates every 200ms, slow enough to be smooth, fast enough to animate
     useEffect(() => {
         const interval = setInterval(() => {
             setRainbowTime(t => t + 0.2);
@@ -496,7 +496,7 @@ const startTracking = async (type) => {
         return () => clearInterval(interval);
     }, []);
 
-    // Longitude range of the hex grid — used to normalize position for rainbow
+    // Longitude range of the hex grid, used to normalize position for rainbow
     const { minLng, maxLng } = useMemo(() => {
         if (gridHexagons.length === 0) return { minLng: 0, maxLng: 1 };
         let min = Infinity, max = -Infinity;
@@ -753,7 +753,7 @@ const startTracking = async (type) => {
                 showsTraffic={false}
                 showsIndoors={false}
             >
-                {/* Hex grid — rainbow wave on uncaptured tiles */}
+                {/* Hex grid: rainbow wave on uncaptured tiles */}
                 {gridHexagons.map(hex => {
                     const isCaptured = territories.some(t => t.hexagonId === hex.hexagonId);
                     if (isCaptured) return null;
@@ -949,7 +949,7 @@ const startTracking = async (type) => {
                 </TouchableOpacity>
             )}
 
-            {/* ===== EXPLORE BOTTOM — "Start Activity" button ===== */}
+            {/* ===== EXPLORE BOTTOM: "Start Activity" button ===== */}
             {mode === 'explore' && (
                 <View style={styles.exploreBottom}>
                     <TouchableOpacity

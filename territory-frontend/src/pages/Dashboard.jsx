@@ -333,7 +333,7 @@ export default function Dashboard() {
                     </div>
                 </div>
 
-                {/* ========== ACTIVITY FEED — full width below ========== */}
+                {/* ========== ACTIVITY FEED: full width below ========== */}
                 <div style={{
                     background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 16,
                     padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.05)',

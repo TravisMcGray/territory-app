@@ -20,8 +20,8 @@ const {
 // ========== SPEED THRESHOLDS ==========
 // Maximum sustained speed allowed per activity type.
 // These are intentionally generous to avoid false flags from GPS drift.
-// Walk: 6 mph — faster than any human walks, slower than any vehicle
-// Run:  20 mph — faster than any sustained human run
+// Walk: 6 mph, faster than any human walks, slower than any vehicle
+// Run:  20 mph, faster than any sustained human run
 const SPEED_LIMITS_MPH = {
     walk: 6,
     run: 20
@@ -85,10 +85,10 @@ const filterSpeedCoordinates = (coordinates, activityType, durationSeconds) => {
         const speedMetersPerSecond = distanceMeters / timeSecs;
 
         if (speedMetersPerSecond <= maxMetersPerSecond) {
-            // Speed is acceptable — keep this point
+            // Speed is acceptable, so keep this point
             filtered.push(curr);
         } else {
-            // Too fast — drop this point silently
+            // Too fast, so drop this point silently
             droppedCount++;
         }
     }
@@ -264,7 +264,7 @@ router.post('/', authenticateToken, async (req, res) => {
         // Run BEFORE distance/hexagon calculation so cheated points
         // never contribute to stats or territory capture.
         // Silently drops points that exceed the speed threshold.
-        // Activity is ALWAYS saved — Strava/Niantic approach: never delete a workout.
+        // Activity is ALWAYS saved. Strava/Niantic approach: never delete a workout.
         const { filtered, droppedCount, droppedFraction } = filterSpeedCoordinates(
             coordinates,
             activityType,
@@ -306,7 +306,7 @@ router.post('/', authenticateToken, async (req, res) => {
         // Uses MET-based formula with user's body stats for accuracy.
         // MET (Metabolic Equivalent of Task):
         //   Walking: 3.5 METs (moderate pace ~3mph)
-        //   Running: estimated from speed — roughly 1.0 × mph
+        //   Running: estimated from speed, roughly 1.0 × mph
         // Formula: calories = MET × 3.5 × weight(kg) / 200 × duration(min)
         // Falls back to weight-only formula if no duration data.
         const activityUser = await User.findById(userId).select('weight age sex');
@@ -382,9 +382,9 @@ router.post('/', authenticateToken, async (req, res) => {
                                         {
                                             $cond: [
                                                 { $ifNull: ['$ownerId', false] },
-                                                // Territory has an owner — keep them (walkers never steal)
+                                                // Territory has an owner, so keep them (walkers never steal)
                                                 '$ownerId',
-                                                // No owner — this is new territory, claim it
+                                                // No owner, so this is new territory to claim
                                                 new mongoose.Types.ObjectId(userId)
                                             ]
                                         },
@@ -567,7 +567,7 @@ router.get('/', authenticateToken, async (req, res) => {
         // Get total count
         const total = await Activity.countDocuments(query);
 
-        // Get paginated activities — explicitly include coordinates for own route replay
+        // Get paginated activities, explicitly including coordinates for own route replay
         const activities = await Activity.find(query)
             .select('+coordinates')
             .sort({ createdAt: -1 })

@@ -169,7 +169,7 @@ export default function Login() {
 
 // ========== STYLES ==========
 // React Native uses StyleSheet instead of Tailwind.
-// Same visual language as the web app — dark background, emerald accents.
+// Same visual language as the web app: dark background, emerald accents.
 const styles = {
     container: {
         flex: 1,

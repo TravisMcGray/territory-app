@@ -72,7 +72,7 @@ router.post('/:userId/follow', authenticateToken, async (req, res) => {
 
         await session.commitTransaction();
 
-        // Notification outside transaction — non-fatal if it fails
+        // Notification outside transaction: non-fatal if it fails
         await createNewFollowerNotification(targetUserId, currentUser);
 
         res.status(200).json({

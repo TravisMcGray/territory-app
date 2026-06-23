@@ -1,5 +1,5 @@
 // ========== PROFILE SCREEN ==========
-// Own profile: three tabs — Activities, Achievements, Settings.
+// Own profile has three tabs: Activities, Achievements, Settings.
 // Other users' profiles are handled by app/user/[userId].jsx.
 
 import { useState, useEffect, useCallback } from 'react';
@@ -431,7 +431,7 @@ function SettingsTab({ profile, setProfile, logoutUser, router }) {
             {/* ===== BODY STATS ===== */}
             <View style={styles.settingsCard}>
                 <Text style={styles.settingsTitle}>BODY STATS</Text>
-                <Text style={styles.settingsSubtitle}>Optional — improves calorie and distance accuracy</Text>
+                <Text style={styles.settingsSubtitle}>Optional, improves calorie and distance accuracy</Text>
 
                 <Text style={styles.inputLabel}>Weight (lbs)</Text>
                 <TextInput style={inputStyle} value={weight} onChangeText={setWeight} placeholder="154" placeholderTextColor="#4b5563" keyboardType="numeric" />

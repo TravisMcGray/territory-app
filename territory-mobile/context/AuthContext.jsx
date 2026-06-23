@@ -5,7 +5,7 @@
 // - Provides loginUser / logoutUser to all screens
 //
 // Key difference from web: uses expo-secure-store instead of localStorage.
-// SecureStore encrypts the token on the device — more secure than localStorage.
+// SecureStore encrypts the token on the device, more secure than localStorage.
 
 import { createContext, useContext, useState, useEffect } from 'react';
 import * as SecureStore from 'expo-secure-store';
@@ -29,7 +29,7 @@ export function AuthProvider({ children }) {
                     setUser(res.data.profile);
                 }
             } catch (err) {
-                // Token expired or invalid — clear it
+                // Token expired or invalid, so clear it
                 console.error('Auth hydration failed:', err.message);
                 await SecureStore.deleteItemAsync('token');
                 setUser(null);

@@ -6,7 +6,7 @@ const notificationSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
         required: true
-        // No standalone index needed — covered by compound indexes below
+        // No standalone index needed, covered by compound indexes below
     },
 
     // ========== NOTIFICATION CONTENT ==========
@@ -23,7 +23,7 @@ const notificationSchema = new mongoose.Schema({
             'SYSTEM'    // Admin/moderator system messages e.g. username resets
         ],
         required: true
-        // No standalone index needed — covered by compound indexes below
+        // No standalone index needed, covered by compound indexes below
     },
     title: {
         type: String,
@@ -60,7 +60,7 @@ const notificationSchema = new mongoose.Schema({
     read: {
         type: Boolean,
         default: false
-        // No standalone index needed — covered by compound indexes below
+        // No standalone index needed, covered by compound indexes below
     },
 
     // ========== TTL: Auto-delete READ notifications after 30 days ==========

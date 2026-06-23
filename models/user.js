@@ -33,7 +33,7 @@ const userSchema = new mongoose.Schema({
     },
 
     // ========== PASSWORD RESET ==========
-    // Hashed token stored here — raw token only travels in email, never stored
+    // Hashed token stored here. The raw token only travels in email, never stored
     passwordResetToken: {
         type: String,
         select: false
@@ -44,7 +44,7 @@ const userSchema = new mongoose.Schema({
     },
 
     // ========== ACCOUNT DELETION ==========
-    // 6-digit code hashed before storage — expires in 15 minutes
+    // 6-digit code hashed before storage, expires in 15 minutes
     accountDeletionCode: {
         type: String,
         select: false
@@ -67,12 +67,12 @@ const userSchema = new mongoose.Schema({
     firstName:   { type: String, trim: true, maxlength: 50 },
     lastName:    { type: String, trim: true, maxlength: 50 },
     avatar:      { type: String, maxlength: 500 },
-    weight:      { type: Number, min: 50, max: 1000, default: 154 }, // lbs — used for calorie calculation
+    weight:      { type: Number, min: 50, max: 1000, default: 154 }, // lbs, used for calorie calculation
     age:         { type: Number, min: 13, max: 120 },
     sex:         { type: String, enum: ['male', 'female', 'prefer_not_to_say'] },
     heightFeet:  { type: Number, min: 3, max: 8 },
     heightInches:{ type: Number, min: 0, max: 11 },
-    stepLength:  { type: Number, min: 10, max: 50 }, // inches — auto-calculated from height if not set
+    stepLength:  { type: Number, min: 10, max: 50 }, // inches, auto-calculated from height if not set
 
     // ========== GAME STATS ==========
     stats: {
@@ -134,7 +134,7 @@ userSchema.methods.getFollowingCount = function () {
     return this.following ? this.following.length : 0;
 };
 
-// Own profile — includes private fields
+// Own profile: includes private fields
 userSchema.methods.toProfileJSON = function () {
     return {
         id:                this._id,
@@ -160,7 +160,7 @@ userSchema.methods.toProfileJSON = function () {
     };
 };
 
-// Public profile — what other users see (no email, no weight, no verification status)
+// Public profile: what other users see (no email, no weight, no verification status)
 userSchema.methods.toPublicJSON = function () {
     return {
         id:        this._id,

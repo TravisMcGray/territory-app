@@ -137,7 +137,7 @@ function DeleteAccountModal({ profile, onClose, onDeleted }) {
                             </button>
                             <button type="button" onClick={onClose} disabled={loading}
                                 className="w-full bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold py-3 rounded-xl transition-colors">
-                                Cancel — keep my account
+                                Cancel, keep my account
                             </button>
                         </div>
                     </>
@@ -167,7 +167,7 @@ function DeleteAccountModal({ profile, onClose, onDeleted }) {
                             </button>
                             <button type="button" onClick={onClose} disabled={loading}
                                 className="w-full bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold py-3 rounded-xl transition-colors">
-                                Cancel — keep my account
+                                Cancel, keep my account
                             </button>
                         </div>
                         <p className="text-center mt-4">
@@ -512,7 +512,7 @@ export default function Profile() {
                     </div>
                 </div>
 
-                {/* ========== TABS — own profile only ========== */}
+                {/* ========== TABS: own profile only ========== */}
                 {isOwnProfile && (
                     <>
                         <div style={{
@@ -712,7 +712,7 @@ function ActivityDetailModal({ activity, onClose }) {
     };
 
     const formatPace = () => {
-        if (!activity.duration || !activity.distance || activity.distance === 0) return '—';
+        if (!activity.duration || !activity.distance || activity.distance === 0) return '-';
         const minPerMile = activity.duration / 60 / activity.distance;
         const mins = Math.floor(minPerMile);
         const secs = Math.round((minPerMile - mins) * 60);
@@ -786,7 +786,7 @@ function ActivityDetailModal({ activity, onClose }) {
                         { label: 'Distance', value: <>{distanceMiles}<span className="text-slate-400 text-sm ml-1">mi</span></> },
                         { label: 'Duration', value: formatDuration(activity.duration) },
                         { label: 'Pace', value: formatPace() },
-                        { label: 'Calories', value: <>{activity.estimatedCalories ?? '—'}<span className="text-slate-400 text-sm ml-1">kcal</span></> },
+                        { label: 'Calories', value: <>{activity.estimatedCalories ?? '-'}<span className="text-slate-400 text-sm ml-1">kcal</span></> },
                         { label: 'Elevation Gain', value: <>{elevationFt}<span className="text-slate-400 text-sm ml-1">ft</span></> },
                     ].map((s, i) => (
                         <div key={i} className="bg-slate-50 rounded-xl p-4">
@@ -921,7 +921,7 @@ function SettingsTab({ profile, setProfile, onShowDeleteModal }) {
             {/* Body Stats */}
             <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
                 <h3 className="text-sm font-black text-slate-600 uppercase tracking-wide mb-1">Body Stats</h3>
-                <p className="text-slate-400 text-xs font-bold mb-5">Optional — improves calorie and distance accuracy</p>
+                <p className="text-slate-400 text-xs font-bold mb-5">Optional, improves calorie and distance accuracy</p>
 
                 <div className="space-y-4">
                     <div>
