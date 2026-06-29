@@ -23,12 +23,7 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "package": "com.hexcapture.app",
-      "config": {
-        "googleMaps": {
-          "apiKey": "AIzaSyAh7DoThqWCLVx_kcVHmyp-0ZRva4qQlZw"
-        }
-      }
+      "package": "com.hexcapture.app"
     },
     "web": {
       "favicon": "./assets/favicon.png"
